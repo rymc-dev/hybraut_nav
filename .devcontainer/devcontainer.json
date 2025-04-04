@@ -1,0 +1,37 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "colav-hybrid-automaton-dev-container",
+	"workspaceFolder": "/workspace/ros2_ws/src/colav-hybrid-automaton",
+	"workspaceMount": "source=${localWorkspaceFolder}/colav-hybrid-automaton,target=/workspace/ros2_ws/src//colav-hybrid-automaton,type=bind,consistency=cached",
+	"build": {
+		"dockerfile": "../dockerfile",
+		"args": {
+			"MODE": "dev"
+		}
+	},
+	"runArgs": [
+		//"--privileged",
+		"--network", "bridge" // bridged connection puts the container on the same network as the host meaning all ports can be accessed via localhost on container or external
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-toolsai.jupyter",
+				"ms-azuretools.vscode-docker",
+				"redhat.vscode-xml",
+				"redhat.vscode-yaml",
+				"ms-python.pylint"
+			]
+		},
+		"settings": {
+			"terminal.integrated.shell.linux": "/bin/bash",
+			"python.languageServer": "Pylance",
+			"python.analysis.typeCheckingMode": "basic",
+			"python.formatting.provider": "black",
+			"python.formatting.autoFormatOnSave": true
+		},
+		"remoteUser": "vscode"
+	}
+}
