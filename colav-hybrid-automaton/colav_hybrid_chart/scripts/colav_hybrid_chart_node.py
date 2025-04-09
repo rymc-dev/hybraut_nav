@@ -57,7 +57,7 @@ class HAChart(Node):
 
     _GUARDS = { # dict showing the name of the transitions associated with the guard conditions
         _MODES[1]: [
-            f"{_MODES[1]}_{_MODES[2]}",
+            f"{_MODES[1]}_{_MODES[2]}", # TODO Need to set priority for transitions.
             f"{_MODES[1]}_{_MODES[3]}",
             f"{_MODES[1]}_{_MODES[4]}",
             f"{_MODES[1]}_{_MODES[5]}",

@@ -5,13 +5,12 @@
 	"workspaceFolder": "/workspace/ros2_ws/src/colav-hybrid-automaton",
 	"workspaceMount": "source=${localWorkspaceFolder}/colav-hybrid-automaton,target=/workspace/ros2_ws/src//colav-hybrid-automaton,type=bind,consistency=cached",
 	"build": {
-		"dockerfile": "../dockerfile",
+		"dockerfile": "../hybrid-automaton.dockerfile",
 		"args": {
 			"MODE": "dev"
 		}
 	},
 	"runArgs": [
-		//"--privileged",
 		"--network", "bridge" // bridged connection puts the container on the same network as the host meaning all ports can be accessed via localhost on container or external
 	],
 	"customizations": {
