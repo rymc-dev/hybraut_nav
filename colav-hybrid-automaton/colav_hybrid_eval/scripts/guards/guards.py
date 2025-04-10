@@ -12,7 +12,7 @@ from shapely.geometry import Polygon, LineString
 DSF = 80 # constant distance threshold for now
 
 """1. CRUISE Guard Functions"""
-def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoint: Waypoint) -> bool:
+def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoint: Waypoint, dsf: float = DSF) -> bool:
     """This guard checks if the agent is in a position to move from 1.cruise to 3.t2theta"""
     # condition_1: if los within distance threshold intercepts unsafe set meaning it's going to hit a dynamic obstacle
     # distance threhsold should be determined by how long it takes vessel at current velocity to turn 180 degrees 
@@ -23,8 +23,7 @@ def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: Obstacles
     goal_position = (waypoint.position.x, waypoint.position.y)
 
     los_line = LineString([agent_position, goal_position])
-    
-    unsafe_polygon = Polygon(unsafe_set.vertices)
+    unsafe_polygon = Polygon([(unsafe_set.vertices.data[i], unsafe_set.vertices.data[i+1]) for i in range(0, len(unsafe_set.vertices.data), 2)])
 
     if los_line.intersects(unsafe_polygon):
         intersection_point = los_line.intersection(unsafe_polygon)
@@ -36,7 +35,7 @@ def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: Obstacles
 
         intersection_distance = euclidean_distance(agent_position, (intersection_point.x, intersection_point.y))
 
-        if intersection_distance <= DSF:
+        if intersection_distance <= dsf:
             return True # The LOS intersects the unsafe set within the distance threshold
 
     # condition_2: if los within distance threshold intercepts unsafe set meaning it's going to any individual static obstacles
@@ -46,12 +45,12 @@ def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: Obstacles
 
 def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float = 0.1, tolerance: Duration = None) -> bool:
     """This guard checks if the agent is in a position to move from 1.cruise to 2.t2los"""
-    if tolerance is None:
-        tolerance = Duration(1,0)
+    # if tolerance is None:
+    #     tolerance = Duration(sec=1,nanosec=0)
 
-    # should not only validate timestamp against comparator and arg operators but against current timestamp for system
+    # # should not only validate timestamp against comparator and arg operators but against current timestamp for system
     
-    # if validate_timestamps(agent_state, unsafe_set) and validate_timestamps(agent_state, obstacles_state):
+    # if not validate_timestamps(agent_state.header.stamp, current_waypoint):
     #     func_name = inspect.currentframe().f_code.co_name
     #     raise TimeoutError(f"{__file__}::{func_name}: "
     #                        f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
@@ -62,11 +61,9 @@ def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, 
     # Condition 1: If heading to waypoint is equal to around 0 then transition occurs
     def heading_error(x_a, y_a, theta_a, x_w, y_w):
         # desired heading angle (from agent to waypoint)
-        desired_theta = np.arctan2(y_w - y_a, x_w, x_a)
-
+        desired_theta = np.arctan2(y_w - y_a, x_w - x_a)
         # Heading error: difference between the desired and current orientation
         error = desired_theta - theta_a
-
         # Normalize to [-pi, pi]
         error = (error + np.pi) % (2 * np.pi) - np.pi
 
@@ -115,9 +112,9 @@ def guard_CRUISE_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdat
     # Condition 1: If inside the unsafe set or interception with unsafe set is immenant but agnet constriants make it impossible 
     #              to decelerate enough to avoid or navigate out of the road of the unsafe set
     if tolerance is None:
-        tolerance = Duration(1,0)
+        tolerance = Duration(sec=1,nanosec=0)
 
-    if validate_timestamps(agent_state, unsafe_set) and validate_timestamps(agent_state, obstacles_state):
+    if not validate_timestamps(agent_state.header.stamp, unsafe_set.header.stamp, tolerance) and validate_timestamps(agent_state.header.stamp, obstacles_state.header.stamp, tolerance):
         func_name = inspect.currentframe().f_code.co_name
         raise TimeoutError(f"{__file__}::{func_name}: "
                            f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
