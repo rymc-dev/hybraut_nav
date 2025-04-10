@@ -2,7 +2,7 @@ from colav_interfaces.msg import AgentUpdate, UnsafeSet
 from builtin_interfaces.msg import Duration
 from shapely.geometry import Polygon, Point
 import inspect
-from .timestamp_utils import validate_timestamps
+from .validate_timestamps import validate_timestamps
 
 # Optional: Create a helper to build Duration
 def make_duration(sec: int, nanosec: int) -> Duration:

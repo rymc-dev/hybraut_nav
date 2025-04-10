@@ -139,22 +139,22 @@ def test_guard_CRUISE_to_T2LOS(input_args: Tuple[AgentUpdate, Waypoint, float], 
     # Assert that the result matches the expected output
     assert result == expected_output, description
 
-# @pytest.mark.parametrize("input_args, expected_output, description", [
-#     ((AgentUpdate(pose=Pose(position=Point(x=0,y=0,z=0))), ObstaclesUpdate(), UnsafeSet()), True, "agent_state shows that we are already inside the unsafe_set"),
-#     ((AgentUpdate(), ObstaclesUpdate(), UnsafeSet()), False, "agent_state shows we are currently outside the unsafe set"),
-#     ((AgentUpdate(), ObstaclesUpdate(), UnsafeSet()), False, "agent_state shows that based on the params of the vessel we can't maneuver away from a collision with unsafe set"),
-# ])
-# def test_guard_CRUISE_to_FB(
-#     input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet],
-#     expected_output: bool,
-#     description: str
-# ):
-#     """
-#         Tests to ensure guard_CRUISE_To_FB is working as expected
-#     """
-#     actual = guard_CRUISE_to_FB(agent_state=input_args[0], obstacles_state=input_args[1], unsafe_set=input_args[2])
-#     # actual = guard_CRUISE_to_FB(*input_args[0:2])
-#     assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
+@pytest.mark.parametrize("input_args, expected_output, description", [
+    ((AgentUpdate(pose=Pose(position=Point(x=0,y=0,z=0))), ObstaclesUpdate(), UnsafeSet()), True, "agent_state shows that we are already inside the unsafe_set"),
+    ((AgentUpdate(), ObstaclesUpdate(), UnsafeSet()), False, "agent_state shows we are currently outside the unsafe set"),
+    ((AgentUpdate(), ObstaclesUpdate(), UnsafeSet()), False, "agent_state shows that based on the params of the vessel we can't maneuver away from a collision with unsafe set"),
+])
+def test_guard_CRUISE_to_FB(
+    input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet],
+    expected_output: bool,
+    description: str
+):
+    """
+        Tests to ensure guard_CRUISE_To_FB is working as expected
+    """
+    actual = guard_CRUISE_to_FB(agent_state=input_args[0], obstacles_state=input_args[1], unsafe_set=input_args[2])
+    # actual = guard_CRUISE_to_FB(*input_args[0:2])
+    assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
 
 # def test_guard_CRUISE_to_WAYPOINT_REACHED():
 #     pass

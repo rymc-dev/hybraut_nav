@@ -1,5 +1,4 @@
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
-from utils.timestamp_utils import validate_timestamps
 from utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
 from builtin_interfaces.msg import Duration 
 from typing import List, Tuple
@@ -8,16 +7,21 @@ import numpy as np
 import time
 from builtin_interfaces.msg import Time
 from shapely.geometry import Polygon, LineString
+from utils import (
+    validate_timestamps,
+    delta_heading,
+    euclidean_distance,
+    quaternion_to_heading
+)
 
 DSF = 80 # constant distance threshold for now
+# TODO: DSF Should be changed to: Dmaneuver​=Cs​+(vrel​×Tp​)
 
 """1. CRUISE Guard Functions"""
 def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoint: Waypoint, dsf: float = DSF) -> bool:
     """This guard checks if the agent is in a position to move from 1.cruise to 3.t2theta"""
     # condition_1: if los within distance threshold intercepts unsafe set meaning it's going to hit a dynamic obstacle
     # distance threhsold should be determined by how long it takes vessel at current velocity to turn 180 degrees 
-    def euclidean_distance(point1, point2):
-        return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
 
     agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
     goal_position = (waypoint.position.x, waypoint.position.y)
@@ -40,7 +44,6 @@ def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: Obstacles
 
     # condition_2: if los within distance threshold intercepts unsafe set meaning it's going to any individual static obstacles
 
-
     return False
 
 def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float = 0.1, tolerance: Duration = None) -> bool:
@@ -59,37 +62,8 @@ def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, 
     #                    '    f"\ttolerance: {tolerance}")
     
     # Condition 1: If heading to waypoint is equal to around 0 then transition occurs
-    def heading_error(x_a, y_a, theta_a, x_w, y_w):
-        # desired heading angle (from agent to waypoint)
-        desired_theta = np.arctan2(y_w - y_a, x_w - x_a)
-        # Heading error: difference between the desired and current orientation
-        error = desired_theta - theta_a
-        # Normalize to [-pi, pi]
-        error = (error + np.pi) % (2 * np.pi) - np.pi
-
-        return error
     
-    def quaternion_to_heading(qx, qy, qz, qw):
-        """
-        Convert quaternion to 2D heading (yaw angle in radians, normalized to [-π, π])
-        
-        Parameters:
-            qx, qy, qz, qw: Quaternion components
-            
-        Returns:
-            heading: yaw angle in radians
-        """
-        # Yaw (Z-axis rotation) from quaternion
-        siny_cosp = 2 * (qw * qz + qx * qy)
-        cosy_cosp = 1 - 2 * (qy**2 + qz**2)
-        heading = np.arctan2(siny_cosp, cosy_cosp)
-        
-        # Normalize to [-π, π]
-        heading = (heading + np.pi) % (2 * np.pi) - np.pi
-        
-        return heading
-    
-    waypoint_heading_error = heading_error(
+    waypoint_heading_error = delta_heading(
         x_a=agent_state.pose.position.x, 
         y_a=agent_state.pose.position.y, 
         theta_a=quaternion_to_heading(
@@ -101,7 +75,6 @@ def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, 
         x_w=current_waypoint.position.x,
         y_w=current_waypoint.position.y
     )
-
     if waypoint_heading_error < heading_error_tolerance:
         return True
 
@@ -109,7 +82,7 @@ def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, 
 
 def guard_CRUISE_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, tolerance: Duration = None):
     """This guard checks if the agent is in iminant danger of hitting an obstacle therefore moving from 1.cruise to 4.fallback"""
-    # Condition 1: If inside the unsafe set or interception with unsafe set is immenant but agnet constriants make it impossible 
+    # Condition 1: If inside the unsafe set or interception with unsafe set is immenant but agnet constriants make it impossible # TODO: NEED TO WORK ON THIS
     #              to decelerate enough to avoid or navigate out of the road of the unsafe set
     if tolerance is None:
         tolerance = Duration(sec=1,nanosec=0)
@@ -179,6 +152,3 @@ def guard_T2Theta_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpda
 
 """5. WAYPOINT_REACHED Guard Functions"""
 # NO TRANSITIONS OUT OF WAYPOINT_REACHED CURRENTLY THEREFORE NO GUARDS
-
-
-

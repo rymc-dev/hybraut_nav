@@ -55,7 +55,7 @@ class HAChart(Node):
         "unsafe_set": UnsafeSet()
     }
 
-    _GUARDS = { # dict showing the name of the transitions associated with the guard conditions
+    _TRANSITIONS = { # dict showing the name of the transitions associated with the guard conditions
         _MODES[1]: [
             f"{_MODES[1]}_{_MODES[2]}", # TODO Need to set priority for transitions.
             f"{_MODES[1]}_{_MODES[3]}",
