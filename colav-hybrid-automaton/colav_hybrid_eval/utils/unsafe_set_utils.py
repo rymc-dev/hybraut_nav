@@ -19,8 +19,7 @@ def extract_polygon_vertices(unsafe_set: UnsafeSet):
     return list(zip(unsafe_set_vertices_x, unsafe_set_vertices_y))
 
 def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
-                           tolerance: Duration = None,
-                           agent_safety_radius: float = 2) -> bool:
+                           tolerance: Duration = None) -> bool:
     """
     Checks if the agent is within the unsafe set based on its safety radius.
     
@@ -42,28 +41,28 @@ def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
         tolerance = make_duration(1, 1)
 
     # Validate the timestamps of agent_state and unsafe_set.
-    if not validate_timestamps(agent_state, unsafe_set, tolerance):
-        func_name = inspect.currentframe().f_code.co_name
-        raise TimeoutError(f"{__file__}::{func_name}: "
-                           f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
-                           f"\tagent_update_timestamp: {agent_state.header.stamp}\n"
-                           f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
-                           f"\ttolerance: {tolerance}")
+    # if not validate_timestamps(agent_state, unsafe_set, tolerance):
+    #     func_name = inspect.currentframe().f_code.co_name
+    #     raise TimeoutError(f"{__file__}::{func_name}: "
+    #                        f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
+    #                        f"\tagent_update_timestamp: {agent_state.header.stamp}\n"s
+    #                        f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
+    #                        f"\ttolerance: {tolerance}")
 
     # Check if there is any unsafe set defined.
     if not unsafe_set._vertices.data:
         return False
 
     # Validate the agent safety radius.
-    if agent_safety_radius <= 0:
+    if agent_state.safety_radius <= 0:
         func_name = inspect.currentframe().f_code.co_name
         raise ValueError(f"{__file__}::{func_name}: "
-                         f"agent_state:AgentUpdate.safety_radius invalid: current safety radius: {agent_safety_radius} "
+                         f"agent_state:AgentUpdate.safety_radius invalid: current safety radius: {agent_state.safety_radius} "
                          f"expected safety radius to be > 0")
 
     # Create the agent's safety circle.
     agent_center = Point(agent_state.pose.position.x, agent_state.pose.position.y)
-    agent_circle = agent_center.buffer(agent_safety_radius)
+    agent_circle = agent_center.buffer(agent_state.safety_radius)
 
     # Create the unsafe set polygon.
     unsafe_set_vertices = extract_polygon_vertices(unsafe_set)
@@ -73,8 +72,7 @@ def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
     return agent_circle.intersects(unsafe_set_polygon)
 
 def is_imminent_collision(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
-                          tolerance: Duration = None,
-                          agent_safety_radius: float = 2):
+                          tolerance: Duration = None):
     """
       checks if a collision with unsafe set inevitable given the constraints of the agent_vessel
        

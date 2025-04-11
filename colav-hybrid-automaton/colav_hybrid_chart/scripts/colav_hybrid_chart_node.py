@@ -30,14 +30,23 @@ class HAChart(Node):
                 G: guard conditions
                 R: reset conditions
     """
+
+    """
+    _MODES: This dict stores the key-values for control modes for the hybrid automaton
+            the numbers associated with the names of the actual control modes.
+    """
     _MODES = {  # dict showing the name of the control modes.
         1: "CRUISE",
         2: "T2LOS",
-        3: "T2Theta",
+        # 3: "T2Theta",
         4: "FB",
         5: "WAYPOINT_REACHED"
     }
 
+    """
+    _INIT_STATES: This dict stores the initial discrete and continuous states from when the hybrid automaton 
+                  is started
+    """
     _INIT_STATES = {  # Corrected assignment with '='
         "discrete": _MODES[1],  # Discrete state is the initial control mode
         "continuous": { # Continuous state space is defined as agent, obstacles, unsafe set and waypoints
@@ -48,35 +57,48 @@ class HAChart(Node):
         }
     }
 
-    _STATES = { # continuous state space is defined as agent, obstacles, unsafe set and waypoints
+    """
+    _STATES: This dict stores the continuous states
+    """
+    _STATES = {
         "agent": AgentUpdate(),
         "obstacles": ObstaclesUpdate(),
         "waypoints": [],
         "unsafe_set": UnsafeSet()
     }
 
-    _TRANSITIONS = { # dict showing the name of the transitions associated with the guard conditions
-        _MODES[1]: [
-            f"{_MODES[1]}_{_MODES[2]}", # TODO Need to set priority for transitions.
-            f"{_MODES[1]}_{_MODES[3]}",
-            f"{_MODES[1]}_{_MODES[4]}",
-            f"{_MODES[1]}_{_MODES[5]}",
+    """
+    _TRANSITIONS: This dict shows the transitions associated with the hybrid automatons
+                  different control modes
+    """
+    _TRANSITIONS = {
+        _MODES[1]: [ # 1. CRUISE
+            (f"{_MODES[1]}_to_{_MODES[2]}", 3), # T2Theta: PRIORITY = 3
+            (f"{_MODES[1]}_to_{_MODES[3]}", 4), # T2LOS: PRIORITY = 4
+            (f"{_MODES[1]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1
+            (f"{_MODES[1]}_to_{_MODES[5]}", 2), # WAYPOINT_REACHED: PRIORITY = 2
         ],
-        _MODES[2]: [
-            f"{_MODES[2]}_{_MODES[1]}",
-            f"{_MODES[2]}_{_MODES[4]}",
+        _MODES[2]: [ # 2: T2Theta
+            (f"{_MODES[2]}_to_{_MODES[1]}", 2), # T2LOS: PRIORITY = 2
+            (f"{_MODES[2]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1 # TODO: May not need fallback transition for 
         ],
-        _MODES[3]: [
-            f"{_MODES[3]}_{_MODES[2]}",
+        _MODES[3]: [ # 3: T2LOS
+            (f"{_MODES[3]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1
+            (f"{_MODES[3]}_to_{_MODES[1]}", 3), # CRUISE: PRIORITY = 3
+            (f"{_MODES[3]}_to_{_MODES[5]}", 2), # WAYPOINT_REACHED: PRIORITY = 5
         ],
-        _MODES[4]: [
+        _MODES[4]: [ # 4: FB
         ],
-        _MODES[5]: [
+        _MODES[5]: [ # 5: WAYPOINT_REACHED
+            (f"{_MODES[5]}_to_{_MODES[1]}", 1) # CRUISE: PRIORITY = 1 
         ]
     }
 
     _RESETS = { # dict showing the name of the transitions which have reset conditions
+        # _TRANSITIONS[_MODES[5]]: "test"
+    }
 
+    _INVARIANTS = {
     }
 
     def __init__(
@@ -84,17 +106,20 @@ class HAChart(Node):
         namespace:str = "hybrid_automaton",
         name:str = "chart"
     ):
+        """
+        colav_hybrid_chart init
+        """
         super().__init__(name, namespace=namespace)
         self._NODE_SUBS = self._init_node_subs()
         # Initialisation functions
         self.create_service(
             StartHybridAutomaton,
-            '/start_hybrid_automaton',
+            '/hybrid_automaton/start',
             self._start_hybrid_automaton_callback
         )
         self.create_service(
             Trigger,
-            '/stop_hybrid_automaton',
+            '/hybrid_automaton/stop',
             self._stop_hybrid_automaton_callback
         )
 
@@ -102,10 +127,10 @@ class HAChart(Node):
         try:
             # Initialize the hybrid automaton chart init states
             self.get_logger().info(f"/start_hybrid_automaton service called with request: {request}")
-            self._init_ha(request) # Initialize the hybrid automaton chart
-            self._init_controller_feedback_pub() # Initialize the controller feedback publisher
             self._NODE_CLIS = self._init_ha_clis()
-            self._CURRENT_MODE = self._INIT_STATES["discrete"] 
+            self._init_controller_feedback_pub() # Initialize the controller feedback publisher
+            self._init_ha(request) # Initialize the hybrid automaton chart
+            
             self._transition_eval_timer = self.create_timer(
                 1.0, # TODO: Need to make this a parameter received from colav_params_server
                 self._evaluate_transitions
@@ -123,7 +148,7 @@ class HAChart(Node):
         """creates hybrid automaton specific clients."""
         try:
             return {
-                "evalute_transitions": create_cli(node=self, srv_type=EvaluateTransitions, srv_name='/evaluate_transitions')
+                "evalute_transitions": create_cli(node=self, srv_type=EvaluateTransitions, srv_name='/hybrid_automaton/evaluate_transitions')
             }
         except Exception as e:
             self.get_logger().error(f"error occured: {str(e)}")
@@ -157,11 +182,11 @@ class HAChart(Node):
         # TODO: Got to validate the timestamp for STATES is within tolerance
 
         # TODO: Validate that the request mission_request.goal_waypoints is not empty and has at least one waypoint!!!!!
-
+        self._CURRENT_MODE = self._INIT_STATES['discrete']
         self._INIT_STATES["continuous"]["agent"] = self._STATES["agent"]
         self._INIT_STATES["continuous"]["obstacles"] = self._STATES["obstacles"]
         self._INIT_STATES["continuous"]["unsafe_set"] = self._STATES["unsafe_set"]
-        self._INIT_STATES["continuous"]["waypoints"] = request.mission_request.goal_waypoints
+        self._INIT_STATES["continuous"]["waypoints"] = [request.mission_request.goal_waypoint]
     
     def _evaluate_transitions(self):
         """
@@ -170,7 +195,7 @@ class HAChart(Node):
         """
         # Evaluate transitions
         request = EvaluateTransitions.Request()
-        request.transition_names = self._GUARDS[self._CURRENT_MODE]
+        request.transition_names = [transition[0] for transition in self._TRANSITIONS[self._CURRENT_MODE]]
         future = self._NODE_CLIS['evalute_transitions'].call_async(request)
         future.add_done_callback(self._transition_evaluation_callback)
         # if transition results all return no transition
@@ -181,7 +206,29 @@ class HAChart(Node):
             # publish new dynamics to controller feedback
     def _transition_evaluation_callback(self, future):
         try: # create callback group based on future.messages, call all the guard functions asyncronously and return results in response.
-            pass
+            response = future.result()
+            if response.overall_success:
+                # Iterate through 
+                active_transitions = []
+                for transition in response.results:
+                    if transition.success:
+                        active_transitions.append(transition)
+                
+                active_transition_priority = -1
+                active_transition = None
+                for op_active_transition in active_transitions:
+                    if active_transition_priority == -1:
+                        active_transition = op_active_transition
+                        active_transition_priority = self._TRANSITIONS[active_transition['transition_name'][1]]
+                    if self._TRANSITIONS[active_transition['transition_name']][1] < active_transition_priority:
+                        active_transition = op_active_transition
+                        active_transition_priority = self._TRANSITIONS[active_transition['transition_name']][1]
+
+                # MOVE TO NEW CONTROL MODE
+                pass
+                # self._CURRENT_MODE = 
+            else:
+                raise RuntimeError(f"transition evaluation failed: {response.message}")
         except Exception as e:
             self.get_logger().error(str(e))
             raise e

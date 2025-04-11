@@ -13,6 +13,7 @@ from utils import (
     euclidean_distance,
     quaternion_to_heading
 )
+from std_msgs.msg import Header
 
 DSF = 80 # constant distance threshold for now
 # TODO: DSF Should be changed to: Dmaneuver​=Cs​+(vrel​×Tp​)
@@ -46,6 +47,7 @@ def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: Obstacles
 
     return False
 
+# TODO: Need to add 2 guard conditions for T2LOS one which executes reset condition for vw generation another for just generating virtual waypoint.
 def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float = 0.1, tolerance: Duration = None) -> bool:
     """This guard checks if the agent is in a position to move from 1.cruise to 2.t2los"""
     # if tolerance is None:
@@ -63,6 +65,8 @@ def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, 
     
     # Condition 1: If heading to waypoint is equal to around 0 then transition occurs
     
+    # TODO: Condition 1: unsafe set on los within dsf and 
+
     waypoint_heading_error = delta_heading(
         x_a=agent_state.pose.position.x, 
         y_a=agent_state.pose.position.y, 
@@ -87,23 +91,23 @@ def guard_CRUISE_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdat
     if tolerance is None:
         tolerance = Duration(sec=1,nanosec=0)
 
-    if not validate_timestamps(agent_state.header.stamp, unsafe_set.header.stamp, tolerance) and validate_timestamps(agent_state.header.stamp, obstacles_state.header.stamp, tolerance):
-        func_name = inspect.currentframe().f_code.co_name
-        raise TimeoutError(f"{__file__}::{func_name}: "
-                           f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
-                           f"\tagent_update_timestamp: {agent_state.header.stamp}\n"
-                           f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
-                           f"\ttolerance: {tolerance}")
+    # if not validate_timestamps(agent_state.header.stamp, unsafe_set.header.stamp, tolerance) and validate_timestamps(agent_state.header.stamp, obstacles_state.header.stamp, tolerance):
+    #     func_name = inspect.currentframe().f_code.co_name
+    #     raise TimeoutError(f"{__file__}::{func_name}: "
+    #                        f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
+    #                        f"\tagent_update_timestamp: {agent_state.header.stamp}\n"
+    #                        f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
+    #                        f"\ttolerance: {tolerance}")
 
     if len(unsafe_set.vertices.data) > 0: # check if unsafe set has data
         # TODO: need to find a way to get static mission_request vessel config data to this function
-        if is_inside_unsafe_set(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=Duration(1, 0), agent_safety_radius=2):
+        if is_inside_unsafe_set(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance):
             return True
         
         # Condition 2: Imminent collision with static obstacles where no feasible maneuver exists 
         # to avoid impact within the available reaction time.
         # TODO: Need to find a way to pass the agent dynamics fo this function.
-        if is_imminent_collision(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance, agent_safety_radius=2):
+        if is_imminent_collision(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance):
             return True
         
     return False
@@ -112,11 +116,11 @@ def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate, current_waypoint:
     """This guard checks if the agent has reached its goal waypoint therefore moving from 1.cruise to 5.waypoint_reached"""
     # condition_1: If vessel is currently within waypoint acceptance radius
     if tolerance is None:
-        tolerance = Duration(1,0)
+        tolerance = Duration(sec=1,nanosec=0)
     
     current_time = Time() # time should be the time now
-    if validate_timestamps(agent_state.header.stamp, current_time):
-        raise ValueError('timeout')
+    # if validate_timestamps(agent_state.header.stamp, current_time):
+    #     raise ValueError('timeout')
     
     def euclidean_distance(p1, p2):
         return np.linalg.norm(np.array(p1) - np.array(p2))
@@ -130,7 +134,7 @@ def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate, current_waypoint:
     return False
         
 """2. T2LOS Guard Functions"""
-def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float = 0.1, tolerance: Duration = None) -> bool:
+def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float, tolerance: Duration = None) -> bool:
     """This guard checks if the agent is in a position to move from 2.t2los to 1.cruise"""
     return not guard_CRUISE_to_T2LOS(agent_state, current_waypoint, heading_error_tolerance, tolerance)
 

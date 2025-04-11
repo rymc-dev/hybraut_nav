@@ -70,7 +70,7 @@ class HAGuardsNode(Node):
             return {
                 "evalute_transitions": self.create_service(
                     srv_type=EvaluateTransitions,
-                    srv_name="/evaluate_transitions",
+                    srv_name="/hybrid_automaton/evaluate_transitions",
                     callback=self._evaluate_transitions
                 )
             }
@@ -92,7 +92,7 @@ class HAGuardsNode(Node):
     
                     for guard_to_check in guards_to_check:
                         
-                        if guards_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[2]}"]:
+                        if guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[2]}"]:
                             """CRUISE to T2LOS"""
                             transition = guard_CRUISE_to_T2LOS(agent_state=self._current_agent_state , current_waypoint=self._current_waypoint , heading_error_tolerance=0.1, tolerance=1)
                             transition_results.append(
@@ -103,7 +103,7 @@ class HAGuardsNode(Node):
                                 )
                             )
 
-                        elif guards_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[3]}"]:
+                        elif guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[3]}"]:
                             """CRUISE to T2Theta"""   
                             transition = guard_CRUISE_to_T2Theta(
                                 agent_state=self._current_agent_state, 
@@ -119,27 +119,32 @@ class HAGuardsNode(Node):
                                 )
                             )
 
-                        elif guards_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[4]}"]:
+                        elif guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[4]}"]:
                             """CRUISE to FB"""
                             pass
 
-                        elif guards_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[5]}"]:
+                        elif guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[5]}"]:
                             """CRUISE to WAYPOINT_REACHED"""
                             pass
 
-                        elif guards_to_check is self._GUARDS[f"{self._MODES[2]}_to_{self._MODES[1]}"]:
+                        elif guard_to_check is self._GUARDS[f"{self._MODES[2]}_to_{self._MODES[1]}"]:
                             """T2LOS to CRUISE"""
                             pass
 
-                        elif guards_to_check is self._GUARDS[f"{self._MODES[2]}_to_{self._MODES[4]}"]:
+                        elif guard_to_check is self._GUARDS[f"{self._MODES[2]}_to_{self._MODES[4]}"]:
                             """T2LOS to FB"""
                             pass
 
-                        elif guards_to_check is self._GUARDS[f"{self._MODES[3]}_to_{self._MODES[2]}"]:
+                        elif guard_to_check is self._GUARDS[f"{self._MODES[3]}_to_{self._MODES[2]}"]:
                             """"""
                             pass
                         else:
+                            print('GUARD EXCEPTION OCCURED')
                             raise RuntimeError('guard exception')
+                        
+                    response.overall_success = True
+                    response.message = "Transitions have been evaluated"
+                    response.results = transition_results
             else:
                 response.overall_success = True
                 response.message = "No transition names sent for evaluation"
