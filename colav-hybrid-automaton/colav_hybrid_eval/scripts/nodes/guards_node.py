@@ -31,18 +31,15 @@ class HAGuardsNode(Node):
     _MODES = {  # dict showing the name of the control modes.
         1: "CRUISE",
         2: "T2LOS",
-        3: "T2Theta",
-        4: "FB",
-        5: "WAYPOINT_REACHED"
+        3: "FB",
+        4: "WAYPOINT_REACHED"
     }
     _GUARDS = {
         f"{_MODES[1]}_to_{_MODES[2]}": guard_CRUISE_to_T2LOS,
-        f"{_MODES[1]}_to_{_MODES[3]}": guard_CRUISE_to_T2Theta,
         f"{_MODES[1]}_to_{_MODES[4]}": guard_CRUISE_to_FB,
         f"{_MODES[1]}_to_{_MODES[5]}": guard_CRUISE_to_WAYPOINT_REACHED,
         f"{_MODES[2]}_to_{_MODES[1]}": guard_CRUISE_to_T2LOS,
         f"{_MODES[2]}_to_{_MODES[4]}": guard_T2LOS_to_FB,
-        f"{_MODES[3]}_to_{_MODES[2]}": guard_T2Theta_to_T2LOS
     }
 
     def __init__(

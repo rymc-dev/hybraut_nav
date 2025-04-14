@@ -12,6 +12,7 @@ and confirm the expected functionality of each guard.
 
 from typing import Tuple
 
+import sys
 import pytest
 
 from geometry_msgs.msg import Point, Point32, Pose, Quaternion
@@ -20,13 +21,12 @@ from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoi
 
 from scripts.guards import ( 
     guard_CRUISE_to_FB,
-    guard_CRUISE_to_T2LOS,
-    guard_CRUISE_to_T2Theta,
+    guard_CRUISE_to_T2LOS_1,
+    guard_CRUISE_to_T2LOS_2,
     guard_CRUISE_to_WAYPOINT_REACHED,
     guard_T2LOS_to_CRUISE,
     guard_T2LOS_to_FB,
-    guard_T2Theta_to_FB,
-    guard_T2Theta_to_T2LOS
+    guard_WAYPOINT_REACHED_to_CRUISE
 )
 
 
@@ -209,7 +209,7 @@ def test_guard_CRUISE_to_T2Theta(
 
     :raises: AssertionError if any of the checks fails
     """
-    actual = guard_CRUISE_to_T2Theta(*input_args)
+    actual = guard_CRUISE_to_T2LOS_1(*input_args)
     assert actual == expected_output, f"{description}: expected {expected_output}, got {actual}"
 
 @pytest.mark.parametrize("input_args, expected_output, description", [
@@ -250,7 +250,7 @@ def test_guard_CRUISE_to_T2LOS(input_args: Tuple[AgentUpdate, Waypoint, float], 
 
     :raises: AssertionError if any of the checks fails
     """
-    result = guard_CRUISE_to_T2LOS(*input_args)
+    result = guard_CRUISE_to_T2LOS_2(*input_args)
     assert result == expected_output, description
 
 @pytest.mark.parametrize("input_args, expected_output, description", [
@@ -399,22 +399,48 @@ def test_T2LOS_to_CRUISE(
     assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
 
 @pytest.mark.parametrize("input_args, expected_output, description", [
-    """Test Case 1: validate evaluation of fallback condition when inside unsafe set it true"""
     (
         (
-            
+            AgentUpdate(pose=Pose(position=Point(x=0.0, y=0.0, z=0.0)), safety_radius=float(10)),
+            ObstaclesUpdate(),
+            UnsafeSet(
+                vertices=Float64MultiArray(
+                    layout=MultiArrayLayout(
+                        dim=[MultiArrayDimension(label='vertices', stride=2)]
+                    ),
+                    data=[
+                        -5.0, -5.0,  # Point 1
+                        -5.0, 5.0,   # Point 2
+                        5.0, 5.0,    # Point 3
+                        5.0, -5.0    # Point 4
+                    ]
+                )
+            )
         ),
         True,
-        ""
+        "agent_state shows that we are already inside the unsafe_set"
     ),
-    """Test Case 2: validate evaluation of fallback condition when outside unsafe set is false"""
-    (
-        (
-
-        ),
-        False,
-        ""
-    )
+    # "Test Case 2: agent_state shows we are currently outside the unsafe set and within dsf"
+    # (
+    #     (
+    #         AgentUpdate(), 
+    #         ObstaclesUpdate(), 
+    #         UnsafeSet()
+    #     ), 
+    #     True, 
+    #     "agent_state shows we are currently outside the unsafe set"
+    # ),
+    # "Test Case 3: agent_state shows we are outside the unsafe set and outside the dsf"
+    # (
+    #     (
+    #         AgentUpdate(), 
+    #         ObstaclesUpdate(), 
+    #         UnsafeSet()
+    #     ), 
+    #     False, 
+    #     "agent_state shows that based on the params of the vessel we can't maneuver away from a collision with unsafe set"
+    # ),
+    # "Test Case 4: We are we are intercepting the safety_radius of a static obstacle"
 ])
 def test_T2LOS_to_FB(
     input_args: Tuple[AgentUpdate, Waypoint, ObstaclesUpdate, UnsafeSet],
@@ -432,14 +458,27 @@ def test_T2LOS_to_FB(
     actual = guard_T2LOS_to_FB(*input_args)
     assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
 
-# def test_T2Theta_to_FB():
-#     pass
-
-# def test_T2Theta_to_T2LOS():
-#     pass
-
-def main():
-    pass
+"""WAYPOINT_REACHED Guards Tests"""
+@pytest.mark.parametrize("input_args, expected_output, description", [
+    (
+        [  # input_args
+            Waypoint(position=Point32(x=0.0, y=0.0, z=0.0), acceptance_radius=0.0),
+            Waypoint(position=Point32(x=1.0, y=1.0, z=0.0), acceptance_radius=0.0)
+        ],
+        True,
+        "More than one waypoint signifying virtual waypoints exist therefore transition should occur"
+    ),
+    (
+        [  # input_args
+            Waypoint(position=Point32(x=0.0, y=0.0, z=0.0), acceptance_radius=0.0)
+        ],
+        False,
+        "One waypoint signifying we have arrived at the goal waypoint, therefore transition should not occur"
+    ),
+])
+def test_WAYPOINT_REACHED_to_CRUISE(input_args, expected_output, description):
+    actual = guard_WAYPOINT_REACHED_to_CRUISE(input_args)
+    assert actual == expected_output, f'{description}: expected {expected_output}, got {actual}'
 
 if __name__ == "__main__":
-    main()
+    sys.exit(pytest.main([__file__]))

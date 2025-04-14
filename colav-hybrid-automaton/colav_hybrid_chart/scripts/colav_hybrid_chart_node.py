@@ -38,9 +38,8 @@ class HAChart(Node):
     _MODES = {  # dict showing the name of the control modes.
         1: "CRUISE",
         2: "T2LOS",
-        # 3: "T2Theta",
         4: "FB",
-        5: "WAYPOINT_REACHED"
+        4: "WAYPOINT_REACHED"
     }
 
     """
@@ -73,23 +72,19 @@ class HAChart(Node):
     """
     _TRANSITIONS = {
         _MODES[1]: [ # 1. CRUISE
-            (f"{_MODES[1]}_to_{_MODES[2]}", 3), # T2Theta: PRIORITY = 3
-            (f"{_MODES[1]}_to_{_MODES[3]}", 4), # T2LOS: PRIORITY = 4
-            (f"{_MODES[1]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1
-            (f"{_MODES[1]}_to_{_MODES[5]}", 2), # WAYPOINT_REACHED: PRIORITY = 2
+            (f"{_MODES[1]}_to_{_MODES[2]}_1", 3), # T2LOS: guard/reset: PRIORITY = 4
+            (f"{_MODES[1]}_to_{_MODES[2]}_2", 4), # T2LOS: gurad PRIORITY = 4
+            (f"{_MODES[1]}_to_{_MODES[3]}", 1), # FALLBACK: PRIORITY = 1
+            (f"{_MODES[1]}_to_{_MODES[4]}", 2), # WAYPOINT_REACHED: PRIORITY = 2
         ],
-        _MODES[2]: [ # 2: T2Theta
-            (f"{_MODES[2]}_to_{_MODES[1]}", 2), # T2LOS: PRIORITY = 2
-            (f"{_MODES[2]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1 # TODO: May not need fallback transition for 
-        ],
-        _MODES[3]: [ # 3: T2LOS
+        _MODES[2]: [ # 2: T2LOS
             (f"{_MODES[3]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1
             (f"{_MODES[3]}_to_{_MODES[1]}", 3), # CRUISE: PRIORITY = 3
             (f"{_MODES[3]}_to_{_MODES[5]}", 2), # WAYPOINT_REACHED: PRIORITY = 5
         ],
-        _MODES[4]: [ # 4: FB
+        _MODES[3]: [ # 3: FB
         ],
-        _MODES[5]: [ # 5: WAYPOINT_REACHED
+        _MODES[4]: [ # 4: WAYPOINT_REACHED
             (f"{_MODES[5]}_to_{_MODES[1]}", 1) # CRUISE: PRIORITY = 1 
         ]
     }

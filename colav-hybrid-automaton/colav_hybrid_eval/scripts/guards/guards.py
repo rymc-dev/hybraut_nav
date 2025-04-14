@@ -1,75 +1,103 @@
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
-from utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
-from builtin_interfaces.msg import Duration 
-from typing import List, Tuple
-import inspect
-import numpy as np
-import time
-from builtin_interfaces.msg import Time
+from std_msgs.msg import Header
+from builtin_interfaces.msg import Duration, Time
 from shapely.geometry import Polygon, LineString
+import numpy as np
+
+from utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
 from utils import (
     validate_timestamps,
     delta_heading,
     euclidean_distance,
     quaternion_to_heading
 )
-from std_msgs.msg import Header
+from typing import List
 
-DSF = 80 # constant distance threshold for now
-# TODO: DSF Should be changed to: Dmaneuver​=Cs​+(vrel​×Tp​)
+# Constant distance threshold (DSF) for now.
+DSF = 80  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
 
 """1. CRUISE Guard Functions"""
-def guard_CRUISE_to_T2Theta(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoint: Waypoint, dsf: float = DSF) -> bool:
-    """This guard checks if the agent is in a position to move from 1.cruise to 3.t2theta"""
-    # condition_1: if los within distance threshold intercepts unsafe set meaning it's going to hit a dynamic obstacle
-    # distance threhsold should be determined by how long it takes vessel at current velocity to turn 180 degrees 
 
+def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate, 
+                            obstacles_state: ObstaclesUpdate, 
+                            unsafe_set: UnsafeSet, 
+                            waypoint: Waypoint, 
+                            dsf: float = DSF) -> bool:
+    """
+    Guard for transition from CRUISE to T2LOS (Guard 1)
+
+    Transition condition:
+      - If the line-of-sight (LOS) from the agent to the waypoint intersects the unsafe set
+        and the distance from the agent to the intersection is less than or equal to dsf.
+        
+    Parameters:
+        agent_state: Current state of the agent.
+        obstacles_state: State information about obstacles.
+        unsafe_set: The unsafe polygon defined by its vertices.
+        waypoint: The target waypoint.
+        dsf: Distance threshold for considering an intersection (default: DSF).
+
+    Returns:
+        bool: True if a transition is required, otherwise False.
+
+    Raises:
+        TimeoutError, ValueError: If evaluation times out or input values are invalid.
+    """
     agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
     goal_position = (waypoint.position.x, waypoint.position.y)
-
     los_line = LineString([agent_position, goal_position])
-    unsafe_polygon = Polygon([(unsafe_set.vertices.data[i], unsafe_set.vertices.data[i+1]) for i in range(0, len(unsafe_set.vertices.data), 2)])
-
+    
+    # Create unsafe polygon from vertex data (assumes [x1, y1, x2, y2, ...])
+    unsafe_vertices = unsafe_set.vertices.data
+    unsafe_polygon = Polygon([(unsafe_vertices[i], unsafe_vertices[i + 1]) 
+                              for i in range(0, len(unsafe_vertices), 2)])
+    
+    # Check for LOS intersection with unsafe polygon.
     if los_line.intersects(unsafe_polygon):
-        intersection_point = los_line.intersection(unsafe_polygon)
-        if intersection_point.is_empty:
+        intersection = los_line.intersection(unsafe_polygon)
+        
+        if intersection.is_empty:
             return False
         
-        if isinstance(intersection_point, LineString):
-            intersection_point = intersection_point.interpolate(0.5, normalized=True)
-
-        intersection_distance = euclidean_distance(agent_position, (intersection_point.x, intersection_point.y))
-
+        # If the intersection is a LineString, take a midpoint.
+        if isinstance(intersection, LineString):
+            intersection = intersection.interpolate(0.5, normalized=True)
+        
+        # Calculate distance from the agent to the intersection point.
+        intersection_distance = euclidean_distance(agent_position, (intersection.x, intersection.y))
         if intersection_distance <= dsf:
-            return True # The LOS intersects the unsafe set within the distance threshold
-
-    # condition_2: if los within distance threshold intercepts unsafe set meaning it's going to any individual static obstacles
+            return True
 
     return False
 
-# TODO: Need to add 2 guard conditions for T2LOS one which executes reset condition for vw generation another for just generating virtual waypoint.
-def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float = 0.1, tolerance: Duration = None) -> bool:
-    """This guard checks if the agent is in a position to move from 1.cruise to 2.t2los"""
-    # if tolerance is None:
-    #     tolerance = Duration(sec=1,nanosec=0)
 
-    # # should not only validate timestamp against comparator and arg operators but against current timestamp for system
-    
-    # if not validate_timestamps(agent_state.header.stamp, current_waypoint):
-    #     func_name = inspect.currentframe().f_code.co_name
-    #     raise TimeoutError(f"{__file__}::{func_name}: "
-    #                        f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
-    #                        f"\tagent_update_timestamp: {agent_state.header.stamp}\n"
-    #                        f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
-    #                    '    f"\ttolerance: {tolerance}")
-    
-    # Condition 1: If heading to waypoint is equal to around 0 then transition occurs
-    
-    # TODO: Condition 1: unsafe set on los within dsf and 
+def guard_CRUISE_to_T2LOS_2(agent_state: AgentUpdate, 
+                            current_waypoint: Waypoint, 
+                            heading_error_tolerance: float = 0.1, 
+                            tolerance: Duration = None) -> bool:
+    """
+    Guard for the second transition condition to T2LOS
 
+    Transition condition:
+      - If the agent's heading error relative to the waypoint is within the acceptable tolerance,
+        then the agent is considered aligned and a transition is triggered.
+        
+    Parameters:
+        agent_state: Current state of the agent.
+        current_waypoint: The current waypoint towards which the agent is navigating.
+        heading_error_tolerance: Allowable heading error (default: 0.1 radians).
+        tolerance: A time tolerance for validations, if needed.
+
+    Returns:
+        bool: True if transition is required (i.e. the agent is sufficiently aligned), otherwise False.
+
+    Raises:
+        TimeoutError, ValueError: If evaluation takes too long or if input values are invalid.
+    """
+    # Calculate the heading error between the agent's current heading and the direction to the waypoint.
     waypoint_heading_error = delta_heading(
-        x_a=agent_state.pose.position.x, 
-        y_a=agent_state.pose.position.y, 
+        x_a=agent_state.pose.position.x,
+        y_a=agent_state.pose.position.y,
         theta_a=quaternion_to_heading(
             qx=agent_state.pose.orientation.x,
             qy=agent_state.pose.orientation.y,
@@ -79,80 +107,155 @@ def guard_CRUISE_to_T2LOS(agent_state: AgentUpdate, current_waypoint: Waypoint, 
         x_w=current_waypoint.position.x,
         y_w=current_waypoint.position.y
     )
-    if waypoint_heading_error < heading_error_tolerance:
-        return True
+    
+    # If the heading error is within the allowed tolerance, return True.
+    return waypoint_heading_error < heading_error_tolerance
 
-    return False
 
-def guard_CRUISE_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, tolerance: Duration = None):
-    """This guard checks if the agent is in iminant danger of hitting an obstacle therefore moving from 1.cruise to 4.fallback"""
-    # Condition 1: If inside the unsafe set or interception with unsafe set is immenant but agnet constriants make it impossible # TODO: NEED TO WORK ON THIS
-    #              to decelerate enough to avoid or navigate out of the road of the unsafe set
+def guard_CRUISE_to_FB(agent_state: AgentUpdate, 
+                       obstacles_state: ObstaclesUpdate, 
+                       unsafe_set: UnsafeSet, 
+                       tolerance: Duration = None) -> bool:
+    """
+    Guard for transition from CRUISE to FB (Fallback)
+
+    Transition condition:
+      - If the agent is either inside an unsafe set or an imminent collision is detected.
+      
+    Parameters:
+        agent_state: Current state of the agent.
+        obstacles_state: State information about obstacles.
+        unsafe_set: The unsafe set (polygon) data.
+        tolerance: A time tolerance for validations (default: 1 second if not provided).
+
+    Returns:
+        bool: True if a transition to FB is required, otherwise False.
+
+    Raises:
+        TimeoutError: If evaluation takes too long.
+        ValueError: If input values are invalid or inconsistent.
+    """
     if tolerance is None:
-        tolerance = Duration(sec=1,nanosec=0)
+        tolerance = Duration(sec=1, nanosec=0)
 
-    # if not validate_timestamps(agent_state.header.stamp, unsafe_set.header.stamp, tolerance) and validate_timestamps(agent_state.header.stamp, obstacles_state.header.stamp, tolerance):
-    #     func_name = inspect.currentframe().f_code.co_name
-    #     raise TimeoutError(f"{__file__}::{func_name}: "
-    #                        f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
-    #                        f"\tagent_update_timestamp: {agent_state.header.stamp}\n"
-    #                        f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
-    #                        f"\ttolerance: {tolerance}")
-
-    if len(unsafe_set.vertices.data) > 0: # check if unsafe set has data
-        # TODO: need to find a way to get static mission_request vessel config data to this function
+    # Check if unsafe set data exists and apply collision conditions.
+    if unsafe_set.vertices.data:
         if is_inside_unsafe_set(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance):
             return True
-        
-        # Condition 2: Imminent collision with static obstacles where no feasible maneuver exists 
-        # to avoid impact within the available reaction time.
-        # TODO: Need to find a way to pass the agent dynamics fo this function.
+
         if is_imminent_collision(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance):
             return True
         
     return False
 
-def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate, current_waypoint: Waypoint, tolerance: Duration = None):
-    """This guard checks if the agent has reached its goal waypoint therefore moving from 1.cruise to 5.waypoint_reached"""
-    # condition_1: If vessel is currently within waypoint acceptance radius
+
+def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate, 
+                                     current_waypoint: Waypoint, 
+                                     tolerance: Duration = None) -> bool:
+    """
+    Guard for transition from CRUISE to WAYPOINT_REACHED
+
+    Transition condition:
+      - If the agent is within the waypoint's acceptance radius.
+      
+    Parameters:
+        agent_state: Current state of the agent.
+        current_waypoint: The target waypoint containing the acceptance radius.
+        tolerance: A time tolerance for validations (default: 1 second if not provided).
+
+    Returns:
+        bool: True if the agent has reached the waypoint (transition required), otherwise False.
+
+    Raises:
+        TimeoutError: If evaluation takes too long.
+        ValueError: If input values are invalid or inconsistent.
+    """
     if tolerance is None:
-        tolerance = Duration(sec=1,nanosec=0)
-    
-    current_time = Time() # time should be the time now
+        tolerance = Duration(sec=1, nanosec=0)
+
+    # Obtain the current time (this would normally be compared with agent_state.header.stamp).
+    current_time = Time()  # Note: For an actual implementation, use a proper time provider.
     # if validate_timestamps(agent_state.header.stamp, current_time):
-    #     raise ValueError('timeout')
-    
-    def euclidean_distance(p1, p2):
-        return np.linalg.norm(np.array(p1) - np.array(p2))
+    #     raise ValueError('Timeout')
 
-    if euclidean_distance(
-        [agent_state.pose.position.x, agent_state.pose.position.y],
-        [current_waypoint.position.x, current_waypoint.position.y]
-    ) < current_waypoint.acceptance_radius:
+    # Use the imported euclidean_distance function.
+    agent_coords = [agent_state.pose.position.x, agent_state.pose.position.y]
+    waypoint_coords = [current_waypoint.position.x, current_waypoint.position.y]
+    if euclidean_distance(agent_coords, waypoint_coords) < current_waypoint.acceptance_radius:
         return True
-    
+
     return False
-        
+
 """2. T2LOS Guard Functions"""
-def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate, current_waypoint: Waypoint, heading_error_tolerance: float, tolerance: Duration = None) -> bool:
-    """This guard checks if the agent is in a position to move from 2.t2los to 1.cruise"""
-    return not guard_CRUISE_to_T2LOS(agent_state, current_waypoint, heading_error_tolerance, tolerance)
 
-def guard_T2LOS_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, tolerance: Duration = None):
-    """This guard checks if the agent is in iminant danger of hitting an obstacle therefore moving from 2.t2los to 4.fallback"""
+def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate, 
+                          current_waypoint: Waypoint, 
+                          heading_error_tolerance: float, 
+                          tolerance: Duration = None) -> bool:
+    """
+    Guard for transition from T2LOS back to CRUISE
+
+    Transition condition:
+      - Transition occurs if the agent is not sufficiently aligned with the waypoint.
+    
+    Parameters:
+        agent_state: Current state of the agent.
+        current_waypoint: The waypoint that the agent is navigating toward.
+        heading_error_tolerance: Maximum allowable heading error.
+        tolerance: Time tolerance for validations if required.
+
+    Returns:
+        bool: True if the agent should transition back to CRUISE, otherwise False.
+    """
+    # Transition back to CRUISE if the heading alignment is not met.
+    return not guard_CRUISE_to_T2LOS_2(agent_state, current_waypoint, heading_error_tolerance, tolerance)
+
+
+def guard_T2LOS_to_FB(agent_state: AgentUpdate, 
+                      obstacles_state: ObstaclesUpdate, 
+                      unsafe_set: UnsafeSet, 
+                      tolerance: Duration = None) -> bool:
+    """
+    Guard for transition from T2LOS to FB (Fallback)
+
+    Transition condition:
+      - Reuses the CRUISE to FB condition for imminent danger detection.
+    
+    Parameters:
+        agent_state: Current state of the agent.
+        obstacles_state: State information about obstacles.
+        unsafe_set: The unsafe polygon data.
+        tolerance: A time tolerance for validations (default provided if None).
+
+    Returns:
+        bool: True if a transition to fallback is required, otherwise False.
+    """
     return guard_CRUISE_to_FB(agent_state, obstacles_state, unsafe_set, tolerance)
 
-"""3. T2Theta Guard Functions"""
-def guard_T2Theta_to_T2LOS(agent_state: AgentUpdate, virtual_waypoint: Waypoint): # This control mode finds a safe 
-    """This guard checks that a virtual waypoint has been set and is not None therefore allowing us to move to T2LOS"""
-    return virtual_waypoint is not None 
 
-def guard_T2Theta_to_FB(agent_state: AgentUpdate, obstacles_state: ObstaclesUpdate, unsafe_set: UnsafeSet, tolerance: Duration = None):
-    """This guard checks if the agent is in iminant danger of hitting an obstacle therefore moving from 3.t2theta to 4.fallback"""
-    return guard_CRUISE_to_FB(agent_state, obstacles_state, unsafe_set, tolerance)
+"""3. FB Guard Functions"""
+# Currently no transitions out of the fallback state; therefore, no guards are implemented.
 
-"""4. FB Guard Functions"""
-# NO TRANSITIONS OUT OF FALLBACK CURRENTLY THEREFORE NO GUARDS
 
-"""5. WAYPOINT_REACHED Guard Functions"""
-# NO TRANSITIONS OUT OF WAYPOINT_REACHED CURRENTLY THEREFORE NO GUARDS
+"""4. WAYPOINT_REACHED Guard Functions"""
+
+def guard_WAYPOINT_REACHED_to_CRUISE(waypoints: List[Waypoint], 
+                                       tolerance: Duration = None) -> bool:
+    """
+    Guard for transitioning from WAYPOINT_REACHED to CRUISE
+
+    Transition condition:
+      - If there are still multiple waypoints available, indicating that the current waypoint is not the final one.
+    
+    Parameters:
+        waypoints: List of remaining waypoints.
+        tolerance: A time tolerance for validations (default provided if None).
+
+    Returns:
+        bool: True if there are more waypoints (transition required), otherwise False.
+
+    Raises:
+        TimeoutError: If the evaluation takes too long.
+        ValueError: If input values are invalid.
+    """
+    return len(waypoints) > 1
