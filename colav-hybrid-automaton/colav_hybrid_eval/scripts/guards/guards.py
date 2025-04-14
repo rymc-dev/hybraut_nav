@@ -6,15 +6,17 @@ import numpy as np
 
 from utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
 from utils import (
-    validate_timestamps,
+    timestamps_within_tolerance,
     delta_heading,
     euclidean_distance,
-    quaternion_to_heading
+    quaternion_to_heading,
+    get_current_ros_time
 )
 from typing import List
 
 # Constant distance threshold (DSF) for now.
 DSF = 80  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
+tolerance = Duration(sec=1, nanosec=0)
 
 """1. CRUISE Guard Functions"""
 
@@ -43,6 +45,15 @@ def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
     Raises:
         TimeoutError, ValueError: If evaluation times out or input values are invalid.
     """
+
+    # Validate timestamps of sync messages ensuring they are within tolerance
+    system_timestamp = get_current_ros_time()
+    if not timestamps_within_tolerance(system_timestamp, agent_state.header.stamp, tolerance) and \
+        timestamps_within_tolerance(system_timestamp, obstacles_state.header.stamp, tolerance) and \
+            timestamps_within_tolerance(system_timestamp, unsafe_set.header.stamp, tolerance):
+        raise TimeoutError('input args out of sync dropping arg this timestamp')
+
+
     agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
     goal_position = (waypoint.position.x, waypoint.position.y)
     los_line = LineString([agent_position, goal_position])

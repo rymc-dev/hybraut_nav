@@ -11,6 +11,7 @@ and confirm the expected functionality of each guard.
 """
 
 from typing import Tuple
+from std_msgs.msg import Header
 
 import sys
 import pytest
@@ -18,6 +19,7 @@ import pytest
 from geometry_msgs.msg import Point, Point32, Pose, Quaternion
 from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
+from utils import get_current_ros_time
 
 from scripts.guards import ( 
     guard_CRUISE_to_FB,
@@ -36,6 +38,7 @@ from scripts.guards import (
     (
         (
             AgentUpdate(
+                header=Header(stamp=get_current_ros_time()),
                 pose=Pose(
                     position=Point(
                         x=float(400),
@@ -44,8 +47,9 @@ from scripts.guards import (
                 ),
                 velocity=float(10)
             ),
-            ObstaclesUpdate(),
+            ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
             UnsafeSet(
+                header=Header(stamp=get_current_ros_time()),
                 vertices=Float64MultiArray(
                     layout=MultiArrayLayout(
                         dim=[MultiArrayDimension(label='vertices', stride=2)]
@@ -70,6 +74,7 @@ from scripts.guards import (
     (
         (
             AgentUpdate(
+                header=Header(stamp=get_current_ros_time()),
                 pose=Pose(
                     position=Point(
                         x=float(100),
@@ -78,8 +83,9 @@ from scripts.guards import (
                 ),
                 velocity=float(10)
             ),
-            ObstaclesUpdate(),
+            ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
             UnsafeSet(
+                header=Header(stamp=get_current_ros_time()),
                 vertices=Float64MultiArray(
                     layout=MultiArrayLayout(
                         dim=[MultiArrayDimension(label='vertices', stride=2)]
@@ -104,6 +110,7 @@ from scripts.guards import (
     (
         (
             AgentUpdate(
+                header=Header(stamp=get_current_ros_time()),
                 pose=Pose(
                     position=Point(
                         x=float(100),
@@ -112,8 +119,9 @@ from scripts.guards import (
                 ),
                 velocity=float(10)
             ),
-            ObstaclesUpdate(),
+            ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
             UnsafeSet(
+                header=Header(stamp=get_current_ros_time()),
                 vertices=Float64MultiArray(
                     layout=MultiArrayLayout(
                         dim=[MultiArrayDimension(label='vertices', stride=2)]
@@ -138,6 +146,7 @@ from scripts.guards import (
     (
         (
             AgentUpdate(
+                header=Header(stamp=get_current_ros_time()),
                 pose=Pose(
                     position=Point(
                         x=float(100),
@@ -146,8 +155,9 @@ from scripts.guards import (
                 ),
                 velocity=float(10)
             ),
-            ObstaclesUpdate(),
+            ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
             UnsafeSet(
+                header=Header(stamp=get_current_ros_time()),
                 vertices=Float64MultiArray(
                     layout=MultiArrayLayout(
                         dim=[MultiArrayDimension(label='vertices', stride=2)]
@@ -192,6 +202,11 @@ from scripts.guards import (
     #     False, 
     #     "static obstacle outside distance threshold outside line of sight"
     # )
+    # Test Case 9: agent_update out of sync
+
+    # Test Case 10: obstacles_update out of sync
+
+    # Test Case 11: UnsafeSet out of sync
 ])
 def test_guard_CRUISE_to_T2Theta(
     input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
