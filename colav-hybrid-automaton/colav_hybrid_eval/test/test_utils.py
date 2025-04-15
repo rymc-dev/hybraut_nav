@@ -7,17 +7,19 @@ used in the COLAV Hybrid Automaton. Both standard and edge cases are tested to e
 and confirm the expected functionality of each guard.
 
 :author: Ryan McKee  
-:date: April 11, 2025
+:date: April 15, 2025
 """
 
 import pytest
 import sys
 from typing import Tuple, Union
+from std_msgs.msg import Float64MultiArray
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
 from utils import (
     delta_heading, 
     euclidean_distance, 
-    generate_circle_points, 
+    generate_circle_points,
+    extract_polygon_vertices, 
     quaternion_to_heading,
     get_current_ros_time,
     validate_timestamps_within_tolerance,
@@ -230,15 +232,30 @@ def test_quaternion_to_heading(input_args, expected_output, description):
 
 """utils.unsafe_set_utils unit tests"""
 
+# Define the parametrize test cases.
 # @pytest.mark.parametrize("input_args, expected_output, description", [
-
+#     (
+#         (UnsafeSet(vertices=Float64MultiArray(data=[0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]))),
+#         [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
+#         "Square shape with four vertices"
+#     ),
+#     # (
+#     #     (None, None, DummyUnsafeSet([0.0, 0.0, 1.0, 1.0, 2.0]), None, 0.0),
+#     #     [(0.0, 0.0), (1.0, 1.0)],  # Note: Last element (2.0) is dropped
+#     #     "Odd number of data elements: last element dropped"
+#     # ),
+#     # (
+#     #     (None, None, DummyUnsafeSet([]), None, 0.0),
+#     #     [],
+#     #     "Empty data list should return an empty list"
+#     # )
 # ])
-# def test_extract_polygon_vertices(
-#     input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
-#     expected_output: Union[bool, Exception],
-#     description: str
-# ):
-#     pass
+# def test_extract_polygon_vertices(input_args, expected_output, description):
+#     # The function under test accepts only the UnsafeSet argument.
+#     # We unpack the tuple. (None, None, unsafe_set, None, float)
+
+#     result = extract_polygon_vertices(*input_args)
+#     assert result == expected_output, f"Failed: {description}"
 
 # @pytest.mark.parametrize("input_args, expected_output, description", [
 

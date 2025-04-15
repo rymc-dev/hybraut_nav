@@ -246,6 +246,8 @@ def guard_T2LOS_to_FB(agent_state: AgentUpdate,
     """
     return guard_CRUISE_to_FB(agent_state, obstacles_state, unsafe_set, tolerance)
 
+def guard_T2LOS_to_WAYPOINT_REACHED():
+    pass
 
 """3. FB Guard Functions"""
 # Currently no transitions out of the fallback state; therefore, no guards are implemented.

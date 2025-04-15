@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+"""
+"""
+
 import sys
 import os
 
@@ -6,26 +10,25 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 
 import rclpy
 from rclpy.node import Node
-from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult, ParameterType
 import os
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate
-from colav_interfaces.srv import EvaluateTransitions
-from colav_interfaces.msg import TransitionResult
-
+from colav_interfaces.msg import GuardsStatus
+from utils import get_current_ros_time
 from config.qos_config import QOS_PROFILE
 from scripts.guards import (
     guard_CRUISE_to_FB,
-    guard_CRUISE_to_T2LOS,
-    guard_CRUISE_to_T2Theta,
+    guard_CRUISE_to_T2LOS_1,
+    guard_CRUISE_to_T2LOS_2,
     guard_CRUISE_to_WAYPOINT_REACHED,
     guard_T2LOS_to_CRUISE,
     guard_T2LOS_to_FB,
-    guard_T2Theta_to_FB,
-    guard_T2Theta_to_T2LOS
+    guard_T2LOS_to_WAYPOINT_REACHED,
+    guard_WAYPOINT_REACHED_to_CRUISE
 )
 from rclpy.executors import MultiThreadedExecutor
-from colav_interfaces.msg import Waypoint, UnsafeSet
-
+from colav_interfaces.msg import Waypoint, UnsafeSet, Waypoints
+from std_msgs.msg import String
+from typing import List
 
 class HAGuardsNode(Node):
     _MODES = {  # dict showing the name of the control modes.
@@ -34,18 +37,11 @@ class HAGuardsNode(Node):
         3: "FB",
         4: "WAYPOINT_REACHED"
     }
-    _GUARDS = {
-        f"{_MODES[1]}_to_{_MODES[2]}": guard_CRUISE_to_T2LOS,
-        f"{_MODES[1]}_to_{_MODES[4]}": guard_CRUISE_to_FB,
-        f"{_MODES[1]}_to_{_MODES[5]}": guard_CRUISE_to_WAYPOINT_REACHED,
-        f"{_MODES[2]}_to_{_MODES[1]}": guard_CRUISE_to_T2LOS,
-        f"{_MODES[2]}_to_{_MODES[4]}": guard_T2LOS_to_FB,
-    }
 
     def __init__(
         self,
         namespace:str = "hybrid_automaton",
-        name:str = "guards"
+        name:str = "guards_node"
     ):
         super().__init__(name, namespace=namespace)
 
@@ -55,106 +51,148 @@ class HAGuardsNode(Node):
         self._current_agent_state = AgentUpdate()
         self._current_obstacles_state = ObstaclesUpdate()
         self._current_waypoint = Waypoint()
+        self._current_waypoints = List[Waypoint]
         self._current_unsafe_set = UnsafeSet()
 
         # Initialisation functions
+        self._current_control_mode = None
         self._NODE_SUBS = self._init_node_subs()
-        self._NODE_SRVS = self._init_node_srvs()
+        self._NODE_PUBS = self._init_node_pubs()
+        self._NODE_TIMER = self._init_node_timers()
 
-    def _init_node_srvs(self):
-        """initialize the nodes services"""
+    def _init_node_pubs(self):
+        """initialize the node publisher"""
         try:
             return {
-                "evalute_transitions": self.create_service(
-                    srv_type=EvaluateTransitions,
-                    srv_name="/hybrid_automaton/evaluate_transitions",
+                "guards_status": self.create_publisher(
+                    msg_type=GuardsStatus,
+                    topic="/hybrid_automaton/guards_status",
+                    qos_profile=QOS_PROFILE
+                )
+            }
+        except Exception as e: 
+            self.get_logger().error(f"{self.__class__}::_init_node_pubs: Exception occured: {str(e)}")
+
+    def _init_node_timers(self):
+        """initialize the node timers"""
+        try:   
+            return {
+                "transition_eval_timer": self.create_timer(
+                    timer_period_sec=float(1),
                     callback=self._evaluate_transitions
                 )
             }
         except Exception as e:
-            self.get_logger().error(f"{self.__class__}::init_node_srvs: Exception occured: {str(e)}")
+            self.get_logger().error(f"{self.__class__}::_init_node_timers: Exception occured: {str(e)}")
             raise e
         
-    def _evaluate_transitions(self, request: EvaluateTransitions.Request, response: EvaluateTransitions.Response):
-        """evalute the transitions passed in"""
+    def _evaluate_transitions(self):
+        """evalute the transitions passed in based on the control mode"""
+        guards_status = GuardsStatus()
         try:
-            if request.transition_names is not []:
-                    guards_to_check = []
-                    for transition in request._transition_names:
-                        if transition not in self._GUARDS:
-                            raise KeyError(f"Transition '{transition}' not found in _GUARDS dictionary")
-                        guards_to_check.append(self._GUARDS[transition])
+            if self._current_control_mode == None:
+                guards_status.control_mode = "NA"
+                guards_status.error = True
+                guards_status.status.error_message = "transition evaluation states required not updated"
+                guards_status.timestamp = get_current_ros_time()
+                self._NODE_PUBS["guards_status"].publish(guards_status)
+                return
+            else: 
+                # if _current_control_mode is given
+                if self._current_control_mode == self._MODES[1]:
+                    # CRUISE Transitions
+                    guards_status.control_mode = self._MODES[1]
 
-                    transition_results = []
-    
-                    for guard_to_check in guards_to_check:
-                        
-                        if guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[2]}"]:
-                            """CRUISE to T2LOS"""
-                            transition = guard_CRUISE_to_T2LOS(agent_state=self._current_agent_state , current_waypoint=self._current_waypoint , heading_error_tolerance=0.1, tolerance=1)
-                            transition_results.append(
-                                TransitionResult(
-                                    transition_name= f"{self._MODES[1]}_to_{self._MODES[2]}",
-                                    success = transition,
-                                    message = "transition executed"
-                                )
-                            )
+                    # T2LOS1
+                    guards_status.cruise_to_t2los1 = guard_CRUISE_to_T2LOS_1(
+                        agent_state = self._current_agent_state,
+                        obstacles_state = self._current_obstacles_state,
+                        unsafe_set = self._current_unsafe_set,
+                        waypoint = self._current_waypoint,
+                        dsf = 80
+                    )
+                    # T2LOS2 
+                    guards_status.cruise_to_t2los1 = guard_CRUISE_to_T2LOS_2(
+                        agent_state= self._current_agent_state,
+                        current_waypoint= self._current_waypoint,
+                        heading_error_tolerance=0.1
+                    )
 
-                        elif guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[3]}"]:
-                            """CRUISE to T2Theta"""   
-                            transition = guard_CRUISE_to_T2Theta(
-                                agent_state=self._current_agent_state, 
-                                obstacles_state=self._current_obstacles_state,
-                                unsafe_set=self._current_unsafe_set,
-                                waypoint=self._current_waypoint
-                            )
-                            transition_results.append(
-                                TransitionResult(
-                                    transition_name = f"{self._MODES[1]}_to_{self._MODES[4]}",
-                                    success=transition,
-                                    message="transition exeucted"
-                                )
-                            )
+                    # FALLBACK
+                    guards_status.cruise_to_fb = guard_CRUISE_to_FB(
+                        agent_state=self._current_agent_state,
+                        obstacles_state=self._current_obstacles_state,
+                        unsafe_set=self._current_unsafe_set
+                    )
+                    # WAYPOINT_REACHED
+                    guards_status.cruise_to_waypoint_reached = guard_CRUISE_to_WAYPOINT_REACHED(
+                        agent_state=self._current_agent_state,
+                        current_waypoint=self._current_waypoint
+                    )
+                elif self._current_control_mode == self._MODES[2]:
+                    # T2LOS Transitions
+                    guards_status.control_mode = self._MODES[2]
 
-                        elif guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[4]}"]:
-                            """CRUISE to FB"""
-                            pass
+                    # CRUISE
+                    guards_status.t2los_to_cruise = guard_T2LOS_to_CRUISE(
+                        agent_state=self._current_agent_state,
+                        current_waypoint=self._current_waypoint,
+                        heading_error_tolerance=0.1
+                    )
 
-                        elif guard_to_check is self._GUARDS[f"{self._MODES[1]}_to_{self._MODES[5]}"]:
-                            """CRUISE to WAYPOINT_REACHED"""
-                            pass
+                    # Fallback
+                    guards_status.t2los_to_fb = guard_T2LOS_to_FB(
+                        agent_state=self._current_agent_state,
+                        obstacles_state=self._current_obstacles_state,
+                        unsafe_set=self._current_unsafe_set
+                    )
 
-                        elif guard_to_check is self._GUARDS[f"{self._MODES[2]}_to_{self._MODES[1]}"]:
-                            """T2LOS to CRUISE"""
-                            pass
+                    # WAYPOINT_REACHED
+                    guards_status.t2los_to_waypoint_reached = guard_T2LOS_to_WAYPOINT_REACHED(
 
-                        elif guard_to_check is self._GUARDS[f"{self._MODES[2]}_to_{self._MODES[4]}"]:
-                            """T2LOS to FB"""
-                            pass
+                    )
 
-                        elif guard_to_check is self._GUARDS[f"{self._MODES[3]}_to_{self._MODES[2]}"]:
-                            """"""
-                            pass
-                        else:
-                            print('GUARD EXCEPTION OCCURED')
-                            raise RuntimeError('guard exception')
-                        
-                    response.overall_success = True
-                    response.message = "Transitions have been evaluated"
-                    response.results = transition_results
-            else:
-                response.overall_success = True
-                response.message = "No transition names sent for evaluation"
-        except Exception as e:
-            self.get_logger(f"{self.__class__}::_evaluate_transitions: Exception occured: {str(e)}")
-            response.overall_success = False
-            response.message = str(e)
+                elif self._current_control_mode == self._MODES[3]:
+                    # fallback
+                    guards_status.control_mode = self._MODES[3]
+
+                elif self._current_control_mode == self._MODES[4]:
+                    # CRUISE
+                    guards_status.control_mode = self._MODES[4]
+
+                    guards_status.waypoint_reached_to_cruise = guard_WAYPOINT_REACHED_to_CRUISE(
+                        waypoints=self._current_waypoints
+                    )
+                else:
+                    self.get_logger().info('exception occured')
+                    self._NODE_PUBS["guards_status"].publish(GuardsStatus(
+                        control_mode="NA",
+                        timestamp=get_current_ros_time()
+                    ))
+
+        except Exception as e: 
+            self.get_logger().info(str(e))
+            guards_status.error = True
+            guards_status.error_message = str(e)
         
-        return response
+        guards_status.timestamp=get_current_ros_time()
+        self._NODE_PUBS["guards_status"].publish(guards_status)
 
     def _init_node_subs(self):
         try:
             return {
+                "control_mode": self.create_subscription(
+                    topic="/hybrid_automaton/current_mode",
+                    msg_type=String,
+                    callback=self._control_mode_update,
+                    qos_profile=QOS_PROFILE
+                ),
+                "waypoints": self.create_subscription(
+                    topic="/hybrid_automaton/waypoints",
+                    msg_type= Waypoints,
+                    callback=self._waypoints_update,
+                    qos_profile=QOS_PROFILE
+                ), 
                 "agent_update": self.create_subscription(
                     topic = "/agent_update",
                     msg_type = AgentUpdate,
@@ -171,12 +209,19 @@ class HAGuardsNode(Node):
         except Exception as e:
             self.get_logger().error(str(e))
             raise e
-        
-    def _agent_update_callback(self, msg: AgentUpdate):
-        pass
+    
+    def _waypoints_update(self, waypoints: Waypoints):
+        self._current_waypoints = waypoints
+        self._current_waypoint = self._current_waypoints.waypoints[0]
 
-    def _obstacles_update(self, msg:ObstaclesUpdate):
-        pass
+    def _control_mode_update(self, control_mode: String):
+        self._current_control_mode = control_mode.data
+
+    def _agent_update_callback(self, agent_update: AgentUpdate):
+        self._current_agent_state = agent_update
+
+    def _obstacles_update(self, obstacle_update: ObstaclesUpdate):
+        self._current_obstacles_state = obstacle_update
 
 
 def main(args=None):
