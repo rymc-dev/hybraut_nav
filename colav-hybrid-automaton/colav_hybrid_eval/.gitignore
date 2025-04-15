@@ -1,0 +1,6 @@
+# Ignore coverage report directory
+htmlcov/
+.coverage
+
+# Ignore all __pycache__ directories everywhere
+**/__pycache__/

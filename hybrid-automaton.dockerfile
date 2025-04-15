@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install colav-bridge==0.0.2
 RUN pip install colav-protobuf-utils==0.1.4
 RUN pip install pytest-dependency
+RUN pip install coverage
 
 # Create workspace directory
 RUN mkdir -p /home/ros2_ws/src

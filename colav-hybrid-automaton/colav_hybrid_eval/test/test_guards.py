@@ -10,7 +10,7 @@ and confirm the expected functionality of each guard.
 :date: April 11, 2025
 """
 
-from typing import Tuple
+from typing import Tuple, Union
 from std_msgs.msg import Header
 
 import sys
@@ -20,6 +20,7 @@ from geometry_msgs.msg import Point, Point32, Pose, Quaternion
 from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
 from utils import get_current_ros_time
+from builtin_interfaces.msg import Time
 
 from scripts.guards import ( 
     guard_CRUISE_to_FB,
@@ -203,29 +204,66 @@ from scripts.guards import (
     #     "static obstacle outside distance threshold outside line of sight"
     # )
     # Test Case 9: agent_update out of sync
-
-    # Test Case 10: obstacles_update out of sync
-
-    # Test Case 11: UnsafeSet out of sync
+    (
+        (
+            AgentUpdate(header=Header(stamp=Time(sec=0, nanosec=0))),
+            ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+            UnsafeSet(header=Header(stamp=get_current_ros_time())),
+            Waypoint(),
+            float(50)
+        ),
+        TimeoutError('Timeout Exception occured'),
+        "Timeout error was not thrown for ObstaclesUpdate"
+    ),
+    # Test Case 20: obstacle_update out of sync
+    (
+        (
+            AgentUpdate(header=Header(stamp=get_current_ros_time())),
+            ObstaclesUpdate(header=Header(stamp=Time(sec=1, nanosec=0))),
+            UnsafeSet(header=Header(stamp=get_current_ros_time())),
+            Waypoint(),
+            float(50)
+        ),
+        TimeoutError('Timeout Exception occured'),
+        "Timeout error was not thrown for ObstaclesUpdate"
+    ),
+    # Test Case 11: unsafe_set out of sync
+    (
+        (
+            AgentUpdate(header=Header(stamp=get_current_ros_time())),
+            ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+            UnsafeSet(header=Header(stamp=Time(sec=0, nanosec=0))),
+            Waypoint(),
+            float(50)
+        ),
+        TimeoutError('Timeout Exception occured'),
+        "Timeout error was not thrown for ObstaclesUpdate"
+    ),
 ])
-def test_guard_CRUISE_to_T2Theta(
+def test_guard_CRUISE_to_T2LOS_1(
     input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
-    expected_output: bool,
+    expected_output: Union[bool, Exception],
     description: str
 ):
-    """
+    """        TimeoutError('timeout occured withkget_current_ros_time())),
+            Waypoint(),
+            float(50)
     Test if the guard_CRUISE_to_T2Theta is working correctly. 
 
     This test verifies:
     1. guard correctly evaluates unsafe set scenarios and returns expected transition evaluation
     2. TODO: guard correctly evaluates static obstacles scenarios and returns expected transition evaluation
-    3. TODO: guard handles out of sync state updates and raises exception
+    3. guard handles out of sync state updates and raises exception
     4. TODO: guard handles invalid input data and raises exception
 
     :raises: AssertionError if any of the checks fails
     """
-    actual = guard_CRUISE_to_T2LOS_1(*input_args)
-    assert actual == expected_output, f"{description}: expected {expected_output}, got {actual}"
+    try:
+        actual = guard_CRUISE_to_T2LOS_1(*input_args)
+        assert actual == expected_output, f"{description}: expected {expected_output}, got {actual}"
+    except Exception as e:
+        assert type(e) == type(expected_output), f"{description}, expected {expected_output}, got {type(e)}"
+        assert str(e) == str(expected_output), f"{description}, expected {expected_output}, got {str(e)}"
 
 @pytest.mark.parametrize("input_args, expected_output, description", [
     # Test Case 1: Agent heading is not within error tolerance
@@ -254,7 +292,7 @@ def test_guard_CRUISE_to_T2Theta(
         "agent_state heading is current within LOS error tolerance of current waypoint"
     )
 ])
-def test_guard_CRUISE_to_T2LOS(input_args: Tuple[AgentUpdate, Waypoint, float], expected_output, description):
+def test_guard_CRUISE_to_T2LOS_2(input_args: Tuple[AgentUpdate, Waypoint, float], expected_output, description):
     """
     Test if guard_CRUISE_to_T2LOS is working correctly.
 
@@ -363,6 +401,7 @@ def test_guard_CRUISE_to_WAYPOINT_REACHED(
     """
     actual = guard_CRUISE_to_WAYPOINT_REACHED(*input_args)
     assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
+
 
 """T2LOS Guards Tests"""
 @pytest.mark.parametrize("input_args, expected_output, description", [

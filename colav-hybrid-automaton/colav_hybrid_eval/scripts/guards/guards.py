@@ -6,7 +6,7 @@ import numpy as np
 
 from utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
 from utils import (
-    timestamps_within_tolerance,
+    validate_timestamps_within_tolerance,
     delta_heading,
     euclidean_distance,
     quaternion_to_heading,
@@ -17,6 +17,9 @@ from typing import List
 # Constant distance threshold (DSF) for now.
 DSF = 80  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
 tolerance = Duration(sec=1, nanosec=0)
+
+max_yaw_rate = 0.2
+Tp = ((1*np.pi) / max_yaw_rate) # Tp finite time stabilization law: time to convergence with full 180degree maneuver total angle to turn/ in radians / max_yaw_rate 
 
 """1. CRUISE Guard Functions"""
 
@@ -48,10 +51,9 @@ def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
 
     # Validate timestamps of sync messages ensuring they are within tolerance
     system_timestamp = get_current_ros_time()
-    if not timestamps_within_tolerance(system_timestamp, agent_state.header.stamp, tolerance) and \
-        timestamps_within_tolerance(system_timestamp, obstacles_state.header.stamp, tolerance) and \
-            timestamps_within_tolerance(system_timestamp, unsafe_set.header.stamp, tolerance):
-        raise TimeoutError('input args out of sync dropping arg this timestamp')
+    validate_timestamps_within_tolerance(system_timestamp, agent_state.header.stamp, tolerance)
+    validate_timestamps_within_tolerance(system_timestamp, obstacles_state.header.stamp, tolerance)
+    validate_timestamps_within_tolerance(system_timestamp, unsafe_set.header.stamp, tolerance)
 
 
     agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
@@ -151,10 +153,10 @@ def guard_CRUISE_to_FB(agent_state: AgentUpdate,
 
     # Check if unsafe set data exists and apply collision conditions.
     if unsafe_set.vertices.data:
-        if is_inside_unsafe_set(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance):
+        if is_inside_unsafe_set(agent_state=agent_state, unsafe_set=unsafe_set):
             return True
 
-        if is_imminent_collision(agent_state=agent_state, unsafe_set=unsafe_set, tolerance=tolerance):
+        if is_imminent_collision(agent_state=agent_state, unsafe_set=unsafe_set):
             return True
         
     return False
@@ -196,6 +198,7 @@ def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate,
         return True
 
     return False
+
 
 """2. T2LOS Guard Functions"""
 

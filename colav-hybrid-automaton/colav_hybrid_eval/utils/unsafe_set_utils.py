@@ -2,24 +2,21 @@ from colav_interfaces.msg import AgentUpdate, UnsafeSet
 from builtin_interfaces.msg import Duration
 from shapely.geometry import Polygon, Point
 import inspect
-from .validate_timestamps import timestamps_within_tolerance
+from typing import List, Tuple
 
-# Optional: Create a helper to build Duration
-def make_duration(sec: int, nanosec: int) -> Duration:
-    d = Duration()
-    d.sec = sec
-    d.nanosec = nanosec
-    return d
+def extract_polygon_vertices(unsafe_set: UnsafeSet) -> List[Tuple[float, float]]:
+    """
+      extract_polygon_vertices
+      This function extracts the vertices of the unsafe_set
 
-def extract_polygon_vertices(unsafe_set: UnsafeSet):
-    # Use a consistent attribute (e.g., _vertices) for extraction.
+      returns: List[Tuple[float, float]] a list of tuple vertices, x,y coordinates
+    """
     data = unsafe_set._vertices.data  # or unsafe_set.vertices.data if that's the proper attribute
     unsafe_set_vertices_x = [data[i] for i in range(0, len(data), 2)]
     unsafe_set_vertices_y = [data[i] for i in range(1, len(data), 2)]
     return list(zip(unsafe_set_vertices_x, unsafe_set_vertices_y))
 
-def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
-                           tolerance: Duration = None) -> bool:
+def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet) -> bool:
     """
     Checks if the agent is within the unsafe set based on its safety radius.
     
@@ -36,18 +33,6 @@ def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
       ValueError: If the agent safety radius is invalid.
       TimeoutError: If the timestamps are not updated within the given tolerance.
     """
-    # Default tolerance if not provided.
-    if tolerance is None:
-        tolerance = make_duration(1, 1)
-
-    # Validate the timestamps of agent_state and unsafe_set.
-    # if not validate_timestamps(agent_state, unsafe_set, tolerance):
-    #     func_name = inspect.currentframe().f_code.co_name
-    #     raise TimeoutError(f"{__file__}::{func_name}: "
-    #                        f"State variables agent_state and unsafe_set were not updated within tolerance: \n"
-    #                        f"\tagent_update_timestamp: {agent_state.header.stamp}\n"s
-    #                        f"\tunsafe_set_update_timestamp: {unsafe_set.header.stamp}\n"
-    #                        f"\ttolerance: {tolerance}")
 
     # Check if there is any unsafe set defined.
     if not unsafe_set._vertices.data:
@@ -71,11 +56,12 @@ def is_inside_unsafe_set(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
     # Return whether the agent's safety circle intersects the unsafe set.
     return agent_circle.intersects(unsafe_set_polygon)
 
-def is_imminent_collision(agent_state: AgentUpdate, unsafe_set: UnsafeSet,
-                          tolerance: Duration = None):
+def is_imminent_collision(agent_state: AgentUpdate, unsafe_set: UnsafeSet) -> bool:
     """
-      checks if a collision with unsafe set inevitable given the constraints of the agent_vessel
-       
+    is_imminent_collision
+    checks if a collision with unsafe set inevitable given the constraints of the agent_vessel
+
+    returns: boolean; True is imminet_collision otherwise false
     """
     # TODO: 
     return False
