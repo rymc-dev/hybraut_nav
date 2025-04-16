@@ -2,63 +2,53 @@ import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult, ParameterType
 import os
+
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, ControllerFeedback
 from colav_interfaces.srv import StartHybridAutomaton
 from std_srvs.srv import Trigger
 from colav_hybrid_chart.config.qos_config import QOS_PROFILE
-from colav_interfaces.srv import EvaluateTransitions
 from colav_hybrid_chart.utils.node_utils import create_cli
+from colav_interfaces.msg import GuardsStatus, Waypoints, Waypoint
+from std_msgs.msg import String
 
 class HAChart(Node):
     """
-        This class implements a hybrid automaton chart for the COLAV project.
-        It is responsible for managing the different modes of operation of the system,
-        including the transitions between these modes based on guard conditions.
-        The chart is designed to handle various control policies and behaviors
-        for the system while in each mode.
-
-        formal definition of the hybrid automaton chart: 
-            HA: (Q, X, F, Init, Inv, E, G, R)
-
-            where: 
-                Q: set of modes
-                X: set of continuous states
-                F: Dynamics of the system (mode behavior/control policies)
-                Init: Initial state of the system (discrete state (chart initial control mode) and continuous state (environment))
-                Inv: Invariants of the system (
-                E: set of transitions
-                G: guard conditions
-                R: reset conditions
+    This class implements a hybrid automaton chart for the COLAV project.
+    It manages different modes of operation of the system, including transitions
+    between modes based on guard conditions. The hybrid automaton is defined as:
+        HA: (Q, X, F, Init, Inv, E, G, R)
+    
+    Where:
+        Q: set of modes
+        X: set of continuous states
+        F: Dynamics (control policies for each mode)
+        Init: Initial discrete and continuous states
+        Inv: Invariants of the system
+        E: set of transitions
+        G: guard conditions
+        R: reset conditions
     """
 
-    """
-    _MODES: This dict stores the key-values for control modes for the hybrid automaton
-            the numbers associated with the names of the actual control modes.
-    """
-    _MODES = {  # dict showing the name of the control modes.
-        1: "CRUISE",
-        2: "T2LOS",
-        4: "FB",
-        4: "WAYPOINT_REACHED"
+    # Define control modes with unique keys
+    _MODES = {
+        1: "cruise",
+        2: "t2los",
+        3: "fb",
+        4: "waypoint_reached"
     }
 
-    """
-    _INIT_STATES: This dict stores the initial discrete and continuous states from when the hybrid automaton 
-                  is started
-    """
-    _INIT_STATES = {  # Corrected assignment with '='
-        "discrete": _MODES[1],  # Discrete state is the initial control mode
-        "continuous": { # Continuous state space is defined as agent, obstacles, unsafe set and waypoints
-            "agent": AgentUpdate(), # agent will have initial agent passed in.
-            "obstacles": ObstaclesUpdate(), # obstacles will have initial obstacles passed in
-            "waypoints": [], # waypoints will have initial goal waypoint appended on init.
-            "unsafe_set": UnsafeSet() # unsafe set will have initial unsafe set passed in 
+    # Initial states of the automaton (discrete and continuous)
+    _INIT_STATES = {
+        "discrete": _MODES[1],
+        "continuous": {
+            "agent": AgentUpdate(),
+            "obstacles": ObstaclesUpdate(),
+            "waypoints": [],
+            "unsafe_set": UnsafeSet()
         }
     }
 
-    """
-    _STATES: This dict stores the continuous states
-    """
+    # Current states (continuous)
     _STATES = {
         "agent": AgentUpdate(),
         "obstacles": ObstaclesUpdate(),
@@ -66,47 +56,48 @@ class HAChart(Node):
         "unsafe_set": UnsafeSet()
     }
 
-    """
-    _TRANSITIONS: This dict shows the transitions associated with the hybrid automatons
-                  different control modes
-    """
+    # Transitions for each mode along with their priorities
     _TRANSITIONS = {
-        _MODES[1]: [ # 1. CRUISE
-            (f"{_MODES[1]}_to_{_MODES[2]}_1", 3), # T2LOS: guard/reset: PRIORITY = 4
-            (f"{_MODES[1]}_to_{_MODES[2]}_2", 4), # T2LOS: gurad PRIORITY = 4
-            (f"{_MODES[1]}_to_{_MODES[3]}", 1), # FALLBACK: PRIORITY = 1
-            (f"{_MODES[1]}_to_{_MODES[4]}", 2), # WAYPOINT_REACHED: PRIORITY = 2
+        _MODES[1]: {  # CRUISE
+            f"{_MODES[1]}_to_{_MODES[2]}1": 3,  # CRUISE to T2LOS (priority 3)
+            f"{_MODES[1]}_to_{_MODES[2]}2": 4,  # CRUISE to T2LOS (priority 4)
+            f"{_MODES[1]}_to_{_MODES[3]}": 1,      # CRUISE to FALLBACK (priority 1)
+            f"{_MODES[1]}_to_{_MODES[4]}": 2,      # CRUISE to WAYPOINT_REACHED (priority 2)
+        },
+        _MODES[2]: {  # T2LOS
+            f"{_MODES[2]}_to_{_MODES[3]}": 1,      # T2LOS to FALLBACK (priority 1)
+            f"{_MODES[2]}_to_{_MODES[1]}": 3,      # T2LOS to CRUISE (priority 3)
+            f"{_MODES[2]}_to_{_MODES[4]}": 2,      # T2LOS to WAYPOINT_REACHED (priority 2)
+        },
+        _MODES[3]: [  # FALLBACK
+            # Define fallback transitions if required
         ],
-        _MODES[2]: [ # 2: T2LOS
-            (f"{_MODES[3]}_to_{_MODES[4]}", 1), # FALLBACK: PRIORITY = 1
-            (f"{_MODES[3]}_to_{_MODES[1]}", 3), # CRUISE: PRIORITY = 3
-            (f"{_MODES[3]}_to_{_MODES[5]}", 2), # WAYPOINT_REACHED: PRIORITY = 5
+        _MODES[4]: {  # WAYPOINT_REACHED
+            f"{_MODES[4]}_to_{_MODES[1]}": 1       # WAYPOINT_REACHED to CRUISE (priority 1)
+        }
+    }
+
+    # Define transitions with reset conditions
+    _RESETS = {
+        _MODES[1]: [  # CRUISE 
+            f"{_MODES[1]}_to_{_MODES[2]}_1"
         ],
-        _MODES[3]: [ # 3: FB
-        ],
-        _MODES[4]: [ # 4: WAYPOINT_REACHED
-            (f"{_MODES[5]}_to_{_MODES[1]}", 1) # CRUISE: PRIORITY = 1 
+        _MODES[4]: [  # WAYPOINT_REACHED
+            f"{_MODES[4]}_to_{_MODES[1]}"
         ]
     }
 
-    _RESETS = { # dict showing the name of the transitions which have reset conditions
-        # _TRANSITIONS[_MODES[5]]: "test"
-    }
+    _INVARIANTS = {}
 
-    _INVARIANTS = {
-    }
-
-    def __init__(
-        self,
-        namespace:str = "hybrid_automaton",
-        name:str = "chart"
-    ):
+    def __init__(self, namespace: str = "hybrid_automaton", name: str = "chart"):
         """
-        colav_hybrid_chart init
+        Initialize the COLAV Hybrid Automaton Chart node.
         """
         super().__init__(name, namespace=namespace)
         self._NODE_SUBS = self._init_node_subs()
-        # Initialisation functions
+        self._NODE_CLIS = self._init_ha_clis()
+
+        # Create services to start and stop the hybrid automaton.
         self.create_service(
             StartHybridAutomaton,
             '/hybrid_automaton/start',
@@ -118,121 +109,197 @@ class HAChart(Node):
             self._stop_hybrid_automaton_callback
         )
 
-    def _start_hybrid_automaton_callback(self, request:StartHybridAutomaton.Request, response:StartHybridAutomaton.Response):
+    def _start_hybrid_automaton_callback(self, request: StartHybridAutomaton.Request,
+                                           response: StartHybridAutomaton.Response) -> StartHybridAutomaton.Response:
+        """
+        Callback to start the hybrid automaton.
+        """
         try:
-            # Initialize the hybrid automaton chart init states
             self.get_logger().info(f"/start_hybrid_automaton service called with request: {request}")
-            self._NODE_CLIS = self._init_ha_clis()
-            self._init_controller_feedback_pub() # Initialize the controller feedback publisher
-            self._init_ha(request) # Initialize the hybrid automaton chart
-            
+            self._ha_pubs = self._init_ha_pubs()  # Initialize controller feedback publisher
+            self._init_ha(request)                   # Initialize the hybrid automaton
+            # start the guards_evaluation
+            # start the dynamics evaluation
+            future = self._NODE_CLIS['start_guards_evaluation'].call_async(Trigger.Request())
+            future_response = future.result()
+            # Blocking until service responds:
+            # if not response.success: # TODO: NEED TO FIGURE OUT WHY THE FUTURE CLI IS NOT RECEIVING A RESPONSE
+            #     raise Exception(f'Failed to start guards_evaluation: reason: {response.message}')
+
+            # Start a timer to evaluate transitions periodically
             self._transition_eval_timer = self.create_timer(
-                1.0, # TODO: Need to make this a parameter received from colav_params_server
+                1.0,  # This timer period might later be parameterized.
                 self._evaluate_transitions
             )
+            self._guards_status = None
+
             response.success = True
             response.message = "Hybrid Automaton started successfully"
         except Exception as e:
-            self.get_logger().warning(f'Error in starting hybrid automaton: {str(e)}')
+            self.get_logger().warning(f"Error in starting hybrid automaton: {str(e)}")
             response.success = False
-            response.message = str(e) 
-
+            response.message = str(e)
         return response
-    
-    def _init_ha_clis(self):
-        """creates hybrid automaton specific clients."""
+
+    def _init_ha_clis(self) -> dict:
+        """
+        Creates hybrid automaton-specific service clients.
+        """
         try:
             return {
-                "evalute_transitions": create_cli(node=self, srv_type=EvaluateTransitions, srv_name='/hybrid_automaton/evaluate_transitions')
+                "start_guards_evaluation": create_cli(
+                    node=self,
+                    srv_type=Trigger,
+                    srv_name='/hybrid_automaton/guards_node/start_guard_evaluation'
+                ),
+                "stop_guards_evaluation": create_cli(
+                    node=self,
+                    srv_type=Trigger,
+                    srv_name='/hybrid_automaton/guards_node/stop_guards_evaluation'
+                )
             }
         except Exception as e:
-            self.get_logger().error(f"error occured: {str(e)}")
+            self.get_logger().error(f"Error occurred in client initialization: {str(e)}")
             raise e
 
-    def _init_controller_feedback_pub(self):
+    def _init_ha_pubs(self):
         """
-            This function initializes the publisher for controller feedback.
-            It creates a publisher that will publish messages to the '/controller_feedback' topic.
+        Initializes the publisher for controller feedback on the '/controller_feedback' topic.
         """
         try:
-            return self.create_publisher(
-                ControllerFeedback,
-                '/controller_feedback',
-                qos_profile=QOS_PROFILE
-            )
-        except Exception as e: 
-            self.get_logger().error(f"Error in initializing controller feedback publisher: {str(e)}")
+            return { 
+                'controller_feedback': self.create_publisher(
+                    ControllerFeedback,
+                    '/hybrid_automaton/controller_feedback',
+                    qos_profile=QOS_PROFILE
+                ),
+                'mode': self.create_publisher(
+                    String,
+                    '/hybrid_automaton/mode',
+                    qos_profile=QOS_PROFILE
+                ),
+                'waypoints': self.create_publisher(
+                    Waypoints,
+                    '/hybrid_automaton/waypoints',
+                    qos_profile=QOS_PROFILE
+                )
+            }
+        except Exception as e:
+            self.get_logger().error(f"Error initializing controller feedback publisher: {str(e)}")
             raise e
 
-    def _init_ha(self, request:StartHybridAutomaton.Request):
+    def _init_ha(self, request: StartHybridAutomaton.Request):
         """
-            This function initializes the hybrid automaton chart.
-            It sets the initial states and prepares the system for operation.
+        Initializes the hybrid automaton chart by setting the initial states.
         """
-        if self._STATES["agent"] is None or \
-            self._STATES["obstacles"] is None or \
-            self._STATES["unsafe_set"] is None:
+        # Ensure that key continuous states are not None
+        if (self._STATES["agent"] is None or
+                self._STATES["obstacles"] is None or
+                self._STATES["unsafe_set"] is None):
             raise ValueError("Initial states cannot be None")
         
-        # TODO: Got to validate the timestamp for STATES is within tolerance
+        # TODO: Validate the timestamp for STATES is within tolerance.
 
-        # TODO: Validate that the request mission_request.goal_waypoints is not empty and has at least one waypoint!!!!!
+        # TODO: Validate that mission_request.goal_waypoint is provided.
+
         self._CURRENT_MODE = self._INIT_STATES['discrete']
+        # Update the continuous part of the initial state
         self._INIT_STATES["continuous"]["agent"] = self._STATES["agent"]
         self._INIT_STATES["continuous"]["obstacles"] = self._STATES["obstacles"]
         self._INIT_STATES["continuous"]["unsafe_set"] = self._STATES["unsafe_set"]
         self._INIT_STATES["continuous"]["waypoints"] = [request.mission_request.goal_waypoint]
-    
+
     def _evaluate_transitions(self):
         """
-            This function evaluates the transitions between the different modes of operation
-            based on the guard conditions defined in the hybrid automaton chart.
+        Evaluates transitions between different modes based on guard conditions.
         """
-        # Evaluate transitions
-        request = EvaluateTransitions.Request()
-        request.transition_names = [transition[0] for transition in self._TRANSITIONS[self._CURRENT_MODE]]
-        future = self._NODE_CLIS['evalute_transitions'].call_async(request)
-        future.add_done_callback(self._transition_evaluation_callback)
-        # if transition results all return no transition
-            # Call the Dynamics controller for this mode and publish to controller feedback topic
-        # else 
-            # Transition to next control mode based on priority
-            # Make init dynamics request
-            # publish new dynamics to controller feedback
+        # Prepare request for evaluating transitions
+        
+        self._ha_pubs['mode'].publish(String(data=str(self._CURRENT_MODE).upper()))
+        self._ha_pubs['waypoints'].publish(Waypoints(waypoints=self._STATES['waypoints']))
+
+        try:
+            if self._guards_status is not None:
+                guards_to_check = self._guards_status.guard_names
+                guard_results = {}
+                for guard_name in guards_to_check:
+                    if hasattr(self._guards_status, guard_name):
+                        value = getattr(self._guards_status, guard_name)
+                        guard_results[guard_name] = value
+                    else:
+                        self.get_logger().warn(f'Guard name: "{guard_name}" not found in guard_status fields ')
+                active_guard = None
+                priority = -1
+                for guard, status in guard_results.items():
+                    if self._TRANSITIONS[self._CURRENT_MODE][guard] < priority or priority == -1:
+                        priority = self._TRANSITIONS[self._CURRENT_MODE][guard]
+                        active_guard = guard
+
+                # make transition based on active guard
+                if active_guard is not None:
+                    # TODO: first check if there is a reset for this guar
+                    new_control_mode = active_guard.split('_')[2] # Get transition to item from guard name
+                    self._CURRENT_MODE = new_control_mode  
+                    # If no reset condition for this guard then change control mode based on the transition
+
+                # need to now publish the latest dynamic updates!!!!!!
+
+        except Exception as e:
+            self.get_logger().error(f'Error occured: {str(e)}')
+
+
+        # request = EvaluateTransitions.Request()
+        # request.transition_names = [transition[0] for transition in self._TRANSITIONS[self._CURRENT_MODE]]
+        # cli = self._NODE_CLIS['evaluate_transitions']
+        # future = cli.call_async(request)
+        # future.add_done_callback(self._transition_evaluation_callback)
+
     def _transition_evaluation_callback(self, future):
-        try: # create callback group based on future.messages, call all the guard functions asyncronously and return results in response.
+        """
+        Callback to process the results of transition evaluation.
+        """
+        try:
             response = future.result()
             if response.overall_success:
-                # Iterate through 
-                active_transitions = []
-                for transition in response.results:
-                    if transition.success:
-                        active_transitions.append(transition)
-                
-                active_transition_priority = -1
-                active_transition = None
-                for op_active_transition in active_transitions:
-                    if active_transition_priority == -1:
-                        active_transition = op_active_transition
-                        active_transition_priority = self._TRANSITIONS[active_transition['transition_name'][1]]
-                    if self._TRANSITIONS[active_transition['transition_name']][1] < active_transition_priority:
-                        active_transition = op_active_transition
-                        active_transition_priority = self._TRANSITIONS[active_transition['transition_name']][1]
+                # Filter active transitions (those with a successful guard evaluation)
+                active_transitions = [t for t in response.results if t.success]
+                if active_transitions:
+                    # Determine the transition with the highest priority (lowest numerical value)
+                    def get_priority(transition_name):
+                        for trans, priority in self._TRANSITIONS[self._CURRENT_MODE]:
+                            if trans == transition_name:
+                                return priority
+                        return float('inf')
 
-                # MOVE TO NEW CONTROL MODE
-                pass
-                # self._CURRENT_MODE = 
+                    active_transition = min(active_transitions, key=lambda t: get_priority(t.transition_name))
+                    self.get_logger().info(f"Active transition: {active_transition.transition_name}")
+
+                    # TODO: Execute any reset/update actions,
+                    # and update the _CURRENT_MODE based on the chosen transition.
+                    pass
+                else:
+                    # No transition was activated: execute dynamics for the current mode.
+                    pass
             else:
-                raise RuntimeError(f"transition evaluation failed: {response.message}")
+                raise RuntimeError(f"Transition evaluation failed: {response.message}")
         except Exception as e:
             self.get_logger().error(str(e))
             raise e
 
+    def _stop_hybrid_automaton_callback(self, request: Trigger.Request,
+                                          response: Trigger.Response) -> Trigger.Response:
+        """
+        Placeholder for stopping the hybrid automaton.
+        """
+        # TODO: Add logic to gracefully stop the automaton.
+        response.success = True
+        response.message = "Stop function not implemented yet"
+        return response
 
-    def _stop_hybrid_automaton_callback(self, request:Trigger.Request, response:Trigger.Response):
-        pass
-
-    def _init_node_subs(self):
+    def _init_node_subs(self) -> dict:
+        """
+        Initializes subscriptions for continuous state updates.
+        """
         try:
             return {
                 "agent_update": self.create_subscription(
@@ -249,21 +316,30 @@ class HAChart(Node):
                 ),
                 "unsafe_set_update": self.create_subscription(
                     msg_type=UnsafeSet,
-                    topic='/unsafe_set_update',
+                    topic='/unsafe_set',
                     callback=lambda msg: self._STATES.__setitem__("unsafe_set", msg),
+                    qos_profile=QOS_PROFILE
+                ),
+                "guards_status_update": self.create_subscription(
+                    msg_type=GuardsStatus,
+                    topic='/hybrid_automaton/guards_status',
+                    callback=lambda msg: setattr(self, '_guards_status', msg),
                     qos_profile=QOS_PROFILE
                 )
             }
         except Exception as e:
-            self.get_logger().error(str(e))
+            self.get_logger().error(f"Error initializing subscriptions: {str(e)}")
             raise e
+
+from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
-    node = None
+    node = HAChart()
     try:
-        node = HAChart()
-        rclpy.spin(node)
+        executor = MultiThreadedExecutor()
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     except Exception as e:

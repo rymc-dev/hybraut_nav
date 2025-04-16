@@ -2,5 +2,5 @@
 source /opt/ros/humble/setup.bash
 source /home/ros2_ws/install/setup.bash 
 cd /workspace/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_eval
-python3 -m coverage run -m pytest 
+python3 -m coverage run -m pytest -s
 python3 -m coverage html

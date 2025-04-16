@@ -18,6 +18,7 @@ from scripts.dynamics import (
     dynamics_FB,
     dynamics_WAYPOINT_REACHED
 )
+from std_srvs.srv import Trigger
 
 class DynamicsNode(Node):
     
@@ -48,6 +49,29 @@ class DynamicsNode(Node):
              UpdateDynamics,
              self._update_dynamics
         )
+
+    def _init_node_srvs(self):
+        """""" 
+        try:
+            return {
+                "start_dynamic_evaluations": self.create_service(
+                    srv_type=Trigger,
+                    srv_name='start_dynamics_evaluation',
+                    callback=self._start_dynamics_evaluation_callback
+                
+                ),
+                "stop_dynamics_evaluations": self.create_service(
+                    srv_type=Trigger,
+                    srv_name='/stop_dynamics_evaluation',
+                    callback=self._stop_dynamics_evaluation_callback
+                )
+            }
+        except Exception as e:
+            self.get_logger().error('Error when iniitialising hybrid automaton services')
+
+    def _start_dynamics_evaluation_callback(self, request: Trigger.Request, response: Trigger.Response):
+        """callback for starting dynamics evaluation callback"""
+        pass
 
     def _update_dynamics(self, request: UpdateDynamics.Request, response: UpdateDynamics.Response):
         """updating dynamics"""

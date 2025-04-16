@@ -1,4 +1,4 @@
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
+from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, Waypoints
 from std_msgs.msg import Header
 from builtin_interfaces.msg import Duration, Time
 from shapely.geometry import Polygon, LineString
@@ -14,6 +14,7 @@ from utils import (
 )
 from typing import List
 
+
 # Constant distance threshold (DSF) for now.
 DSF = 80  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
 tolerance = Duration(sec=1, nanosec=0)
@@ -27,7 +28,8 @@ def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
                             obstacles_state: ObstaclesUpdate, 
                             unsafe_set: UnsafeSet, 
                             waypoint: Waypoint, 
-                            dsf: float = DSF) -> bool:
+                            dsf: float = DSF,
+                            tolerance: float = Duration(sec=1)) -> bool:
     """
     Guard for transition from CRUISE to T2LOS (Guard 1)
 
@@ -87,7 +89,7 @@ def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
 def guard_CRUISE_to_T2LOS_2(agent_state: AgentUpdate, 
                             current_waypoint: Waypoint, 
                             heading_error_tolerance: float = 0.1, 
-                            tolerance: Duration = None) -> bool:
+                            tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for the second transition condition to T2LOS
 
@@ -122,13 +124,13 @@ def guard_CRUISE_to_T2LOS_2(agent_state: AgentUpdate,
     )
     
     # If the heading error is within the allowed tolerance, return True.
-    return waypoint_heading_error < heading_error_tolerance
+    return bool(waypoint_heading_error < heading_error_tolerance)
 
 
 def guard_CRUISE_to_FB(agent_state: AgentUpdate, 
                        obstacles_state: ObstaclesUpdate, 
                        unsafe_set: UnsafeSet, 
-                       tolerance: Duration = None) -> bool:
+                       tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from CRUISE to FB (Fallback)
 
@@ -164,7 +166,7 @@ def guard_CRUISE_to_FB(agent_state: AgentUpdate,
 
 def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate, 
                                      current_waypoint: Waypoint, 
-                                     tolerance: Duration = None) -> bool:
+                                     tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from CRUISE to WAYPOINT_REACHED
 
@@ -205,7 +207,7 @@ def guard_CRUISE_to_WAYPOINT_REACHED(agent_state: AgentUpdate,
 def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate, 
                           current_waypoint: Waypoint, 
                           heading_error_tolerance: float, 
-                          tolerance: Duration = None) -> bool:
+                          tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from T2LOS back to CRUISE
 
@@ -228,7 +230,7 @@ def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate,
 def guard_T2LOS_to_FB(agent_state: AgentUpdate, 
                       obstacles_state: ObstaclesUpdate, 
                       unsafe_set: UnsafeSet, 
-                      tolerance: Duration = None) -> bool:
+                      tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from T2LOS to FB (Fallback)
 
@@ -246,8 +248,22 @@ def guard_T2LOS_to_FB(agent_state: AgentUpdate,
     """
     return guard_CRUISE_to_FB(agent_state, obstacles_state, unsafe_set, tolerance)
 
-def guard_T2LOS_to_WAYPOINT_REACHED():
-    pass
+def guard_T2LOS_to_WAYPOINT_REACHED(agent_state: AgentUpdate, current_waypoint: Waypoint, tolerance: Duration = Duration(sec=1)) -> bool:
+    """
+    Guard for transition from T2LOS to WAYPOINT_REACHED
+
+    Transition conditions: 
+     - Reuses the CRUISE to WAYPOINT_REACHED condition to check if agent_state is within current_waypoints acceptance radius
+
+    Parameters: 
+        agent_state (AgentUpdate): Current state of the agent.
+        current_waypoint (Waypoint): current waypoint for the hybrid automaton
+        tolerance (float): tolerance duration for valid messages.
+
+    Returns: 
+        bool: True is transition to WAYPOINT_REACHED is required, otherwise False
+    """
+    return bool(guard_CRUISE_to_WAYPOINT_REACHED(agent_state=agent_state, current_waypoint=current_waypoint, tolerance=tolerance))
 
 """3. FB Guard Functions"""
 # Currently no transitions out of the fallback state; therefore, no guards are implemented.
@@ -255,8 +271,8 @@ def guard_T2LOS_to_WAYPOINT_REACHED():
 
 """4. WAYPOINT_REACHED Guard Functions"""
 
-def guard_WAYPOINT_REACHED_to_CRUISE(waypoints: List[Waypoint], 
-                                       tolerance: Duration = None) -> bool:
+def guard_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints, 
+                                       tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transitioning from WAYPOINT_REACHED to CRUISE
 
@@ -274,4 +290,4 @@ def guard_WAYPOINT_REACHED_to_CRUISE(waypoints: List[Waypoint],
         TimeoutError: If the evaluation takes too long.
         ValueError: If input values are invalid.
     """
-    return len(waypoints) > 1
+    return len(waypoints._waypoints) > 1
