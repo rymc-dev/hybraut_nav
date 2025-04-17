@@ -1,9 +1,9 @@
 import rclpy
-from colav_hybrid_eval.scripts.nodes.guards_node import HAGuardsNode
+from colav_hybrid_eval.scripts.nodes.guards_node import GuardsNode
 
 def main(args = None):
     rclpy.init()
-    node = HAGuardsNode()
+    node = GuardsNode()
 
     try: 
         rclpy.spin(node=node)

@@ -27,9 +27,8 @@ from colav_hybrid_eval.scripts.guards import (
 )
 from builtin_interfaces.msg import Duration
 from rclpy.executors import MultiThreadedExecutor
-from colav_interfaces.msg import Waypoint, UnsafeSet, Waypoints
+from colav_interfaces.msg import UnsafeSet, Waypoints
 from std_msgs.msg import String
-from typing import List
 from std_srvs.srv import Trigger
 
 class InitializationError(Exception):
@@ -39,7 +38,8 @@ class InitializationError(Exception):
         self.component = component
         self.message = message
 
-class HAGuardsNode(Node):
+class GuardsNode(Node):
+
     _MODES = {  # dict showing the name of the control modes.
         1: "CRUISE",
         2: "T2LOS",
@@ -52,6 +52,9 @@ class HAGuardsNode(Node):
         namespace:str = "hybrid_automaton",
         name:str = "guards_node"
     ):
+        """
+        init of 
+        """
         super().__init__(name, namespace=namespace)
 
         # Initialize the ThreadPoolExecutor
@@ -63,10 +66,6 @@ class HAGuardsNode(Node):
         self._current_waypoints = None
         self._current_unsafe_set = None
         self._current_control_mode = None
-
-        self._NODE_SUBS = None
-        self._NODE_PUBS = None
-        self._NODE_TIMERS = None
 
         # Initialisation functions
         self._NODE_SRVS = self._init_node_srvs()
@@ -104,6 +103,7 @@ class HAGuardsNode(Node):
             # Log the initialization start
             self.get_logger().info('Initializing guards evaluation components...')
 
+            self._current_control_mode = self._MODES[1]
             # Initialize node subscribers
             self._node_subs = self._init_node_subs()
             self.get_logger().debug(f'Node subscribers initialized: {self._node_subs}')
@@ -135,7 +135,11 @@ class HAGuardsNode(Node):
 
         return response
 
-    def _stop_guards_evaluation_callback(self, request: Trigger.Request, _) -> Trigger.Response:
+    def _stop_guards_evaluation_callback(
+        self,
+        request: Trigger.Request,
+        _,
+    ) -> Trigger.Response:
         """
         callback to stop guards guards evaluation:
         - destroys the Subscrbers, Publisher, and timers
@@ -143,22 +147,18 @@ class HAGuardsNode(Node):
         """
         response = Trigger.Response()
         try:
-            if self._NODE_SUBS is not None:
-                for key in self._NODE_SUBS:
-                    self.destroy_subscription(self._NODE_SUBS[key])
-            if self._NODE_PUBS is not None:
-                for key in self._NODE_PUBS:
-                    self.destroy_publisher(self._NODE_PUBS[key])
-            if self._NODE_TIMERS is not None:
-                for key in self._NODE_TIMERS:
-                    self.destroy_timer(self._NODE_TIMERS[key])
-
+            for collection in (self._node_subs, self._node_pubs, self._node_timers):
+                for handle in collection.values():
+                    destroy = getattr(self, f"destroy_{handle.__class__.__name__.lower()}", None)
+                    if callable(destroy):
+                        destroy(handle)
             response.success = True
-            response.message = 'Successfully shut down subs, pubs and srvs related to guards_evaluation'
-        except Exception as e: 
+            response.message = 'Guards evaluation stopped successfully'
+            self.get_logger().info(response.message)
+        except Exception as e:
+            self.get_logger().exception('Error in stop callback')
             response.success = False
             response.message = str(e)
-
         return response
 
     def _init_node_pubs(self):
@@ -173,6 +173,59 @@ class HAGuardsNode(Node):
             }
         except Exception as e: 
             raise InitializationError(f"Publishers",  f"Failed to create one or more subscriptions: {e}")
+
+    def _init_node_subs(self):
+        """initialisation the nodes subscriptions for the guard_evaluation component."""
+        try:
+            return {
+                "mode": self.create_subscription(
+                    topic="/hybrid_automaton/mode",
+                    msg_type=String,
+                    callback=lambda msg: self.__setattr__('_current_control_mode', msg.data),
+                    qos_profile=QOS_PROFILE
+                ),
+                "waypoints": self.create_subscription(
+                    topic="/hybrid_automaton/waypoints",
+                    msg_type= Waypoints,
+                    callback=self._waypoints_update_callback,
+                    qos_profile=QOS_PROFILE
+                ), 
+                "agent_update": self.create_subscription(
+                    topic="/agent_update",
+                    msg_type=AgentUpdate,
+                    callback=lambda msg: self.__setattr__('_current_agent_state', msg),
+                    qos_profile=QOS_PROFILE
+                ),
+                "obstacles_update": self.create_subscription(
+                    topic="/obstacles_update",
+                    msg_type=ObstaclesUpdate,
+                    callback=lambda msg: self.__setattr__('_current_obstacles_state', msg),
+                    qos_profile=QOS_PROFILE
+                ),
+                "unsafe_set": self.create_subscription(
+                    topic="/unsafe_set",
+                    msg_type=UnsafeSet,
+                    callback=lambda msg: self.__setattr__('_current_unsafe_set', msg),
+                    qos_profile=QOS_PROFILE
+                )
+            }
+        except Exception as e:
+            raise InitializationError("Subscribers", f"Failed to create one or more subscriptions: {e}")
+    
+    def _waypoints_update_callback(self, waypoints: Waypoints):
+        """
+        Callback function for waypoints subscription.
+        
+        Updates the internal `_current_waypoints` and sets `_current_waypoint` 
+        to the first waypoint if available; otherwise sets it to None.
+        """
+        self._current_waypoints = waypoints
+
+        waypoints_list = getattr(waypoints, 'waypoints', [])
+        if waypoints_list:
+            self._current_waypoint = waypoints_list[0]
+        else:
+            self._current_waypoint = None
 
     def _init_node_timers(self):
         """initialize the node timers"""
@@ -198,7 +251,7 @@ class HAGuardsNode(Node):
         if any(state is None for state in required_states):
             return False
         return True
-
+    
     def _evaluate_transitions(self):
         """Evaluate transitions based on the control mode."""
         guards_status = GuardsStatus()
@@ -208,9 +261,9 @@ class HAGuardsNode(Node):
             if self._current_control_mode is None:
                 guards_status.control_mode = "NA"
                 guards_status.error = True
-                guards_status.error_message = "Transition evaluation states required not updated"
+                guards_status.error_message = "Transition evalustd_srvs/srv/Triggeration states required not updated"
                 guards_status.timestamp = current_time
-                self._NODE_PUBS["guards_status"].publish(guards_status)
+                self._node_pubs["guards_status"].publish(guards_status)
                 return
 
             # Map control modes to shorthand for readability
@@ -228,7 +281,7 @@ class HAGuardsNode(Node):
                     guards_status.error = True
                     guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
                     guards_status.timestamp = current_time
-                    self._NODE_PUBS["guards_status"].publish(guards_status)
+                    self._node_pubs["guards_status"].publish(guards_status)
                     return
 
                 # TODO: validate timestamps
@@ -269,7 +322,7 @@ class HAGuardsNode(Node):
                     guards_status.error = True
                     guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
                     guards_status.timestamp = current_time
-                    self._NODE_PUBS["guards_status"].publish(guards_status)
+                    self._node_pubs["guards_status"].publish(guards_status)
                     return
 
                 # TODO: validate timestamps
@@ -299,7 +352,7 @@ class HAGuardsNode(Node):
                     guards_status.error = True
                     guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
                     guards_status.timestamp = current_time
-                    self._NODE_PUBS["guards_status"].publish(guards_status)
+                    self._node_pubs["guards_status"].publish(guards_status)
                     return
 
                 # TODO: Validate timestamps for FALLBACK mode if needed
@@ -314,7 +367,7 @@ class HAGuardsNode(Node):
                     guards_status.error = True
                     guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
                     guards_status.timestamp = current_time
-                    self._NODE_PUBS["guards_status"].publish(guards_status)
+                    self._node_pubs["guards_status"].publish(guards_status)
                     return
 
                 # TODO: validate timestamps if necessary
@@ -324,7 +377,7 @@ class HAGuardsNode(Node):
 
             else:
                 self.get_logger().info("Unknown control mode encountered")
-                self._NODE_PUBS["guards_status"].publish(
+                self._node_pubs["guards_status"].publish(
                     GuardsStatus(
                         control_mode="NA",
                         timestamp=current_time,
@@ -337,71 +390,11 @@ class HAGuardsNode(Node):
             guards_status.error_message = str(e)
 
         guards_status.timestamp = get_current_ros_time()
-        self._NODE_PUBS["guards_status"].publish(guards_status)
-
-    def _state_update_check(self):
-        pass
-
-    def _init_node_subs(self):
-        """initialisation the nodes subscriptions for the guard_evaluation component."""
-        try:
-            return {
-                "mode": self.create_subscription(
-                    topic="/hybrid_automaton/mode",
-                    msg_type=String,
-                    callback=self._control_mode_update,
-                    qos_profile=QOS_PROFILE
-                ),
-                "waypoints": self.create_subscription(
-                    topic="/hybrid_automaton/waypoints",
-                    msg_type= Waypoints,
-                    callback=self._waypoints_update,
-                    qos_profile=QOS_PROFILE
-                ), 
-                "agent_update": self.create_subscription(
-                    topic = "/agent_update",
-                    msg_type = AgentUpdate,
-                    callback=self._agent_update_callback,
-                    qos_profile=QOS_PROFILE
-                ),
-                "obstacles_update": self.create_subscription(
-                    topic = "/obstacles_update",
-                    msg_type = ObstaclesUpdate,
-                    callback = self._obstacles_update,
-                    qos_profile=QOS_PROFILE
-                ),
-                "unsafe_set": self.create_subscription(
-                    topic="/unsafe_set",
-                    msg_type=UnsafeSet,
-                    callback=self._unsafe_set_callback,
-                    qos_profile=QOS_PROFILE
-                )
-            }
-        except Exception as e:
-            raise InitializationError("Subscribers", f"Failed to create one or more subscriptions: {e}")
-    
-    def _waypoints_update(self, waypoints: Waypoints):
-        self._current_waypoints = waypoints
-        if len(waypoints.waypoints):
-            self._current_waypoint = self._current_waypoints.waypoints[0]
-        else:
-            self._current_waypoint = None   
-
-    def _control_mode_update(self, control_mode: String):
-        self._current_control_mode = control_mode.data
-
-    def _agent_update_callback(self, agent_update: AgentUpdate):
-        self._current_agent_state = agent_update
-
-    def _obstacles_update(self, obstacle_update: ObstaclesUpdate):
-        self._current_obstacles_state = obstacle_update
-
-    def _unsafe_set_callback(self, unsafe_set_update: UnsafeSet):
-        self._current_unsafe_set = unsafe_set_update
+        self._node_pubs["guards_status"].publish(guards_status)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = HAGuardsNode()
+    node = GuardsNode()
     try:
         # executor = MultiThreadedExecutor()
         # executor.add_node(node)

@@ -1,7 +1,7 @@
 from .dynamics_node import DynamicsNode
-from .guards_node import HAGuardsNode
+from .guards_node import GuardsNode
 
 __all__ = [
     'DynamicsNode',
-    'HAGuardsNode'
+    'GuardsNode'
 ]
