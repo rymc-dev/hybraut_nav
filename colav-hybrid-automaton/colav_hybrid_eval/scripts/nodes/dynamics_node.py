@@ -158,7 +158,6 @@ class DynamicsNode(Node):
             dynamics_update.dynamics = dynamics
             dynamics_update.error = False
         except Exception as e:
-            self.get_logger().error(f'Error occured while updating dynamics: {str(e)}')
             dynamics_update.error = True
             dynamics_update.error_message = f"Error occured: {str(e)}"
 

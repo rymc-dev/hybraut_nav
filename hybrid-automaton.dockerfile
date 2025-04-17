@@ -68,4 +68,4 @@ RUN /bin/bash -c "echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc && \
 RUN /bin/bash -c "source /root/.bashrc"
 
 # Set the entrypoint command
-ENTRYPOINT [ "/bin/bash", "-c", "if [ \"$MODE\" = \"container\" ]; then source /opt/ros/humble/setup.bash && source /home/ros2_ws/install/setup.bash && ros2 launch colav_hybrid_bringup colav_hybrid_automaton.launch.py; else while true; do sleep 30; done; fi" ]
+ENTRYPOINT [ "/bin/bash", "-c", "if [ \"$MODE\" = \"container\" ]; then source /opt/ros/humble/setup.bash && source /home/ros2_ws/install/setup.bash && ros2 launch colav_hybrid_automaton_bringup colav_hybrid_automaton.launch.py; else while true; do sleep 30; done; fi" ]

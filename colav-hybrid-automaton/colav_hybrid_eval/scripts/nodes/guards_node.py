@@ -7,7 +7,7 @@ import os
 
 # Add path two directories back
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
+from rclpy.executors import MultiThreadedExecutor
 import rclpy
 from rclpy.node import Node
 import os
@@ -31,6 +31,13 @@ from colav_interfaces.msg import Waypoint, UnsafeSet, Waypoints
 from std_msgs.msg import String
 from typing import List
 from std_srvs.srv import Trigger
+
+class InitializationError(Exception):
+    """Custom exception for initialization-related failures."""
+    def __init__(self, component: str, message: str):
+        super().__init__(f"[{component}] {message}")
+        self.component = component
+        self.message = message
 
 class HAGuardsNode(Node):
     _MODES = {  # dict showing the name of the control modes.
@@ -82,24 +89,59 @@ class HAGuardsNode(Node):
         except Exception as e: 
             self.get_logger().error(f"{self.__class__}::_init_node_pubs: Exception occured: {str(e)}")
 
-    def _start_guards_evaluation_callback(self, request: Trigger.Request, _) -> Trigger.Response:
+    def _start_guards_evaluation_callback(
+        self,
+        request: Trigger.Request,
+        _
+    ) -> Trigger.Response:
+        """
+        Callback to start guard evaluation:
+        - Initializes subscribers, publishers, and timers
+        - Returns a Trigger.Response indicating success or error details
+        """
         response = Trigger.Response()
         try:
-            self._NODE_SUBS = self._init_node_subs()
-            self._NODE_PUBS = self._init_node_pubs()
-            self._NODE_TIMERS = self._init_node_timers()
+            # Log the initialization start
+            self.get_logger().info('Initializing guards evaluation components...')
 
+            # Initialize node subscribers
+            self._node_subs = self._init_node_subs()
+            self.get_logger().debug(f'Node subscribers initialized: {self._node_subs}')
+
+            # Initialize node publishers
+            self._node_pubs = self._init_node_pubs()
+            self.get_logger().debug(f'Node publishers initialized: {self._node_pubs}')
+
+            # Initialize timers
+            self._node_timers = self._init_node_timers()
+            self.get_logger().debug(f'Node timers initialized: {self._node_timers}')
+
+            # Update response on success
             response.success = True
-            response.message = "guards evaluation started"
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+            response.message = 'Guards evaluation started successfully'
+            self.get_logger().info('Guard evaluation started successfully')
+
+        except InitializationError as init_err:
+            # Handle known initialization errors separately
             response.success = False
-            response.message = str(e)
+            response.message = f'Initialization failed: {init_err}'
+            self.get_logger().error(response.message)
+
+        except Exception as e:
+            # Catch-all for unexpected exceptions with full traceback
+            response.success = False
+            response.message = f'Unexpected error during guards evaluation startup: {str(e)}'
+            self.get_logger().error(f'Unexpected error in _start_guards_evaluation_callback: {str(e)}')
+
         return response
 
-
-    def _stop_guards_evaluation_callback(self, request: Trigger.Request, response: Trigger.Response):
+    def _stop_guards_evaluation_callback(self, request: Trigger.Request, _) -> Trigger.Response:
+        """
+        callback to stop guards guards evaluation:
+        - destroys the Subscrbers, Publisher, and timers
+        - returns a Trigger.Response indicating success or error details
+        """
+        response = Trigger.Response()
         try:
             if self._NODE_SUBS is not None:
                 for key in self._NODE_SUBS:
@@ -130,7 +172,7 @@ class HAGuardsNode(Node):
                 )
             }
         except Exception as e: 
-            self.get_logger().error(f"{self.__class__}::_init_node_pubs: Exception occured: {str(e)}")
+            raise InitializationError(f"Publishers",  f"Failed to create one or more subscriptions: {e}")
 
     def _init_node_timers(self):
         """initialize the node timers"""
@@ -142,8 +184,7 @@ class HAGuardsNode(Node):
                 )
             }
         except Exception as e:
-            self.get_logger().error(f"{self.__class__}::_init_node_timers: Exception occured: {str(e)}")
-            raise e
+            raise InitializationError('timers', f"Failed to create one or more subscriptions: {e}")
         
     def _validate_state_updates(self, mode: str) -> bool:
         """Ensure all necessary state variables are available for the given mode."""
@@ -155,9 +196,6 @@ class HAGuardsNode(Node):
             self._current_waypoint,
         ]
         if any(state is None for state in required_states):
-            self.get_logger().warning(
-                f"Transition evaluation for control mode {mode} active but state updates not received"
-            )
             return False
         return True
 
@@ -295,7 +333,6 @@ class HAGuardsNode(Node):
                 return
 
         except Exception as e:
-            self.get_logger().info(str(e))
             guards_status.error = True
             guards_status.error_message = str(e)
 
@@ -306,6 +343,7 @@ class HAGuardsNode(Node):
         pass
 
     def _init_node_subs(self):
+        """initialisation the nodes subscriptions for the guard_evaluation component."""
         try:
             return {
                 "mode": self.create_subscription(
@@ -340,8 +378,7 @@ class HAGuardsNode(Node):
                 )
             }
         except Exception as e:
-            self.get_logger().error(str(e))
-            raise e
+            raise InitializationError("Subscribers", f"Failed to create one or more subscriptions: {e}")
     
     def _waypoints_update(self, waypoints: Waypoints):
         self._current_waypoints = waypoints
@@ -361,8 +398,6 @@ class HAGuardsNode(Node):
 
     def _unsafe_set_callback(self, unsafe_set_update: UnsafeSet):
         self._current_unsafe_set = unsafe_set_update
-
-from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
