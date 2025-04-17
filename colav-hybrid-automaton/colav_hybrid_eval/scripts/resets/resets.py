@@ -1,19 +1,19 @@
 from typing import List
 import numpy as np
-from colav_interfaces.msg import Waypoint, AgentUpdate, ObstaclesUpdate, UnsafeSet
+from colav_interfaces.msg import Waypoints, Waypoint, AgentUpdate, ObstaclesUpdate, UnsafeSet
 from geometry_msgs.msg import Point32
 from shapely import Polygon, Point, LineString
 
 VW_ACCEPTANCE_RADIUS = 10
 
-def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: List[Waypoint]) -> List[Waypoint]:
+def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     """pops the first item in the queue of waypoints"""
-    if len(waypoints) < 1:
+    if len(waypoints.waypoints) < 1:
         raise ValueError('waypoints list size less than 1, something has went wrong is guard condition')
     
-    return waypoints.pop(0)
+    return waypoints.waypoints.pop(0)
 
-def reset_CRUISE_to_T2LOS(agent_state: AgentUpdate, obstacles_update: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoints: List[Waypoint]) -> List[Waypoint]:
+def reset_CRUISE_to_T2LOS(agent_state: AgentUpdate, obstacles_update: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoints: Waypoints) -> Waypoints:
     """
     Reset from CRUISE to T2LOS when the guard condition is triggered.
     This function finds the rightmost visible vertex on the unsafe set from the agent's perspective,
@@ -76,5 +76,5 @@ def reset_CRUISE_to_T2LOS(agent_state: AgentUpdate, obstacles_update: ObstaclesU
     )
 
     # 7. Insert the new waypoint at the beginning of the waypoint list
-    waypoints.insert(0, new_waypoint)
+    waypoints.waypoints.insert(0, new_waypoint)
     return waypoints

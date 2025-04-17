@@ -2,6 +2,11 @@ import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult, ParameterType
 import os
+import sys
+
+# Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
+# allowing imports to work correctly without relying on the build process.
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, ControllerFeedback, Dynamics, DynamicsUpdate
 
@@ -9,8 +14,16 @@ from colav_interfaces.srv import StartHybridAutomaton
 from std_srvs.srv import Trigger
 from colav_hybrid_chart.config.qos_config import QOS_PROFILE
 from colav_hybrid_chart.utils.node_utils import create_cli
+from utils.ros_timer_utils import get_current_ros_time
 from colav_interfaces.msg import GuardsStatus, Waypoints, Waypoint, ControllerFeedback
 from std_msgs.msg import String
+
+class InitializationError(Exception):
+    """Custom exception for initialization-related failures."""
+    def __init__(self, component: str, message: str):
+        super().__init__(f"[{component}] {message}")
+        self.component = component
+        self.message = message
 
 class HAChart(Node):
     """
@@ -117,9 +130,11 @@ class HAChart(Node):
         Callback to start the hybrid automaton.
         """
         try:
-            self.get_logger().info(f"/start_hybrid_automaton service called with request: {request}")
+            self.get_logger().info(f"/start_hybrid_automaton service called with request at time: secs: {request.stamp.sec}, nanosecs: {request.stamp.nanosec} with goal_waypoint of: {request.goal_waypoint}")
             self._ha_pubs = self._init_ha_pubs()  # Initialize controller feedback publisher
-            self._init_ha(request)                   # Initialize the hybrid automaton
+            self._init_ha(request)
+
+            # Start hybrid_automaton_eval processes required by this chart                  
             # start the guards_evaluation
             future = self._NODE_CLIS["start_guards_evaluation"].call_async(Trigger.Request())
             future_response = future.result()
@@ -210,8 +225,7 @@ class HAChart(Node):
                 )
             }
         except Exception as e:
-            self.get_logger().error(f"Error initializing controller feedback publisher: {str(e)}")
-            raise e
+            raise INi
 
     def _init_ha(self, request: StartHybridAutomaton.Request):
         """
@@ -223,6 +237,8 @@ class HAChart(Node):
                 self._STATES["unsafe_set"] is None):
             raise ValueError("Initial states cannot be None")
         
+        # TODO: Validate that the timestamp for the request is within tolerance
+
         # TODO: Validate the timestamp for STATES is within tolerance.
 
         # TODO: Validate that mission_request.goal_waypoint is provided.
@@ -232,7 +248,7 @@ class HAChart(Node):
         self._INIT_STATES["continuous"]["agent"] = self._STATES["agent"]
         self._INIT_STATES["continuous"]["obstacles"] = self._STATES["obstacles"]
         self._INIT_STATES["continuous"]["unsafe_set"] = self._STATES["unsafe_set"]
-        self._INIT_STATES["continuous"]["waypoints"] = [request.mission_request.goal_waypoint]
+        self._INIT_STATES["continuous"]["waypoints"] = [request.goal_waypoint]
 
     def _evaluate_transitions(self):
         """
@@ -267,12 +283,16 @@ class HAChart(Node):
                     new_control_mode = active_guard.split('_')[2] # Get transition to item from guard name
                     self._CURRENT_MODE = new_control_mode  
                     # If no reset condition for this guard then change control mode based on the transition
-
+                from std_msgs.msg import Header
+                from builtin_interfaces.msg import Time
                 from colav_interfaces.msg import CmdVelYaw, ControlMode, ControlStatus
                 # need to now publish the latest dynamic updates!!!!!!
                 controller_feedback = ControllerFeedback(
+                    header=Header(stamp=get_current_ros_time()),
+                    mission_tag="mission", #TODO: Need to retrieve this from colav_params
+                    agent_tag='agent', # TODO: Need to retrive this from colav_params
                     cmd=CmdVelYaw(velocity= self._current_dynamics.dynamics.velocity,yaw_rate=self._current_dynamics.dynamics.yaw_rate),
-                    mode=ControlMode(type=1),
+                    mode=ControlMode(type= next((k for k, v in self._MODES.items() if v == self._CURRENT_MODE), None)),
                     status=ControlStatus(type=1)
                 )
                 self._ha_pubs['controller_feedback'].publish(controller_feedback)
@@ -289,8 +309,31 @@ class HAChart(Node):
 
     def _transition_evaluation_callback(self, future):
         """
-        Callback to process the results of transition evaluation.
+        Callback function for evaluating mode transitions based on guard conditions.
+
+        This function is triggered when the asynchronous transition evaluation completes.
+        It processes the `future` response containing the result of guard evaluations for
+        possible transitions from the current control mode.
+
+        If the evaluation is successful:
+        - It filters out the transitions with successful guard conditions.
+        - Among the valid transitions, it selects the one with the highest priority (lowest numeric value).
+        - Logs the name of the active transition.
+        - (TODO) Executes any necessary reset or update actions and updates the `_CURRENT_MODE`.
+
+        If the evaluation fails (`overall_success` is False), it raises a `RuntimeError`.
+
+        Args:
+            future (concurrent.futures.Future): A future object containing the result of the transition evaluation,
+                                                which is expected to have an `overall_success` flag,
+                                                a `results` list of evaluated transitions,
+                                                and a `message` describing any failure.
+
+        Raises:
+            RuntimeError: If the evaluation response indicates failure.
+            Exception: For any unexpected error encountered during processing.
         """
+
         try:
             response = future.result()
             if response.overall_success:
@@ -331,7 +374,10 @@ class HAChart(Node):
 
     def _init_node_subs(self) -> dict:
         """
-        Initializes subscriptions for continuous state updates.
+        Initializes subscriptions
+        - Initializes the subscriptions for the required for the hybrid automaton chart
+        
+        :raises: (InitializationError) if exception occurs
         """
         try:
             return {
@@ -361,18 +407,12 @@ class HAChart(Node):
                 )
             }
         except Exception as e:
-            self.get_logger().error(f"Error initializing subscriptions: {str(e)}")
-            raise e
-
-from rclpy.executors import MultiThreadedExecutor
+            raise InitializationError('Subscriptions', f'error occured initializing subscriptions: {str(e)}')
 
 def main(args=None):
     rclpy.init(args=args)
     node = HAChart()
     try:
-        # executor = MultiThreadedExecutor()
-        # executor.add_node(node)
-        # executor.spin()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
