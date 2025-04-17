@@ -54,7 +54,7 @@ while True:
         obstacles_pub.publish(obstacles_update)
         unsafe_set_pub.publish(unsafe_set_update)
         waypoints_pub.publish(waypoints_update)
-        time.sleep(1)
+        time.sleep(0.1)
 
     except KeyboardInterrupt:
         break

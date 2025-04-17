@@ -1,11 +1,17 @@
 import rclpy
-from colav_hybrid_eval.scripts.guards_node import HAGuardsNode
+from colav_hybrid_eval.scripts.nodes.guards_node import HAGuardsNode
 
 def main(args = None):
     rclpy.init()
     node = HAGuardsNode()
-    rclpy.spin(node=node)
-    node.destroy_node()
+
+    try: 
+        rclpy.spin(node=node)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print (f'Exception occured: {str(e)}')
+
     rclpy.shutdown()
 
 if __name__ == '__main__':

@@ -3,12 +3,13 @@ from rclpy.node import Node
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult, ParameterType
 import os
 
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, ControllerFeedback
+from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, ControllerFeedback, Dynamics, DynamicsUpdate
+
 from colav_interfaces.srv import StartHybridAutomaton
 from std_srvs.srv import Trigger
 from colav_hybrid_chart.config.qos_config import QOS_PROFILE
 from colav_hybrid_chart.utils.node_utils import create_cli
-from colav_interfaces.msg import GuardsStatus, Waypoints, Waypoint
+from colav_interfaces.msg import GuardsStatus, Waypoints, Waypoint, ControllerFeedback
 from std_msgs.msg import String
 
 class HAChart(Node):
@@ -59,8 +60,8 @@ class HAChart(Node):
     # Transitions for each mode along with their priorities
     _TRANSITIONS = {
         _MODES[1]: {  # CRUISE
-            f"{_MODES[1]}_to_{_MODES[2]}1": 3,  # CRUISE to T2LOS (priority 3)
-            f"{_MODES[1]}_to_{_MODES[2]}2": 4,  # CRUISE to T2LOS (priority 4)
+            f"{_MODES[1]}_to_{_MODES[2]}_1": 3,  # CRUISE to T2LOS (priority 3)
+            f"{_MODES[1]}_to_{_MODES[2]}_2": 4,  # CRUISE to T2LOS (priority 4)
             f"{_MODES[1]}_to_{_MODES[3]}": 1,      # CRUISE to FALLBACK (priority 1)
             f"{_MODES[1]}_to_{_MODES[4]}": 2,      # CRUISE to WAYPOINT_REACHED (priority 2)
         },
@@ -80,7 +81,7 @@ class HAChart(Node):
     # Define transitions with reset conditions
     _RESETS = {
         _MODES[1]: [  # CRUISE 
-            f"{_MODES[1]}_to_{_MODES[2]}_1"
+            f"{_MODES[1]}_to_{_MODES[2]}1"
         ],
         _MODES[4]: [  # WAYPOINT_REACHED
             f"{_MODES[4]}_to_{_MODES[1]}"
@@ -96,7 +97,7 @@ class HAChart(Node):
         super().__init__(name, namespace=namespace)
         self._NODE_SUBS = self._init_node_subs()
         self._NODE_CLIS = self._init_ha_clis()
-
+        self._current_dynamics = None
         # Create services to start and stop the hybrid automaton.
         self.create_service(
             StartHybridAutomaton,
@@ -108,6 +109,7 @@ class HAChart(Node):
             '/hybrid_automaton/stop',
             self._stop_hybrid_automaton_callback
         )
+        self.get_logger().info(f"{namespace}/{name} node initialised!")
 
     def _start_hybrid_automaton_callback(self, request: StartHybridAutomaton.Request,
                                            response: StartHybridAutomaton.Response) -> StartHybridAutomaton.Response:
@@ -119,16 +121,26 @@ class HAChart(Node):
             self._ha_pubs = self._init_ha_pubs()  # Initialize controller feedback publisher
             self._init_ha(request)                   # Initialize the hybrid automaton
             # start the guards_evaluation
-            # start the dynamics evaluation
-            future = self._NODE_CLIS['start_guards_evaluation'].call_async(Trigger.Request())
+            future = self._NODE_CLIS["start_guards_evaluation"].call_async(Trigger.Request())
             future_response = future.result()
             # Blocking until service responds:
             # if not response.success: # TODO: NEED TO FIGURE OUT WHY THE FUTURE CLI IS NOT RECEIVING A RESPONSE
             #     raise Exception(f'Failed to start guards_evaluation: reason: {response.message}')
 
+            # start the dynamics evluation
+            future = self._NODE_CLIS["start_dynamics_evaluation"].call_async(Trigger.Request())
+            future_response = future.result()
+            
+            self._dynamics_sub = self.create_subscription(
+                msg_type=DynamicsUpdate,
+                topic="/hybrid_automaton/dynamics",
+                callback=self._dynamics_callback,
+                qos_profile=QOS_PROFILE
+            )
+
             # Start a timer to evaluate transitions periodically
             self._transition_eval_timer = self.create_timer(
-                1.0,  # This timer period might later be parameterized.
+                0.1,  # This timer period might later be parameterized.
                 self._evaluate_transitions
             )
             self._guards_status = None
@@ -140,6 +152,9 @@ class HAChart(Node):
             response.success = False
             response.message = str(e)
         return response
+
+    def _dynamics_callback(self, msg: DynamicsUpdate):
+        self._current_dynamics = msg
 
     def _init_ha_clis(self) -> dict:
         """
@@ -156,6 +171,16 @@ class HAChart(Node):
                     node=self,
                     srv_type=Trigger,
                     srv_name='/hybrid_automaton/guards_node/stop_guards_evaluation'
+                ),
+                "start_dynamics_evaluation": create_cli(
+                    node=self,
+                    srv_type=Trigger,
+                    srv_name="/hybrid_automaton/dynamics_node/start_dynamics_evaluation"
+                ),
+                "stop_dynamics_evaluation":create_cli(
+                    node=self,
+                    srv_type=Trigger,
+                    srv_name="/hybrid_automaton/dynamics_node/stop_dynamics_evaluation"
                 )
             }
         except Exception as e:
@@ -232,8 +257,9 @@ class HAChart(Node):
                 priority = -1
                 for guard, status in guard_results.items():
                     if self._TRANSITIONS[self._CURRENT_MODE][guard] < priority or priority == -1:
-                        priority = self._TRANSITIONS[self._CURRENT_MODE][guard]
-                        active_guard = guard
+                        if status == True: # Means that the guard is active
+                            priority = self._TRANSITIONS[self._CURRENT_MODE][guard]
+                            active_guard = guard
 
                 # make transition based on active guard
                 if active_guard is not None:
@@ -242,7 +268,14 @@ class HAChart(Node):
                     self._CURRENT_MODE = new_control_mode  
                     # If no reset condition for this guard then change control mode based on the transition
 
+                from colav_interfaces.msg import CmdVelYaw, ControlMode, ControlStatus
                 # need to now publish the latest dynamic updates!!!!!!
+                controller_feedback = ControllerFeedback(
+                    cmd=CmdVelYaw(velocity= self._current_dynamics.dynamics.velocity,yaw_rate=self._current_dynamics.dynamics.yaw_rate),
+                    mode=ControlMode(type=1),
+                    status=ControlStatus(type=1)
+                )
+                self._ha_pubs['controller_feedback'].publish(controller_feedback)
 
         except Exception as e:
             self.get_logger().error(f'Error occured: {str(e)}')
@@ -337,9 +370,10 @@ def main(args=None):
     rclpy.init(args=args)
     node = HAChart()
     try:
-        executor = MultiThreadedExecutor()
-        executor.add_node(node)
-        executor.spin()
+        # executor = MultiThreadedExecutor()
+        # executor.add_node(node)
+        # executor.spin()
+        rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     except Exception as e:

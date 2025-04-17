@@ -4,8 +4,8 @@ from builtin_interfaces.msg import Duration, Time
 from shapely.geometry import Polygon, LineString
 import numpy as np
 
-from utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
-from utils import (
+from colav_hybrid_eval.utils.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
+from colav_hybrid_eval.utils import (
     validate_timestamps_within_tolerance,
     delta_heading,
     euclidean_distance,

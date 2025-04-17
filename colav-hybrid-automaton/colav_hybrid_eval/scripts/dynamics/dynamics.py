@@ -2,14 +2,14 @@
 # while in each mode.
 
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, Waypoint
-from colav_interfaces.msg import CruiseDynamics, T2LOSDynamics, WaypointReachedDynamics, FBDynamics
+from colav_interfaces.msg import Dynamics
 import math
-from utils import quaternion_to_heading
+from colav_hybrid_eval.utils import quaternion_to_heading
 
 TARGET_VELOCITY = 25 * 0.514444  # constant target velocity for now but in the future would like to change this t obe based on agent static dynamic params Convert knots to meters per second (1 knot = 0.514444 m/s)
 MAX_ACCELERATION = 1.0 # TODO: Get this value from colav_params/agent_constraints Limit acceleration to (m/s^2)
 
-def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> CruiseDynamics:
+def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> Dynamics:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
@@ -31,21 +31,20 @@ def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> CruiseDynamics
     Raises:
         ValueError: (Not currently raised, placeholder for future use if needed.)
     """
+    if agent_state is None:
+        raise ValueError('agent state received is of none type not type AgentUpdate')
+
     current_velocity = agent_state.velocity
     velocity_change = TARGET_VELOCITY - current_velocity
     acceleration = max(min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)  # TODO: Replace -MAX_ACCELERATION with MAX_DECELERATION from agent parameters
     new_velocity = current_velocity + acceleration * dt
 
-    # In cruise mode, the vessel maintains a straight trajectory (no turning)
-    yaw_rate = 0
-
-    cruise_dynamics = CRUISEDynamics(
+    cruise_dynamics = Dynamics(
         velocity=new_velocity,
-        yaw_rate=yaw_rate
     )
     return cruise_dynamics
 
-def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1, error_tolerance: float = 0.01, proportional_gain: float = 1.0) -> T2LOSDynamics:
+def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1, error_tolerance: float = 0.01, proportional_gain: float = 1.0) -> Dynamics:
     """ 
     Computes the dynamics of the COLAV Hybrid Automaton T2LOS control mode
 
@@ -64,6 +63,12 @@ def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1
     Raises: 
         ValueError: (TODO: Not currently set.)
     """
+    if agent_state is None:
+        raise ValueError('agent state received is of none type not type AgentUpdate')
+
+    if waypoint is None:
+        raise ValueError("waypoint received is None type not Waypoint type")
+
     # Current agent heading
     current_heading = quaternion_to_heading(
         qx=agent_state.pose.orientation.x, 
@@ -95,16 +100,19 @@ def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1
 
     # Keep the velocity unchanged since we're just controlling the heading
     new_velocity = agent_state.velocity
-    t2los_dynamics = T2LOSDynamics(
-        velocity=new_velocity,
-        yaw_rate=yaw_rate
+    t2los_dynamics = Dynamics(
+        velocity=float(new_velocity),
+        yaw_rate=float(yaw_rate)
     )
     
     return t2los_dynamics
 
-def dynamics_WAYPOINT_REACHED():
-    # slow vessel down until yaw_rate and velocity are 0 waypoint reached mode holds until invariant of vessel speed and yaw_rate being greater than 0 holds
-    pass
+def dynamics_WAYPOINT_REACHED() -> Dynamics:
+    # Initially controller for fallback will return 0,0 commands therefore 
+    # enabling the controller on ATL vessel to ramp down by itself
+    return Dynamics()
 
-def dynamics_FB():
-    pass
+def dynamics_FB() -> Dynamics:
+    # Initially controller for fallback will return 0,0 commands therefore 
+    # enabling the controller on ATL vessel to ramp down by itself
+    return Dynamics()

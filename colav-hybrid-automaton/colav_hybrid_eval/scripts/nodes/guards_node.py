@@ -13,9 +13,9 @@ from rclpy.node import Node
 import os
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate
 from colav_interfaces.msg import GuardsStatus
-from utils import get_current_ros_time
+from colav_hybrid_eval.utils import get_current_ros_time
 from config.qos_config import QOS_PROFILE
-from scripts.guards import (
+from colav_hybrid_eval.scripts.guards import (
     guard_CRUISE_to_FB,
     guard_CRUISE_to_T2LOS_1,
     guard_CRUISE_to_T2LOS_2,
@@ -63,6 +63,7 @@ class HAGuardsNode(Node):
 
         # Initialisation functions
         self._NODE_SRVS = self._init_node_srvs()
+        self.get_logger().info(f"{namespace}/{name} node initialised!")
 
     def _init_node_srvs(self, node_name: str = 'guards_node'):
         try:
@@ -184,7 +185,7 @@ class HAGuardsNode(Node):
             if self._current_control_mode == mode_cruise:
                 # CRUISE
                 guards_status.control_mode = mode_cruise
-                guards_status.guard_names = ["cruise_to_t2los1", "cruise_to_t2los2", "cruise_to_fb", "cruise_to_waypoint_reached"]
+                guards_status.guard_names = ["cruise_to_t2los_1", "cruise_to_t2los_2", "cruise_to_fb", "cruise_to_waypoint_reached"]
                 if not self._validate_state_updates(mode_cruise):
                     guards_status.error = True
                     guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
@@ -196,7 +197,7 @@ class HAGuardsNode(Node):
                 # mock duration for tolerance for now
                 # Evaluate CRUISE transitions
 
-                guards_status.cruise_to_t2los1 = guard_CRUISE_to_T2LOS_1(
+                guards_status.cruise_to_t2los_1 = guard_CRUISE_to_T2LOS_1(
                     agent_state=self._current_agent_state,
                     obstacles_state=self._current_obstacles_state,
                     unsafe_set=self._current_unsafe_set,
@@ -204,7 +205,7 @@ class HAGuardsNode(Node):
                     dsf=80,
                     tolerance=Duration(sec=3000)
                 )
-                guards_status.cruise_to_t2los2 = guard_CRUISE_to_T2LOS_2(
+                guards_status.cruise_to_t2los_2 = guard_CRUISE_to_T2LOS_2(
                     agent_state=self._current_agent_state,
                     current_waypoint=self._current_waypoint,
                     heading_error_tolerance=0.1,
@@ -367,9 +368,10 @@ def main(args=None):
     rclpy.init(args=args)
     node = HAGuardsNode()
     try:
-        executor = MultiThreadedExecutor()
-        executor.add_node(node)
-        executor.spin()
+        # executor = MultiThreadedExecutor()
+        # executor.add_node(node)
+        # executor.spin()
+        rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     except Exception as e:
