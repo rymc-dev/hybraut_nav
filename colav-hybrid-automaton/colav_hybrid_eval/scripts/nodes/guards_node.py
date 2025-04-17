@@ -1,20 +1,57 @@
 #!/usr/bin/python3
 """
+This module defines the `GuardsNode` class, a real-time ROS 2 node that manages 
+and evaluates guards for the COLAV Hybrid Automaton. It operates within the 
+hybrid evaluation framework, providing services to start and stop guard evaluations 
+and continuously monitors incoming state data to evaluate conditions that trigger 
+transitions between different modes of operation.
+
+The `GuardsNode` interacts with various components, such as agent state, obstacles, 
+waypoints, and unsafe sets, to determine when to transition between control modes, 
+such as CRUISE, T2LOS, FB, and WAYPOINT_REACHED. It publishes the results of these 
+evaluations to a dedicated topic for downstream processes to react to.
+
+Key Features:
+- Subscribes to topics for agent state, obstacles, waypoints, and unsafe set updates.
+- Provides services to start and stop the evaluation process.
+- Evaluates mode transitions in real-time based on incoming data and control logic.
+- Publishes evaluation results to a specified topic for external systems to consume.
+
+This class is crucial for ensuring that the system can adapt to dynamic conditions 
+and make real-time decisions regarding its behavior and transitions.
+
+Version: 0.0.1
+Author: Ryan McKee
+Date: April 15, 2025
 """
 
-import sys
-import os
 
-# Add path two directories back
+# === Standard Library Imports ===
+import os
+import sys
+
+# Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
+# allowing imports to work correctly without relying on the build process.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from rclpy.executors import MultiThreadedExecutor
+
+# === ROS 2 Core Imports ===
 import rclpy
 from rclpy.node import Node
-import os
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate
-from colav_interfaces.msg import GuardsStatus
+from builtin_interfaces.msg import Duration
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+
+# === COLAV Interface Messages ===
+from colav_interfaces.msg import (
+    AgentUpdate,
+    GuardsStatus,
+    ObstaclesUpdate,
+    UnsafeSet,
+    Waypoints
+)
+
+# === COLAV Hybrid Evaluation Utilities ===
 from colav_hybrid_eval.utils import get_current_ros_time
-from config.qos_config import QOS_PROFILE
 from colav_hybrid_eval.scripts.guards import (
     guard_CRUISE_to_FB,
     guard_CRUISE_to_T2LOS_1,
@@ -25,11 +62,9 @@ from colav_hybrid_eval.scripts.guards import (
     guard_T2LOS_to_WAYPOINT_REACHED,
     guard_WAYPOINT_REACHED_to_CRUISE
 )
-from builtin_interfaces.msg import Duration
-from rclpy.executors import MultiThreadedExecutor
-from colav_interfaces.msg import UnsafeSet, Waypoints
-from std_msgs.msg import String
-from std_srvs.srv import Trigger
+
+# === Configuration ===
+from config.qos_config import QOS_PROFILE
 
 class InitializationError(Exception):
     """Custom exception for initialization-related failures."""
@@ -39,8 +74,18 @@ class InitializationError(Exception):
         self.message = message
 
 class GuardsNode(Node):
+    """
+    GuardsNode is an rclpy node that implements real-time Guard evaluations 
+    for the COLAV Hybrid Automaton.
 
-    _MODES = {  # dict showing the name of the control modes.
+    This node provides services to start and stop the guard evaluation process. 
+    It continuously evaluates guards in real time based on incoming state data 
+    from subscribed topics and publishes the results to a dedicated 
+    'guard_evaluations' topic.
+    """
+
+    # Dict shows the different control modes
+    _MODES = {  
         1: "CRUISE",
         2: "T2LOS",
         3: "FB",
@@ -53,12 +98,9 @@ class GuardsNode(Node):
         name:str = "guards_node"
     ):
         """
-        init of 
+        Initializes the guards_node
         """
         super().__init__(name, namespace=namespace)
-
-        # Initialize the ThreadPoolExecutor
-        self.executor = MultiThreadedExecutor()
 
         self._current_agent_state = None
         self._current_obstacles_state = None
@@ -67,11 +109,15 @@ class GuardsNode(Node):
         self._current_unsafe_set = None
         self._current_control_mode = None
 
-        # Initialisation functions
         self._NODE_SRVS = self._init_node_srvs()
         self.get_logger().info(f"{namespace}/{name} node initialised!")
 
     def _init_node_srvs(self, node_name: str = 'guards_node'):
+        """
+        Initializes node services
+        - Initializes the start_guard_evaluations stop_guards_evaluation
+        - Raises InitializationError if exception thrown during service creation
+        """
         try:
             return {
                 "start_guards_evaluation": self.create_service(
@@ -86,7 +132,7 @@ class GuardsNode(Node):
                 )
             }
         except Exception as e: 
-            self.get_logger().error(f"{self.__class__}::_init_node_pubs: Exception occured: {str(e)}")
+            raise InitializationError('Node Services', f"Excpetion occured initializing start/stop guard_evaluations services for this node")
 
     def _start_guards_evaluation_callback(
         self,
