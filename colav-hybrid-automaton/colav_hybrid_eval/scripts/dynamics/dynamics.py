@@ -4,7 +4,7 @@
 from colav_interfaces.msg import AgentUpdate, Waypoint
 from colav_interfaces.msg import Dynamics
 import math
-from colav_hybrid_eval.utils import quaternion_to_heading
+from colav_hybrid_eval.utils.rotation_utils import quaternion_to_heading
 
 # constant target velocity for now but in the future would like to change
 # this t obe based on agent static dynamic params Convert knots to meters

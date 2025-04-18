@@ -63,7 +63,7 @@ RUN cd /home/ros2_ws/src && \
 # Build ROS packages in the workspace
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     cd /home/ros2_ws && \
-    colcon build && \
+    colcon build --packages-select colav_interfaces && \
     source ./install/setup.bash"
 
 # Append sourcing commands to .bashrc so that the environment is ready on container start
@@ -74,4 +74,12 @@ RUN /bin/bash -c "echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc && \
 RUN /bin/bash -c "source /root/.bashrc"
 
 # Set the entrypoint command
-ENTRYPOINT [ "/bin/bash", "-c", "if [ \"$MODE\" = \"container\" ]; then source /opt/ros/humble/setup.bash && source /home/ros2_ws/install/setup.bash && ros2 launch colav_hybrid_automaton_bringup colav_hybrid_automaton.launch.py; else while true; do sleep 30; done; fi" ]
+ENTRYPOINT ["/bin/bash", "-c", "\
+if [ \"$MODE\" = \"container\" ]; then \
+  source /opt/ros/humble/setup.bash && \
+  colcon build /home/ros2_ws && \
+  source /root/.bashrc && \
+  ros2 launch colav_hybrid_automaton_bringup colav_hybrid_automaton.launch.py; \
+else \
+  while true; do sleep 30; done; \
+fi"]
