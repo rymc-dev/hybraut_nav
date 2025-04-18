@@ -2,11 +2,11 @@
 # """
 # Unit Test Suite for COLAV Hybrid Automaton Dynamics.
 
-# This module contains unit tests to validate the behavior of individual Dynamic functions 
-# used in the COLAV Hybrid Automaton. Both standard and edge cases are tested to ensure full coverage 
+# This module contains unit tests to validate the behavior of individual Dynamic functions
+# used in the COLAV Hybrid Automaton. Both standard and edge cases are tested to ensure full coverage
 # and confirm the expected functionality of each guard.
 
-# :author: Ryan McKee  
+# :author: Ryan McKee
 # :date: April 15, 2025
 # """
 

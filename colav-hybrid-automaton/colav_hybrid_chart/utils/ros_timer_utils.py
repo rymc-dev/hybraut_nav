@@ -1,6 +1,7 @@
 from builtin_interfaces.msg import Time
 import time
 
+
 def get_current_ros_time() -> Time:
     """
     get_current_ros_time

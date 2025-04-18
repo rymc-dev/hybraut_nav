@@ -44,6 +44,15 @@ colcon build
 colcon test
 ```
 
+# Dev vs Install time
+When colcon building this pkg we have a site-package dependency issue if we add the utils and config pkgs for example
+to site-packages as is, therefore we add them to site-packages/{package_name}/utils and config and such, Therefore 
+the imports in each file as colav_hybrid_eval.utils or .config this does have issues with dev time because thta means we are importing a module that does not exist locally to solve this we made an editable install via
+```bash
+pip install -e .
+```
+which generated the [.edgg-info](./colav_hybrid_eval.egg-info) file which updates dependency paths in real 
+time allowing our pytests and such to run locally without issues.
 
 ## License
 

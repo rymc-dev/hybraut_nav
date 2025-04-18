@@ -1,31 +1,52 @@
-from typing import List
 import numpy as np
 from colav_interfaces.msg import Waypoints, Waypoint, AgentUpdate, ObstaclesUpdate, UnsafeSet
 from geometry_msgs.msg import Point32
-from shapely import Polygon, Point, LineString
+from shapely import Polygon, LineString
 
 VW_ACCEPTANCE_RADIUS = 10
+
 
 def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     """pops the first item in the queue of waypoints"""
     if len(waypoints.waypoints) < 1:
-        raise ValueError('waypoints list size less than 1, something has went wrong is guard condition')
-    
+        raise ValueError(
+            'waypoints list size less than 1, something has went wrong is guard condition')
+
     return waypoints.waypoints.pop(0)
 
-def reset_CRUISE_to_T2LOS(agent_state: AgentUpdate, obstacles_update: ObstaclesUpdate, unsafe_set: UnsafeSet, waypoints: Waypoints) -> Waypoints:
+
+def reset_CRUISE_to_T2LOS(
+        agent_state: AgentUpdate,
+        obstacles_update: ObstaclesUpdate,
+        unsafe_set: UnsafeSet,
+        waypoints: Waypoints) -> Waypoints:
     """
     Reset from CRUISE to T2LOS when the guard condition is triggered.
     This function finds the rightmost visible vertex on the unsafe set from the agent's perspective,
     applies an offset to it, and creates a new virtual waypoint for the hybrid automaton to steer toward.
     """
+    # TODO: validate values
+    if not isinstance(agent_state, AgentUpdate) or \
+        not isinstance(obstacles_update, ObstaclesUpdate) or \
+            not isinstance(unsafe_set, UnsafeSet) or \
+        not isinstance(waypoints, Waypoints):
+        raise ValueError(
+            'exception occured: input args to function have incorrect types')
+
+    # TODO: validate timestamps
+
+    # TODO: check if unsafe set is valid polyshape
+
+    # TODO: check if any static obstacles exist in environment
+
     # 1. Get the agent's current position
     agent_x = agent_state.pose.position.x
     agent_y = agent_state.pose.position.y
 
     vertices = np.array(unsafe_set.vertices)
     if vertices.size == 0:
-        raise ValueError('Unsafe set does not contain any vertices, Guard with reset should not have occurred.')
+        raise ValueError(
+            'Unsafe set does not contain any vertices, Guard with reset should not have occurred.')
 
     # Convert vertices to shapely Polygon
     polygon = Polygon(vertices)
@@ -37,13 +58,15 @@ def reset_CRUISE_to_T2LOS(agent_state: AgentUpdate, obstacles_update: ObstaclesU
     # 2. Check visibility of each vertex using raycasting
     for vx, vy in vertices:
         ray = LineString([(agent_x, agent_y), (vx, vy)])
-        # The ray must not cross the polygon boundary (except possibly touching at the vertex)
+        # The ray must not cross the polygon boundary (except possibly touching
+        # at the vertex)
         if polygon.exterior.crosses(ray):
             continue
         visible_vertices.append((vx, vy))
 
     if not visible_vertices:
-        raise ValueError("No visible vertices from agent's position to unsafe set.")
+        raise ValueError(
+            "No visible vertices from agent's position to unsafe set.")
 
     # 3. Compute angles to visible vertices
     visible_vertices_np = np.array(visible_vertices)
@@ -63,7 +86,8 @@ def reset_CRUISE_to_T2LOS(agent_state: AgentUpdate, obstacles_update: ObstaclesU
     vec = np.array([rightmost_x - agent_x, rightmost_y - agent_y])
     norm = np.linalg.norm(vec)
     if norm == 0:
-        raise ValueError("Agent position coincides with the rightmost vertex; cannot compute offset direction.")
+        raise ValueError(
+            "Agent position coincides with the rightmost vertex; cannot compute offset direction.")
     direction = vec / norm
     # Apply offset
     adjusted_x = rightmost_x + offset_distance * direction[0]

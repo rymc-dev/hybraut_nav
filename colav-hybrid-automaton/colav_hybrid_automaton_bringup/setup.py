@@ -17,7 +17,7 @@ setup(
     zip_safe=True,
     maintainer='Ryan McKee',
     maintainer_email='r.mckee@qub.ac.uk',
-    description=( 
+    description=(
         'colav hybrid eval contains different service functions for different scenario evaluations.'
     ),
     license='MIT',

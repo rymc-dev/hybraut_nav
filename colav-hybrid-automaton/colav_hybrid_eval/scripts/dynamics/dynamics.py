@@ -1,24 +1,30 @@
 # This files determines the dynamics of the system/ aka the mode behavior/control policies
 # while in each mode.
 
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, Waypoint
+from colav_interfaces.msg import AgentUpdate, Waypoint
 from colav_interfaces.msg import Dynamics
 import math
 from colav_hybrid_eval.utils import quaternion_to_heading
 
-TARGET_VELOCITY = 25 * 0.514444  # constant target velocity for now but in the future would like to change this t obe based on agent static dynamic params Convert knots to meters per second (1 knot = 0.514444 m/s)
-MAX_ACCELERATION = 1.0 # TODO: Get this value from colav_params/agent_constraints Limit acceleration to (m/s^2)
+# constant target velocity for now but in the future would like to change
+# this t obe based on agent static dynamic params Convert knots to meters
+# per second (1 knot = 0.514444 m/s)
+TARGET_VELOCITY = 25 * 0.514444
+# TODO: Get this value from colav_params/agent_constraints Limit
+# acceleration to (m/s^2)
+MAX_ACCELERATION = 1.0
+
 
 def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> Dynamics:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
-    In this mode, a proportional velocity controller is used to adjust the agent's speed 
-    toward a predefined TARGET_VELOCITY. The controller computes the required acceleration 
-    based on the velocity error and clamps it within the maximum allowable acceleration 
+    In this mode, a proportional velocity controller is used to adjust the agent's speed
+    toward a predefined TARGET_VELOCITY. The controller computes the required acceleration
+    based on the velocity error and clamps it within the maximum allowable acceleration
     and deceleration limits, ensuring that the agent adheres to its dynamic constraints.
 
-    During CRUISE mode, the yaw rate is fixed to zero, assuming that the agent is moving 
+    During CRUISE mode, the yaw rate is fixed to zero, assuming that the agent is moving
     along a straight line (e.g., line-of-sight path following).
 
     Parameters:
@@ -32,11 +38,15 @@ def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> Dynamics:
         ValueError: (Not currently raised, placeholder for future use if needed.)
     """
     if agent_state is None:
-        raise ValueError('agent state received is of none type not type AgentUpdate')
+        raise ValueError(
+            'agent state received is of none type not type AgentUpdate')
 
     current_velocity = agent_state.velocity
     velocity_change = TARGET_VELOCITY - current_velocity
-    acceleration = max(min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)  # TODO: Replace -MAX_ACCELERATION with MAX_DECELERATION from agent parameters
+    # TODO: Replace -MAX_ACCELERATION with MAX_DECELERATION from agent
+    # parameters
+    acceleration = max(
+        min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)
     new_velocity = current_velocity + acceleration * dt
 
     cruise_dynamics = Dynamics(
@@ -44,37 +54,44 @@ def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> Dynamics:
     )
     return cruise_dynamics
 
-def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1, error_tolerance: float = 0.01, proportional_gain: float = 1.0) -> Dynamics:
-    """ 
+
+def dynamics_T2LOS(
+        agent_state: AgentUpdate,
+        waypoint: Waypoint,
+        dt: float = 0.1,
+        error_tolerance: float = 0.01,
+        proportional_gain: float = 1.0) -> Dynamics:
+    """
     Computes the dynamics of the COLAV Hybrid Automaton T2LOS control mode
 
-    In this mode, a time-propotional P-controller for heading correction is implemented utilizing 
+    In this mode, a time-propotional P-controller for heading correction is implemented utilizing
     the waypoint arg passed in as the target bearing. Invariant for this function is while yaw_rate is greater
     than 0 and guard condition for leaving to cruise is when we are within within a bearing tolerance of the waypoint
 
-    Parameter: 
+    Parameter:
         agent_state (AgentUpdate): The current state of the agent
         waypoint (Waypoint): The current waypoint
         dt (float): Time step for the update (default is 0.1 seconds)
 
-    Returns: 
+    Returns:
          T2LOSDynamics: updated velocity/yaw_rate for agent vessel
 
-    Raises: 
+    Raises:
         ValueError: (TODO: Not currently set.)
     """
     if agent_state is None:
-        raise ValueError('agent state received is of none type not type AgentUpdate')
+        raise ValueError(
+            'agent state received is of none type not type AgentUpdate')
 
     if waypoint is None:
         raise ValueError("waypoint received is None type not Waypoint type")
 
     # Current agent heading
     current_heading = quaternion_to_heading(
-        qx=agent_state.pose.orientation.x, 
-        qy=agent_state.pose.orientation.y, 
-        qz=agent_state.pose.orientation.z, 
-        qw=agent_state.pose.orientation.w, 
+        qx=agent_state.pose.orientation.x,
+        qy=agent_state.pose.orientation.y,
+        qz=agent_state.pose.orientation.z,
+        qw=agent_state.pose.orientation.w,
     )
 
     # Calculate the heading towards the waypoint (assumes 2D position)
@@ -82,7 +99,8 @@ def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1
     dy = waypoint.position.y - agent_state.pose.position.y
     desired_heading = math.atan2(dy, dx)  # Desired heading to the waypoint
 
-    # Calculate heading error (difference between current heading and desired heading)
+    # Calculate heading error (difference between current heading and desired
+    # heading)
     heading_error = desired_heading - current_heading
 
     # Normalize the error to the range [-pi, pi]
@@ -104,15 +122,17 @@ def dynamics_T2LOS(agent_state: AgentUpdate, waypoint: Waypoint, dt: float = 0.1
         velocity=float(new_velocity),
         yaw_rate=float(yaw_rate)
     )
-    
+
     return t2los_dynamics
 
+
 def dynamics_WAYPOINT_REACHED() -> Dynamics:
-    # Initially controller for fallback will return 0,0 commands therefore 
+    # Initially controller for fallback will return 0,0 commands therefore
     # enabling the controller on ATL vessel to ramp down by itself
     return Dynamics()
 
+
 def dynamics_FB() -> Dynamics:
-    # Initially controller for fallback will return 0,0 commands therefore 
+    # Initially controller for fallback will return 0,0 commands therefore
     # enabling the controller on ATL vessel to ramp down by itself
     return Dynamics()

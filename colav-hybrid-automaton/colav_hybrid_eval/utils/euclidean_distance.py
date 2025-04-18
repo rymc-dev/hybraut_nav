@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def euclidean_distance(point1, point2) -> float:
     """
     euclidean_distance

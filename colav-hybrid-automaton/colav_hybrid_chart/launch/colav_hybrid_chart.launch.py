@@ -3,6 +3,7 @@ from launch_ros.actions import Node
 
 package_name = 'colav_hybrid_chart'
 
+
 def generate_launch_description():
     return LaunchDescription([
         Node(

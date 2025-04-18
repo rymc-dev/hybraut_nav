@@ -1,7 +1,9 @@
 from builtin_interfaces.msg import Time, Duration
 import time
 
-def validate_timestamps_within_tolerance(t1: Time, t2: Time, tolerance: Duration):
+
+def validate_timestamps_within_tolerance(
+        t1: Time, t2: Time, tolerance: Duration):
     """
     Check whether two timestamps are within the specified tolerance
 
@@ -12,6 +14,7 @@ def validate_timestamps_within_tolerance(t1: Time, t2: Time, tolerance: Duration
     max_diff = tolerance.sec + tolerance.nanosec * 1e-9
     if diff >= max_diff:
         raise TimeoutError('Timeout Exception occured')
+
 
 def get_current_ros_time() -> Time:
     """

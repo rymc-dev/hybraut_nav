@@ -2,7 +2,12 @@ import numpy as np
 from typing import Tuple
 import numpy.typing as npt
 
-def generate_circle_points(x: float, y: float, radius: float, num_points: int = 100) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+
+def generate_circle_points(x: float,
+                           y: float,
+                           radius: float,
+                           num_points: int = 100) -> Tuple[npt.NDArray[np.float64],
+                                                           npt.NDArray[np.float64]]:
     """
     generate_circle_points:
     Generate a discretised 2D circle.

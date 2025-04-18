@@ -20,14 +20,14 @@ setup(
     zip_safe=True,
     maintainer='Ryan McKee',
     maintainer_email='r.mckee@qub.ac.uk',
-    description=( 
+    description=(
         'colav hybrid chart manages the control logic of the hybrid automaton.'
     ),
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-             "colav_hybrid_chart_node = colav_hybrid_chart.execute_colav_hybrid_chart:main"
+            "colav_hybrid_chart_node = colav_hybrid_chart.execute_colav_hybrid_chart:main"
         ],
     },
 )

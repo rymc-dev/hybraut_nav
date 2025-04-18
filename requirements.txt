@@ -1,0 +1,7 @@
+colav-bridge
+colav-protobuf-utils
+pytest-dependency
+coverage
+ruff
+pydocstyle
+autopep8
