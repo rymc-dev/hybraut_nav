@@ -15,5 +15,10 @@ def generate_launch_description():
             package=package_name,
             executable='dynamics_node',
             output='screen',
+        ),
+        Node(
+            package=package_name,
+            executable='resets_node',
+            output='screen',
         )
     ])

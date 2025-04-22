@@ -31,7 +31,8 @@ setup(
     entry_points={
         'console_scripts': [
             "guards_node = colav_hybrid_eval.execute_guards_node:main",
-            "dynamics_node = colav_hybrid_eval.execute_dynamics_node:main"
+            "dynamics_node = colav_hybrid_eval.execute_dynamics_node:main",
+            "resets_node = colav_hybrid_eval.execute_resets_node:main"
         ],
     },
 )

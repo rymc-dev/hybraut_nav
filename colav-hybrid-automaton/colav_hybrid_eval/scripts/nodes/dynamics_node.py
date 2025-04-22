@@ -43,7 +43,6 @@ Date: April 17, 2025
 """
 
 
-# === Standard Library Imports ===
 from colav_hybrid_eval.config.qos_config import QOS_PROFILE
 from scripts.dynamics import (
     dynamics_CRUISE,
@@ -73,18 +72,6 @@ sys.path.append(
             os.path.dirname(__file__),
             '..',
             '..')))
-
-# === ROS 2 Core Imports ===
-
-# === ROS2 STD Interface Imports ===
-
-# === COLAV Interface Messages ===
-
-# === COLAV Hybrid Evaluation Utilities ===
-
-# === COLAV Hybrid Evaluation Utilities ===
-
-# === Configuration ===
 
 
 class InitializationError(Exception):

@@ -63,14 +63,6 @@ sys.path.append(
             '..',
             '..')))
 
-# === ROS 2 Core Imports ===
-
-# === COLAV Interface Messages ===
-
-# === COLAV Hybrid Evaluation Utilities ===
-
-# === Configuration ===
-
 
 class InitializationError(Exception):
     """Custom exception for initialization-related failures."""
@@ -472,9 +464,6 @@ def main(args=None):
     rclpy.init(args=args)
     node = GuardsNode()
     try:
-        # executor = MultiThreadedExecutor()
-        # executor.add_node(node)
-        # executor.spin()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass

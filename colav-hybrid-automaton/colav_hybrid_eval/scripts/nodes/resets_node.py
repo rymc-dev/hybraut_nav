@@ -20,8 +20,10 @@ Date: April 17, 2025
 """
 
 
-# === Standard Library Imports ===
 from rclpy.node import Node
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 from colav_hybrid_eval.scripts.resets import (
     reset_CRUISE_to_T2LOS,
     reset_WAYPOINT_REACHED_to_CRUISE
@@ -29,8 +31,6 @@ from colav_hybrid_eval.scripts.resets import (
 import rclpy
 from colav_interfaces.srv import Reset
 from colav_interfaces.msg import Waypoints, AgentUpdate, ObstaclesUpdate, UnsafeSet
-
-# === Configuration ===
 from colav_hybrid_eval.config.qos_config import QOS_PROFILE
 
 
@@ -60,7 +60,7 @@ class ResetNode(Node):
         """
         super().__init__(name, namespace=namespace)
 
-        self._waypoints = None
+        self._waypoints = Waypoints()
         self._agent_state = None
         self._obstacles_state = None
         self._unsafe_set = None
@@ -75,7 +75,7 @@ class ResetNode(Node):
     def _init_node_pubs(self):
         try:
             return {
-                'waypoints_pub': self.create_publisher(
+                'waypoints': self.create_publisher(
                     msg_type=Waypoints,
                     topic='hybrid_automaton/waypoints',
                     qos_profile=QOS_PROFILE),
@@ -125,7 +125,7 @@ class ResetNode(Node):
         try:
             return {
                 "reset": self.create_service(
-                    srv_type=Reset(),
+                    srv_type=Reset,
                     srv_name='reset',
                     callback=self._reset_callback
                 )
@@ -151,13 +151,20 @@ class ResetNode(Node):
 
             if reset_name in list(self._RESETS.keys()):
                 if reset_name == 'waypoint_reached_to_cruise':
-                    waypoints = self._RESETS[reset_name](
-                        waypoints=self._waypoints)
-                    self._node_pubs['waypoints'].publish(waypoints)
+                    reset_func = self._RESETS[reset_name]
+                    self._waypoints: Waypoints = reset_func(waypoints=self._waypoints)
+                    # self.get_logger().info('waypoints: ')
+                    # self.get_logger().info(self._waypoints)
+                    self._node_pubs['waypoints'].publish(self._waypoints)
                 elif reset_name == 'cruise_to_t2los':
-                    waypoints = self._RESETS[reset_name](
-                        self._agent_state, self._obstacles_state, self._unsafe_set, self._waypoints)
-                    self._node_pubs['waypoints'].publish(waypoints)
+                    reset_func = self._RESETS[reset_name]
+                    self._waypoints = reset_func(
+                        agent_state = self._agent_state,
+                        obstacles_state = self._obstacles_state,
+                        unsafe_set = self._unsafe_set,
+                        waypoints = self._waypoints
+                    )
+                    self._node_pubs['waypoints'].publish(self._waypoints)
                 else:
                     # something went wrong here
                     raise Exception('Invalid reset name')

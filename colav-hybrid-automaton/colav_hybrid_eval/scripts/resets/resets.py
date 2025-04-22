@@ -8,11 +8,11 @@ VW_ACCEPTANCE_RADIUS = 10
 
 def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     """pops the first item in the queue of waypoints"""
-    if len(waypoints.waypoints) < 1:
+    if len(waypoints.waypoints) < 2:
         raise ValueError(
             'waypoints list size less than 1, something has went wrong is guard condition')
-
-    return waypoints.waypoints.pop(0)
+    waypoints.waypoints = waypoints.waypoints[1:]
+    return waypoints
 
 
 def reset_CRUISE_to_T2LOS(

@@ -1,269 +1,269 @@
-# #!/usr/bin/python3
-# """
-# Unit Test Suite for COLAV Hybrid Automaton Guard Conditions.
+#!/usr/bin/python3
+"""
+Unit Test Suite for COLAV Hybrid Automaton Guard Conditions.
 
-# This module contains unit tests to validate the behavior of individual guard condition functions
-# used in the COLAV Hybrid Automaton. Both standard and edge cases are tested to ensure full coverage
-# and confirm the expected functionality of each guard.
+This module contains unit tests to validate the behavior of individual guard condition functions
+used in the COLAV Hybrid Automaton. Both standard and edge cases are tested to ensure full coverage
+and confirm the expected functionality of each guard.
 
-# :author: Ryan McKee
-# :date: April 11, 2025
-# """
+:author: Ryan McKee
+:date: April 11, 2025
+"""
 
-# from typing import Tuple, Union
-# from std_msgs.msg import Header
+from typing import Tuple, Union
+from std_msgs.msg import Header
 
-# import sys
-# import pytest
+import sys
+import pytest
 
-# from geometry_msgs.msg import Point, Point32, Pose, Quaternion
-# from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
-# from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
-# from utils import get_current_ros_time
-# from builtin_interfaces.msg import Time
+from geometry_msgs.msg import Point, Point32, Pose, Quaternion
+from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
+from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint
+# from colav_hybrid_eval.utils.validate_timestamps import get_current_ros_time
+from builtin_interfaces.msg import Time
 
-# from scripts.guards import (
-#     guard_CRUISE_to_FB,
-#     guard_CRUISE_to_T2LOS_1,
-#     guard_CRUISE_to_T2LOS_2,
-#     guard_CRUISE_to_WAYPOINT_REACHED,
-#     guard_T2LOS_to_CRUISE,
-#     guard_T2LOS_to_FB,
-#     guard_WAYPOINT_REACHED_to_CRUISE
-# )
+from scripts.guards import (
+    guard_CRUISE_to_FB,
+    guard_CRUISE_to_T2LOS_1,
+    guard_CRUISE_to_T2LOS_2,
+    guard_CRUISE_to_WAYPOINT_REACHED,
+    guard_T2LOS_to_CRUISE,
+    guard_T2LOS_to_FB,
+    guard_WAYPOINT_REACHED_to_CRUISE
+)
 
 
-# """CRUISE Guards Tests"""
-# @pytest.mark.parametrize("input_args, expected_output, description", [
-#     # Test Case 1: unsafe_set on los and within distance threshold
-#     (
-#         (
-#             AgentUpdate(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 pose=Pose(
-#                     position=Point(
-#                         x=float(400),
-#                         y=float(100)
-#                     )
-#                 ),
-#                 velocity=float(10)
-#             ),
-#             ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
-#             UnsafeSet(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 vertices=Float64MultiArray(
-#                     layout=MultiArrayLayout(
-#                         dim=[MultiArrayDimension(label='vertices', stride=2)]
-#                     ),
-#                     data=[
-#                         300.0, 100.0,  # Point 1
-#                         350.0, 150.0,  # Point 2
-#                         400.0, 150.0,  # Point 3
-#                         400.0, 100.0   # Point 4
-#                     ]
-#                 )
-#             ),
-#             Waypoint(
-#                 position=Point32(x=float(500), y=float(100))
-#             ),
-#             float(float(50))
-#         ),
-#         True,
-#         "unsafe set on los within distance threshold"
-#     ),
-#     # Test Case 2: unsafe_set on los but outside distance threshold
-#     (
-#         (
-#             AgentUpdate(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 pose=Pose(
-#                     position=Point(
-#                         x=float(100),
-#                         y=float(100)
-#                     )
-#                 ),
-#                 velocity=float(10)
-#             ),
-#             ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
-#             UnsafeSet(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 vertices=Float64MultiArray(
-#                     layout=MultiArrayLayout(
-#                         dim=[MultiArrayDimension(label='vertices', stride=2)]
-#                     ),
-#                     data=[
-#                         300.0, 100.0,  # Point 1
-#                         350.0, 150.0,  # Point 2
-#                         400.0, 150.0,  # Point 3
-#                         400.0, 100.0   # Point 4
-#                     ]
-#                 )
-#             ),
-#             Waypoint(
-#                 position=Point32(x=float(500), y=float(100))
-#             ),
-#             float(float(50))
-#         ),
-#         False,
-#         "unsafe_set on los but outside distance threshold"
-#     ),
-#     # Test Case 3: Unsafe set within distance threshold but not on los
-#     (
-#         (
-#             AgentUpdate(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 pose=Pose(
-#                     position=Point(
-#                         x=float(100),
-#                         y=float(100)
-#                     )
-#                 ),
-#                 velocity=float(10)
-#             ),
-#             ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
-#             UnsafeSet(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 vertices=Float64MultiArray(
-#                     layout=MultiArrayLayout(
-#                         dim=[MultiArrayDimension(label='vertices', stride=2)]
-#                     ),
-#                     data=[
-#                         250.0, 130.0,  # Point 1
-#                         260.0, 130.0,  # Point 2
-#                         260.0, 140.0,  # Point 3
-#                         250.0, 140.0   # Point 4
-#                     ]
-#                 )
-#             ),
-#             Waypoint(
-#                 position=Point32(x=float(500), y=float(100))
-#             ),
-#             float(50)
-#         ),
-#         False,
-#         "unsafe set within distance threshold but not on los"
-#     ),
-#     # Test Case 4: unsafe set outside distance threshold off line of sight
-#     (
-#         (
-#             AgentUpdate(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 pose=Pose(
-#                     position=Point(
-#                         x=float(100),
-#                         y=float(100)
-#                     )
-#                 ),
-#                 velocity=float(10)
-#             ),
-#             ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
-#             UnsafeSet(
-#                 header=Header(stamp=get_current_ros_time()),
-#                 vertices=Float64MultiArray(
-#                     layout=MultiArrayLayout(
-#                         dim=[MultiArrayDimension(label='vertices', stride=2)]
-#                     ),
-#                     data=[
-#                         300.0, 300.0,  # Point 1
-#                         310.0, 300.0,  # Point 2
-#                         310.0, 310.0,  # Point 3
-#                         300.0, 310.0   # Point 4
-#                     ]
-#                 )
-#             ),
-#             Waypoint(
-#                 position=Point32(x=float(500), y=float(100))
-#             ),
-#             float(50)
-#         ),
-#         False,
-#         "unsafe set outside distance threshold off line of sight"
-#     ),
-#     # # Test Case 5: static obstacle on los within distance threshold
-#     # (
-#     #     (),
-#     #     True,
-#     #     'Static obstacle on los within distance threshold'
-#     # ),
-#     # # Test Case 6: static obstacle on los but not within distance threshold
-#     # (
-#     #     (),
-#     #     False,
-#     #     'static obstacle on los but not within distance threshold'
-#     # ),
-#     # # Test Case 7: static obstacle within distance threshold not on los
-#     # (
-#     #     (),
-#     #     False,
-#     #     "static within distance threshold not on los"
-#     # ),
-#     # # Test Case 8: static obstacle outside distance threshold outside line of sight
-#     # (
-#     #     (),
-#     #     False,
-#     #     "static obstacle outside distance threshold outside line of sight"
-#     # )
-#     # Test Case 9: agent_update out of sync
-#     (
-#         (
-#             AgentUpdate(header=Header(stamp=Time(sec=0, nanosec=0))),
-#             ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
-#             UnsafeSet(header=Header(stamp=get_current_ros_time())),
-#             Waypoint(),
-#             float(50)
-#         ),
-#         TimeoutError('Timeout Exception occured'),
-#         "Timeout error was not thrown for ObstaclesUpdate"
-#     ),
-#     # Test Case 20: obstacle_update out of sync
-#     (
-#         (
-#             AgentUpdate(header=Header(stamp=get_current_ros_time())),
-#             ObstaclesUpdate(header=Header(stamp=Time(sec=1, nanosec=0))),
-#             UnsafeSet(header=Header(stamp=get_current_ros_time())),
-#             Waypoint(),
-#             float(50)
-#         ),
-#         TimeoutError('Timeout Exception occured'),
-#         "Timeout error was not thrown for ObstaclesUpdate"
-#     ),
-#     # Test Case 11: unsafe_set out of sync
-#     (
-#         (
-#             AgentUpdate(header=Header(stamp=get_current_ros_time())),
-#             ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
-#             UnsafeSet(header=Header(stamp=Time(sec=0, nanosec=0))),
-#             Waypoint(),
-#             float(50)
-#         ),
-#         TimeoutError('Timeout Exception occured'),
-#         "Timeout error was not thrown for ObstaclesUpdate"
-#     ),
-# ])
-# def test_guard_CRUISE_to_T2LOS_1(
-#     input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
-#     expected_output: Union[bool, Exception],
-#     description: str
-# ):
-#     """        TimeoutError('timeout occured withkget_current_ros_time())),
-#             Waypoint(),
-#             float(50)
-#     Test if the guard_CRUISE_to_T2Theta is working correctly.
+"""CRUISE Guards Tests"""
+@pytest.mark.parametrize("input_args, expected_output, description", [
+    # # Test Case 1: unsafe_set on los and within distance threshold
+    # (
+    #     (
+    #         AgentUpdate(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             pose=Pose(
+    #                 position=Point(
+    #                     x=float(400),
+    #                     y=float(100)
+    #                 )
+    #             ),
+    #             velocity=float(10)
+    #         ),
+    #         ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+    #         UnsafeSet(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             vertices=Float64MultiArray(
+    #                 layout=MultiArrayLayout(
+    #                     dim=[MultiArrayDimension(label='vertices', stride=2)]
+    #                 ),
+    #                 data=[
+    #                     300.0, 100.0,  # Point 1
+    #                     350.0, 150.0,  # Point 2
+    #                     400.0, 150.0,  # Point 3
+    #                     400.0, 100.0   # Point 4
+    #                 ]
+    #             )
+    #         ),
+    #         Waypoint(
+    #             position=Point32(x=float(500), y=float(100))
+    #         ),
+    #         float(float(50))
+    #     ),
+    #     True,
+    #     "unsafe set on los within distance threshold"
+    # ),
+    # # Test Case 2: unsafe_set on los but outside distance threshold
+    # (
+    #     (
+    #         AgentUpdate(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             pose=Pose(
+    #                 position=Point(
+    #                     x=float(100),
+    #                     y=float(100)
+    #                 )
+    #             ),
+    #             velocity=float(10)
+    #         ),
+    #         ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+    #         UnsafeSet(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             vertices=Float64MultiArray(
+    #                 layout=MultiArrayLayout(
+    #                     dim=[MultiArrayDimension(label='vertices', stride=2)]
+    #                 ),
+    #                 data=[
+    #                     300.0, 100.0,  # Point 1
+    #                     350.0, 150.0,  # Point 2
+    #                     400.0, 150.0,  # Point 3
+    #                     400.0, 100.0   # Point 4
+    #                 ]
+    #             )
+    #         ),
+    #         Waypoint(
+    #             position=Point32(x=float(500), y=float(100))
+    #         ),
+    #         float(float(50))
+    #     ),
+    #     False,
+    #     "unsafe_set on los but outside distance threshold"
+    # ),
+    # # Test Case 3: Unsafe set within distance threshold but not on los
+    # (
+    #     (
+    #         AgentUpdate(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             pose=Pose(
+    #                 position=Point(
+    #                     x=float(100),
+    #                     y=float(100)
+    #                 )
+    #             ),
+    #             velocity=float(10)
+    #         ),
+    #         ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+    #         UnsafeSet(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             vertices=Float64MultiArray(
+    #                 layout=MultiArrayLayout(
+    #                     dim=[MultiArrayDimension(label='vertices', stride=2)]
+    #                 ),
+    #                 data=[
+    #                     250.0, 130.0,  # Point 1
+    #                     260.0, 130.0,  # Point 2
+    #                     260.0, 140.0,  # Point 3
+    #                     250.0, 140.0   # Point 4
+    #                 ]
+    #             )
+    #         ),
+    #         Waypoint(
+    #             position=Point32(x=float(500), y=float(100))
+    #         ),
+    #         float(50)
+    #     ),
+    #     False,
+    #     "unsafe set within distance threshold but not on los"
+    # ),
+    # # Test Case 4: unsafe set outside distance threshold off line of sight
+    # (
+    #     (
+    #         AgentUpdate(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             pose=Pose(
+    #                 position=Point(
+    #                     x=float(100),
+    #                     y=float(100)
+    #                 )
+    #             ),
+    #             velocity=float(10)
+    #         ),
+    #         ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+    #         UnsafeSet(
+    #             header=Header(stamp=get_current_ros_time()),
+    #             vertices=Float64MultiArray(
+    #                 layout=MultiArrayLayout(
+    #                     dim=[MultiArrayDimension(label='vertices', stride=2)]
+    #                 ),
+    #                 data=[
+    #                     300.0, 300.0,  # Point 1
+    #                     310.0, 300.0,  # Point 2
+    #                     310.0, 310.0,  # Point 3
+    #                     300.0, 310.0   # Point 4
+    #                 ]
+    #             )
+    #         ),
+    #         Waypoint(
+    #             position=Point32(x=float(500), y=float(100))
+    #         ),
+    #         float(50)
+    #     ),
+    #     False,
+    #     "unsafe set outside distance threshold off line of sight"
+    # ),
+    # # # Test Case 5: static obstacle on los within distance threshold
+    # # (
+    # #     (),
+    # #     True,
+    # #     'Static obstacle on los within distance threshold'
+    # # ),
+    # # # Test Case 6: static obstacle on los but not within distance threshold
+    # # (
+    # #     (),
+    # #     False,
+    # #     'static obstacle on los but not within distance threshold'
+    # # ),
+    # # # Test Case 7: static obstacle within distance threshold not on los
+    # # (
+    # #     (),
+    # #     False,
+    # #     "static within distance threshold not on los"
+    # # ),
+    # # # Test Case 8: static obstacle outside distance threshold outside line of sight
+    # # (
+    # #     (),
+    # #     False,
+    # #     "static obstacle outside distance threshold outside line of sight"
+    # # )
+    # # Test Case 9: agent_update out of sync
+    # (
+    #     (
+    #         AgentUpdate(header=Header(stamp=Time(sec=0, nanosec=0))),
+    #         ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+    #         UnsafeSet(header=Header(stamp=get_current_ros_time())),
+    #         Waypoint(),
+    #         float(50)
+    #     ),
+    #     TimeoutError('Timeout Exception occured'),
+    #     "Timeout error was not thrown for ObstaclesUpdate"
+    # ),
+    # # Test Case 20: obstacle_update out of sync
+    # (
+    #     (
+    #         AgentUpdate(header=Header(stamp=get_current_ros_time())),
+    #         ObstaclesUpdate(header=Header(stamp=Time(sec=1, nanosec=0))),
+    #         UnsafeSet(header=Header(stamp=get_current_ros_time())),
+    #         Waypoint(),
+    #         float(50)
+    #     ),
+    #     TimeoutError('Timeout Exception occured'),
+    #     "Timeout error was not thrown for ObstaclesUpdate"
+    # ),
+    # # Test Case 11: unsafe_set out of sync
+    # (
+    #     (
+    #         AgentUpdate(header=Header(stamp=get_current_ros_time())),
+    #         ObstaclesUpdate(header=Header(stamp=get_current_ros_time())),
+    #         UnsafeSet(header=Header(stamp=Time(sec=0, nanosec=0))),
+    #         Waypoint(),
+    #         float(50)
+    #     ),
+    #     TimeoutError('Timeout Exception occured'),
+    #     "Timeout error was not thrown for ObstaclesUpdate"
+    # ),
+])
+def test_guard_CRUISE_to_T2LOS_1(
+    input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
+    expected_output: Union[bool, Exception],
+    description: str
+):
+    """        TimeoutError('timeout occured withkget_current_ros_time())),
+            Waypoint(),
+            float(50)
+    Test if the guard_CRUISE_to_T2Theta is working correctly.
 
-#     This test verifies:
-#     1. guard correctly evaluates unsafe set scenarios and returns expected transition evaluation
-#     2. TODO: guard correctly evaluates static obstacles scenarios and returns expected transition evaluation
-#     3. guard handles out of sync state updates and raises exception
-#     4. TODO: guard handles invalid input data and raises exception
+    This test verifies:
+    1. guard correctly evaluates unsafe set scenarios and returns expected transition evaluation
+    2. TODO: guard correctly evaluates static obstacles scenarios and returns expected transition evaluation
+    3. guard handles out of sync state updates and raises exception
+    4. TODO: guard handles invalid input data and raises exception
 
-#     :raises: AssertionError if any of the checks fails
-#     """
-#     try:
-#         actual = guard_CRUISE_to_T2LOS_1(*input_args)
-#         assert actual == expected_output, f"{description}: expected {expected_output}, got {actual}"
-#     except Exception as e:
-#         assert type(e) == type(expected_output), f"{description}, expected {expected_output}, got {type(e)}"
-#         assert str(e) == str(expected_output), f"{description}, expected {expected_output}, got {str(e)}"
+    :raises: AssertionError if any of the checks fails
+    """
+    try:
+        actual = guard_CRUISE_to_T2LOS_1(*input_args)
+        assert actual == expected_output, f"{description}: expected {expected_output}, got {actual}"
+    except Exception as e:
+        assert type(e) == type(expected_output), f"{description}, expected {expected_output}, got {type(e)}"
+        assert str(e) == str(expected_output), f"{description}, expected {expected_output}, got {str(e)}"
 
 # @pytest.mark.parametrize("input_args, expected_output, description", [
 #     # Test Case 1: Agent heading is not within error tolerance
