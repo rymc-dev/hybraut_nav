@@ -19,7 +19,7 @@ setup(
         (f'lib/python3.10/site-packages/{package_name}/config', glob('config/*.py')),
         (f'lib/python3.10/site-packages/{package_name}/utils', glob('utils/*.py')),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'launch_testing'],
     zip_safe=True,
     maintainer='Ryan McKee',
     maintainer_email='r.mckee@qub.ac.uk',
@@ -27,7 +27,7 @@ setup(
         'colav hybrid eval contains different service functions for different scenario evaluations.'
     ),
     license='MIT',
-    tests_require=['pytest'],
+    tests_require=['pytest', 'launch_testing', 'parameterized'],
     entry_points={
         'console_scripts': [
             "guards_node = colav_hybrid_eval.execute_guards_node:main",

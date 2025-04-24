@@ -77,7 +77,7 @@ class ResetNode(Node):
             return {
                 'waypoints': self.create_publisher(
                     msg_type=Waypoints,
-                    topic='hybrid_automaton/waypoints',
+                    topic='/hybrid_automaton/waypoints',
                     qos_profile=QOS_PROFILE),
             }
         except Exception as e:
@@ -126,7 +126,7 @@ class ResetNode(Node):
             return {
                 "reset": self.create_service(
                     srv_type=Reset,
-                    srv_name='reset',
+                    srv_name='resets_node/reset',
                     callback=self._reset_callback
                 )
             }
