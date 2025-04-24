@@ -1,3 +1,17 @@
+#!/usr/bin/python3
+"""
+Integration Test Suite for COLAV Hybrid Automaton Resets Node.
+
+This module contains Integration tests to validate the behavior of the resets node
+used in the COLAV Hybrid Automaton. This test class extends upon the unit tests for
+the reset conditions, this is mainly used for the purpose of ensuring that the communication
+interfaces are working as expected
+
+:author: Ryan McKee
+:date: April 24, 2025
+"""
+
+
 import os
 import sys
 import time
@@ -15,10 +29,10 @@ from config.qos_config import QOS_PROFILE
 
 # Add package path for local imports
 FILE_PATH = os.path.dirname(__file__)
-PKG_PATH = os.path.abspath(
-    os.path.join(FILE_PATH, "..", "install", "colav_hybrid_eval", "lib", "python3.10", "site-packages")
-)
-sys.path.insert(0, PKG_PATH)
+# PKG_PATH = os.path.abspath(
+#     os.path.join(FILE_PATH, "..", "install", "colav_hybrid_eval", "lib", "python3.10", "site-packages")
+# )
+# sys.path.insert(0, PKG_PATH)
 
 EXPECTED_NODE_NAME = 'resets_node'
 EXPECTED_NAMESPACE = '/hybrid_automaton'
@@ -27,7 +41,7 @@ EXPECTED_NAMESPACE = '/hybrid_automaton'
 @pytest.mark.rostest
 def generate_test_description():
     """
-    Launch feature node required for unit tests.
+    Launch reset feature node for this integration testing module
     """
     resets_node = Node(
         executable=sys.executable,
@@ -71,6 +85,8 @@ class TestResetsNode:
 
     def test_node_name_and_namespace(self):
         """Verify the reset node name and namespace."""
+        print (f"test_node_name_and_namespace")
+
         timeout = 5.0
         deadline = time.time() + timeout
 
@@ -86,6 +102,8 @@ class TestResetsNode:
 
     def test_service_metadata(self):
         """Verify the reset service exists with correct type."""
+        print (f"test_service_metadata")
+
         client = self.node.create_client(
             Reset,
             '/hybrid_automaton/resets_node/reset'
@@ -103,6 +121,7 @@ class TestResetsNode:
 
     def test_topic_publications(self):
         """Verify the waypoints topic is published with correct type."""
+        print (f"test_topic_publications")
         timeout = 5.0
         deadline = time.time() + timeout
 
@@ -127,26 +146,41 @@ class TestResetsNode:
             Reset.Response(success=False, message='Reset transition name does not exist: None'),
         ),
         (
-            "no_waypoints",
+            "no_waypoints, waypoint_reached_to_cruise",
             Waypoints(),
             Reset.Request(transition_name='waypoint_reached_to_cruise'),
             Waypoints(),
             Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
         ),
         (
-            "single_waypoint",
+            "single_waypoint, waypoint_reached_to_cruise",
             Waypoints(waypoints=[Waypoint()]),
             Reset.Request(transition_name='waypoint_reached_to_cruise'),
             Waypoints(waypoints=[Waypoint()]),
             Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
         ),
         (
-            "valid_reset",
+            "valid_reset, waypoint_reached_to_cruise",
             Waypoints(waypoints=[Waypoint(acceptance_radius=10.0), Waypoint(acceptance_radius=20.0)]),
             Reset.Request(transition_name='waypoint_reached_to_cruise'),
             Waypoints(waypoints=[Waypoint(acceptance_radius=20.0)]),
             Reset.Response(success=True, message='Reset successfully applied'),
         ),
+        (
+            "no_waypoints, cruise_to_t2los",
+            Waypoints(),
+            Reset.Request(transition_name='cruise_to_t2los'),
+            Waypoints(),
+            Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
+        ),
+        (
+            "single_waypoint, cruise_to_t2los",
+            Waypoints(waypoints=[Waypoint()]),
+            Reset.Request(transition_name='cruise_to_t2los'),
+            Waypoints(waypoints=[Waypoint()]),
+            Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
+        ),
+        # TODO: Add tests for cruise_to_t2los test.
     ])
     def test_reset_service(
         self,
@@ -157,6 +191,8 @@ class TestResetsNode:
         expected_response,
     ):
         """Test the reset service behavior."""
+        print (f"test_reset_service: Test Case: {name}")
+
         if input_waypoints.waypoints:
             self.publisher.publish(input_waypoints)
             rclpy.spin_once(self.node, timeout_sec=0.2)
