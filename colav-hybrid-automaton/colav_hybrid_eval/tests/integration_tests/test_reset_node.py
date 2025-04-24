@@ -25,7 +25,7 @@ from parameterized import parameterized
 
 from colav_interfaces.srv import Reset
 from colav_interfaces.msg import Waypoint, Waypoints
-from config.qos_config import QOS_PROFILE
+from colav_hybrid_eval.config.qos_config import QOS_PROFILE
 
 # Add package path for local imports
 FILE_PATH = os.path.dirname(__file__)

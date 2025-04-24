@@ -13,15 +13,13 @@ and confirm the expected functionality of each guard.
 from typing import Tuple, Union
 from std_msgs.msg import Header
 
-import sys
 import pytest
 
 from geometry_msgs.msg import Point, Point32, Pose, Quaternion
 from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, Waypoints
-# from colav_hybrid_eval.utils.validate_timestamps import get_current_ros_time
 from builtin_interfaces.msg import Time
-from utils import get_current_ros_time
+
 from colav_hybrid_eval.scripts.guards import (
     guard_CRUISE_to_FB,
     guard_CRUISE_to_T2LOS_1,
@@ -31,6 +29,7 @@ from colav_hybrid_eval.scripts.guards import (
     guard_T2LOS_to_FB,
     guard_WAYPOINT_REACHED_to_CRUISE
 )
+from colav_hybrid_eval.utils.validate_timestamps import get_current_ros_time
 
 
 """CRUISE Guards Tests"""
