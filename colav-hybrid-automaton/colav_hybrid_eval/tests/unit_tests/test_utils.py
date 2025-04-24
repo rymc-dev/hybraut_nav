@@ -29,7 +29,8 @@ from colav_hybrid_eval.utils import (
 import pytest
 import numpy as np
 from typing import Tuple, Union
-
+import time
+from builtin_interfaces.msg import Time, Duration
 
 @pytest.mark.parametrize("point1, point2, expected, description", [
     # Identical Points: Expected distance is zero.
@@ -176,12 +177,28 @@ def test_delta_heading(
     actual = delta_heading(*input_args)
     assert np.isclose(actual, expected_output, atol=1e-6), f"{description}: expected {expected_output}, got {actual}"
 
-# TODO: Need to write tests for normalize angle
-# @pytest.mark.parametrize("input_args, expected_output, description", [
-
-# ])
-# def test_normalize_angle(input_args, expected_output, description):
-#     pass
+@pytest.mark.parametrize(
+    "input_args, expected_output, description",
+    [
+        (0.0,                 0.0,                "zero stays zero"),
+        (np.pi/2,            np.pi/2,            "positive half-pi"),
+        (-np.pi/2,          -np.pi/2,            "negative half-pi"),
+        (np.pi,             -np.pi,              "π wraps to −π"),
+        (-np.pi,            -np.pi,              "−π stays −π"),
+        (2*np.pi,            0.0,                "2π wraps to 0"),
+        (-2*np.pi,           0.0,                "−2π wraps to 0"),
+        (3*np.pi/2,         -np.pi/2,            "3π/2 → −π/2"),
+        (-3*np.pi/2,         np.pi/2,            "−3π/2 → π/2"),
+        (4*np.pi + 0.1,      0.1,                "large + angle beyond 2π"),
+        (-4*np.pi - 0.1,    -0.1,                "large − angle beyond −2π"),
+        (np.pi + 0.2,       -(np.pi - 0.2),      "just above +π"),
+        (-(np.pi + 0.2),     np.pi - 0.2,        "just below −π"),
+    ],
+)
+def test_normalize_angle(input_args, expected_output, description):
+    actual = normalize_angle(input_args)
+    # allow tiny floating‐point slop
+    assert pytest.approx(actual, rel=1e-9, abs=1e-12) == expected_output, description
 
 @pytest.mark.parametrize("input_args, expected_output, description", [
     (
@@ -280,25 +297,72 @@ def test_quaternion_to_heading(input_args, expected_output, description):
 
 """utils.validate_timestamps unit tests"""
 
-# @pytest.mark.parametrize("input_args, expected_output, description", [
+@pytest.mark.parametrize(
+    "fake_time, exp_sec, description",
+    [
+        (0.0,                  0,   "exact epoch"),
+        (1.5,                  1,   "simple half-second"),
+        (1630000000.123456789, 1630000000, "long timestamp with nanoseconds"),
+        (42.999999999,         42,  "edge case just under next second"),
+    ],
+)
+def test_get_current_ros_time(monkeypatch, fake_time, exp_sec, description):
+    """
+    Test to ensure get_current_ros_time is working as expected
+    """
+    # Patch time.time() so we know exactly what comes back
+    monkeypatch.setattr(time, "time", lambda: fake_time)
 
-# ])
-# def test_get_current_ros_time(
-#     input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
-#     expected_output: Union[bool, Exception],
-#     description: str
-# ):
-#     pass
+    # Call under test
+    ros_time: Time = get_current_ros_time()
 
-@pytest.mark.parametrize("input_args, expected_output, description", [
+    # It must be a Time message
+    assert isinstance(ros_time, Time), f"{description}: return type"
 
-])
+    # Seconds is just the integer part
+    assert ros_time.sec == exp_sec, f"{description}: sec field"
+
+    # Nanoseconds must be int((now - sec) * 1e9)
+    expected_nanosec = int((fake_time - exp_sec) * 1e9)
+    assert ros_time.nanosec == expected_nanosec, (
+        f"{description}: nanosec field (got {ros_time.nanosec}, "
+        f"expected {expected_nanosec})"
+    )
+
+@pytest.mark.parametrize(
+    "t1_vals, t2_vals, tol_vals, expect_exc, description",
+    [
+        # identical times with nonzero tolerance → no exception
+        ((10,   0), (10,   0), (1,   0), False, "identical timestamps within tolerance"),
+
+        # difference less than tolerance → no exception
+        ((5, 200_000_000), (5, 100_000_000), (0, 200_000_000), False, "200ms diff under 200ms tolerance"),
+
+        # difference exactly equal to tolerance → should raise
+        ((2,         0), (0,         0), (2,   0), True, "2s diff equals 2s tolerance"),
+
+        # difference just above tolerance → should raise
+        ((1, 500_000_001), (1,         0), (0, 500_000_000), True, "500ms+1ns diff above 500ms tolerance"),
+
+        # zero tolerance always raises if any difference >= 0
+        ((0,         0), (0,         0), (0,   0), True, "zero tolerance always triggers on zero diff"),
+    ],
+)
 def test_validate_timestamps_within_tolerance(
-    input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
-    expected_output: Union[bool, Exception],
-    description: str
+    t1_vals, t2_vals, tol_vals, expect_exc, description
 ):
-    pass
+    """
+    Test to ensure the validate timestamps within tolerance working as expected
+    """
+    # Arrange: create Time objects with internal fields
+    t1 = Time(); t1._sec,   t1._nanosec   = t1_vals
+    t2 = Time(); t2._sec,   t2._nanosec   = t2_vals
+    tol = Duration(sec=tol_vals[0], nanosec=tol_vals[1])
 
-if __name__ == "__main__":
-    sys.exit(pytest.main([__file__]))
+    # Act & Assert
+    if expect_exc:
+        with pytest.raises(TimeoutError):
+            validate_timestamps_within_tolerance(t1, t2, tol)
+    else:
+        # Should complete without raising
+        validate_timestamps_within_tolerance(t1, t2, tol)

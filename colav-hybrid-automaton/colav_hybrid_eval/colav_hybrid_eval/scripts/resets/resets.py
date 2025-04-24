@@ -8,6 +8,10 @@ VW_ACCEPTANCE_RADIUS = 10
 
 def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     """pops the first item in the queue of waypoints"""
+    if not isinstance(waypoints, Waypoints):
+        raise ValueError(
+            'exception occured: waypoints arg passed in invalid type, should be type: "colav_interfaces.msg.waypoints"'
+        )
     if len(waypoints.waypoints) < 2:
         raise ValueError(
             'waypoints list size less than 1, something has went wrong is guard condition')

@@ -25,7 +25,7 @@ def quaternion_to_heading(qx: float, qy: float, qz: float, qw: float) -> float:
     return heading
 
 
-def normalize_angle(angle):
+def normalize_angle(angle: float):
     return (angle + np.pi) % (2 * np.pi) - np.pi
 
 

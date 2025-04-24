@@ -11,14 +11,20 @@ and confirm the expected functionality of each guard.
 """
 
 from typing import Tuple, Union
-from std_msgs.msg import Header
 
 import pytest
 
-from geometry_msgs.msg import Point, Point32, Pose, Quaternion
-from std_msgs.msg import Float64MultiArray, MultiArrayLayout, MultiArrayDimension
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, Waypoints
 from builtin_interfaces.msg import Time
+from geometry_msgs.msg import Point, Point32, Pose, Quaternion
+from std_msgs.msg import Float64MultiArray, Header, MultiArrayDimension, MultiArrayLayout
+
+from colav_interfaces.msg import (
+    AgentUpdate,
+    ObstaclesUpdate,
+    UnsafeSet,
+    Waypoint,
+    Waypoints,
+)
 
 from colav_hybrid_eval.scripts.guards import (
     guard_CRUISE_to_FB,
@@ -27,7 +33,7 @@ from colav_hybrid_eval.scripts.guards import (
     guard_CRUISE_to_WAYPOINT_REACHED,
     guard_T2LOS_to_CRUISE,
     guard_T2LOS_to_FB,
-    guard_WAYPOINT_REACHED_to_CRUISE
+    guard_WAYPOINT_REACHED_to_CRUISE,
 )
 from colav_hybrid_eval.utils.validate_timestamps import get_current_ros_time
 
@@ -244,9 +250,7 @@ def test_guard_CRUISE_to_T2LOS_1(
     expected_output: Union[bool, Exception],
     description: str
 ):
-    """        TimeoutError('timeout occured withkget_current_ros_time())),
-            Waypoint(),
-            float(50)
+    """   
     Test if the guard_CRUISE_to_T2Theta is working correctly.
 
     This test verifies:
@@ -305,6 +309,7 @@ def test_guard_CRUISE_to_T2LOS_2(input_args: Tuple[AgentUpdate, Waypoint, float]
     result = guard_CRUISE_to_T2LOS_2(*input_args)
     assert result == expected_output, description
 
+# TODO: THis functions implementation is yet to be completed, still needs work therefore will write more tests when completed
 @pytest.mark.parametrize("input_args, expected_output, description", [
     (
         (
@@ -401,7 +406,6 @@ def test_guard_CRUISE_to_WAYPOINT_REACHED(
     actual = guard_CRUISE_to_WAYPOINT_REACHED(*input_args)
     assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
 
-
 """T2LOS Guards Tests"""
 @pytest.mark.parametrize("input_args, expected_output, description", [
     # Test Case 1: Agent heading is within error tolerance
@@ -452,6 +456,7 @@ def test_T2LOS_to_CRUISE(
     assert actual == expected_output, f"{description}: expected {expected_output}, got: {actual}"
 
 @pytest.mark.parametrize("input_args, expected_output, description", [
+    # Test Case 1: agent_state shows we are already within unsafe_set
     (
         (
             AgentUpdate(pose=Pose(position=Point(x=0.0, y=0.0, z=0.0)), safety_radius=float(10)),
@@ -473,7 +478,7 @@ def test_T2LOS_to_CRUISE(
         True,
         "agent_state shows that we are already inside the unsafe_set"
     ),
-    # "Test Case 2: agent_state shows we are currently outside the unsafe set and within dsf"
+    # Test Case 2: agent_state shows we are currently outside the unsafe set and within dsf
     # (
     #     (
     #         AgentUpdate(),
@@ -530,8 +535,14 @@ def test_T2LOS_to_FB(
     ),
 ])
 def test_WAYPOINT_REACHED_to_CRUISE(input_args, expected_output, description):
-    actual = guard_WAYPOINT_REACHED_to_CRUISE(input_args)
-    assert actual == expected_output, f'{description}: expected {expected_output}, got {actual}'
+    """
+    test if WAYPOINT_REACHED_TO_CRUISE guard is working correctly
 
-# if __name__ == "__main__":
-#     sys.exit(pytest.main([__file__]))
+    This test verifies: 
+    1. The function returns expected outputs for valid params
+    2. The function handles Exceptions correctly
+
+    :raises: AssertionError if any of the checks fails
+    """
+    actual = guard_WAYPOINT_REACHED_to_CRUISE(input_args)
+    assert actual == expected_output, f'Test: "{description}" failed, expected {expected_output}, got {actual}'
