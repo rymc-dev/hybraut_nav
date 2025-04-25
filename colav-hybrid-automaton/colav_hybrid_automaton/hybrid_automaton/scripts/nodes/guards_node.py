@@ -122,12 +122,12 @@ class GuardsNode(Node):
             return {
                 "start_guards_evaluation": self.create_service(
                     srv_type=Trigger,
-                    srv_name=f"{node_name}/start_guard_evaluation",
+                    srv_name=f"/hybrid_automaton/start_guards_eval",
                     callback=self._start_guards_evaluation_callback
                 ),
                 "stop_guards_evaluation": self.create_service(
                     srv_type=Trigger,
-                    srv_name=f"{node_name}/stop_guards_evaluation",
+                    srv_name=f"/hybrid_automaton/stop_guards_eval",
                     callback=self._stop_guards_evaluation_callback
                 )
             }

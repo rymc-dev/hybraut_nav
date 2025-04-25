@@ -44,7 +44,7 @@ Date: April 17, 2025
 
 
 from hybrid_automaton.config.qos_config import QOS_PROFILE
-from scripts.dynamics import (
+from hybrid_automaton.scripts.dynamics import (
     dynamics_CRUISE,
     dynamics_T2LOS,
     dynamics_FB,

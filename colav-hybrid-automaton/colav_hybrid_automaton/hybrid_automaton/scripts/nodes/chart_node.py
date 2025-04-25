@@ -197,12 +197,12 @@ class ChartNode(Node):
                 "start_guards_evaluation": create_cli(
                     node=self,
                     srv_type=Trigger,
-                    srv_name='/hybrid_automaton/guards_node/start_guard_evaluation'
+                    srv_name='/hybrid_automaton/start_guards_eval'
                 ),
                 "stop_guards_evaluation": create_cli(
                     node=self,
                     srv_type=Trigger,
-                    srv_name='/hybrid_automaton/guards_node/stop_guards_evaluation'
+                    srv_name='/hybrid_automaton/stop_guards_eval'
                 ),
                 "start_dynamics_evaluation": create_cli(
                     node=self,

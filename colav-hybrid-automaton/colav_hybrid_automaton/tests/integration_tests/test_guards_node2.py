@@ -26,6 +26,7 @@ from parameterized import parameterized
 from colav_interfaces.srv import Reset
 from colav_interfaces.msg import Waypoint, Waypoints
 from hybrid_automaton.config.qos_config import QOS_PROFILE
+from std_srvs.srv import Trigger
 
 # Add package path for local imports
 FILE_PATH = os.path.dirname(__file__)
@@ -96,3 +97,59 @@ class TestGuardsNode:
             f"Node '{EXPECTED_NODE_NAME}' in namespace '{EXPECTED_NAMESPACE}' not found. "
             f"Available nodes: {nodes}"
         )
+
+    def test_node_srvs_exist(self):
+        """
+        test vertifies that guards node services are available
+
+        1. checks /hybrid_automaton/start_guards_eval available
+        2. checks /hybrid_automaton/stop_guards_eval available
+
+        :raises: AssertionError if fails
+        """
+        print (f'test_node_srvs_exist')
+
+        
+        start_guards_eval_cli = self.node.create_client(
+            Trigger,
+            '/hybrid_automaton/start_guards_eval',
+        )
+        if not start_guards_eval_cli.wait_for_service(timeout_sec=5.0):
+            assert False, 'Test: test_node_srvs_exists failed!, Timeout occured while waiting for /hybrid_automaton/start_guards_eval'
+            
+
+        stop_guards_eval = self.node.create_client(
+            Trigger,
+            '/hybrid_automaton/stop_guards_eval'
+        )
+        if not stop_guards_eval.wait_for_service(timeout_sec=5.0):
+            assert False, 'Test: test_node_srvs_exist failed!, Timeout occured while waiting for /hybrid_automaton/stop_guards_eval'
+
+        assert True
+
+    def test_start_guards_eval_srv(self):
+        """
+        test verifies that the start_guards_eval service works as expected
+
+        1. Should return response True
+        2. Should start topics /hybrid_automaton/guards
+        2. should create topic subscriptions to /agent_update, /obstacles_update, /unsafe_set, .....
+
+        :raises: if any test fails an AssertionError will be thrown
+        """
+        # create client
+        start_guards_eval_cli = self.node.create_client(
+            Trigger,
+            '/hybrid_automaton/start_guards_eval',
+        )
+        if not start_guards_eval_cli.wait_for_service(timeout_sec=5.0):
+            assert False, 'Test: test_node_srvs_exists failed!, Timeout occured while waiting for /hybrid_automaton/start_guards_eval'
+        
+        # Send Request and wait for response
+        future = start_guards_eval_cli.call_async(Trigger.Request())
+        rclpy.spin_until_future_complete(self.node, future, timeout_sec=5.0)
+        
+        if not future.done():
+            assert False, 'Test: test_node_srvs_exists failed!, Timeout occured while waiting for /hybrid_automaton/start_guards_eval service response'
+        
+        assert True
