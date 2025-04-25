@@ -27,7 +27,7 @@ Date: April 17, 2025
 
 
 # === Standard Library Imports ===
-from config import QOS_PROFILE
+from hybrid_automaton.config import QOS_PROFILE
 from hybrid_automaton.scripts.guards import (
     guard_CRUISE_to_FB,
     guard_CRUISE_to_T2LOS_1,

@@ -11,207 +11,233 @@ interfaces are working as expected
 :date: April 24, 2025
 """
 
+# NOTE: Ensure resets_node is not already running when running tests otherwise there will be exceptions.
 
 import os
 import sys
 import time
 
+import unittest
 import pytest
 import rclpy
 from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch_testing.actions import ReadyToTest
+import launch_ros
+import launch_testing.actions
 from parameterized import parameterized
 
 from colav_interfaces.srv import Reset
 from colav_interfaces.msg import Waypoint, Waypoints
 from hybrid_automaton.config.qos_config import QOS_PROFILE
 
-# Add package path for local imports
-FILE_PATH = os.path.dirname(__file__)
-# PKG_PATH = os.path.abspath(
-#     os.path.join(FILE_PATH, "..", "install", "colav_hybrid_eval", "lib", "python3.10", "site-packages")
-# )
-# sys.path.insert(0, PKG_PATH)
 
 EXPECTED_NODE_NAME = 'resets_node'
 EXPECTED_NAMESPACE = '/hybrid_automaton'
 
-
 @pytest.mark.rostest
 def generate_test_description():
     """
-    Launch reset feature node for this integration testing module
+    Launch reset feature node for testing
     """
-    resets_node = Node(
-        executable=sys.executable,
-        arguments=[
-            os.path.join(FILE_PATH, "..", "colav_hybrid_eval", "execute_resets_node.py")
-        ],
-        additional_env={'PYTHONBUFFERED': '1'},
+    file_path = os.path.join(os.path.dirname(__file__), '..', '..', 'hybrid_automaton', 'execute_resets_node.py') 
+
+    reset_node = launch_ros.actions.Node(
+        executable=sys.executable, # sys.executable python interpreted
+        arguments=[file_path],
+        additional_env={'PYTHONBUFFERED':'1'}, # std::out std::error streams being sent straight to terminal in real time
     )
+    return (LaunchDescription([reset_node, launch_testing.actions.ReadyToTest()]), {'reset_node': reset_node})
 
-    return LaunchDescription([resets_node, ReadyToTest()]), {'resets_node': resets_node}
-
-
-class TestResetsNode:
-    """Tests for the resets node."""
-
+class TestResetsNode(unittest.TestCase):
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         rclpy.init()
 
     @classmethod
-    def teardown_class(cls):
-        rclpy.shutdown()
+    def tearDownClass(cls):
+        if rclpy.ok():
+            rclpy.shutdown()
 
     def setUp(self):
-        self.node = rclpy.create_node('test_resets_node')
+        self.test_node = rclpy.create_node('test_resets_node')
         self.waypoints = None
-        self.node.create_subscription(
-            Waypoints,
-            'hybrid_automaton/waypoints',
-            lambda msg: setattr(self, 'waypoints', msg),
-            qos_profile=QOS_PROFILE,
+        self.test_node.create_subscription(
+            msg_type=Waypoints,
+            topic='hybrid_automaton/waypoints',
+            callback=lambda msg: self.__setattr__('waypoints', msg),
+            qos_profile=QOS_PROFILE
         )
-        self.publisher = self.node.create_publisher(
-            Waypoints,
-            'hybrid_automaton/waypoints',
-            qos_profile=QOS_PROFILE,
+        self._waypoints_pub = self.test_node.create_publisher(
+            msg_type=Waypoints,
+            topic='hybrid_automaton/waypoints',
+            qos_profile=QOS_PROFILE            
         )
 
     def tearDown(self):
-        self.node.destroy_node()
+        self.test_node.destroy_node()
 
     def test_node_name_and_namespace(self):
-        """Verify the reset node name and namespace."""
-        print (f"test_node_name_and_namespace")
+        """
+        Tests if resets node has correct default initiailzation
 
-        timeout = 5.0
-        deadline = time.time() + timeout
+        """
+        start_time = time.time()
+        timeout_period = 5
 
-        while time.time() < deadline:
-            rclpy.spin_once(self.node, timeout_sec=0.2)
-            nodes = self.node.get_node_names_and_namespaces()
-            if (EXPECTED_NODE_NAME, EXPECTED_NAMESPACE) in nodes:
-                return
-        pytest.fail(
-            f"Node '{EXPECTED_NODE_NAME}' in namespace '{EXPECTED_NAMESPACE}' not found. "
-            f"Available nodes: {nodes}"
-        )
+        
+        while (time.time() - start_time) < timeout_period: 
+            node_names_and_namespaces= self.test_node.get_node_names_and_namespaces()
+            is_correct_node_name_and_namespace = False
+            for node_name_and_namespace in node_names_and_namespaces:
+                if node_name_and_namespace[0] == EXPECTED_NODE_NAME and \
+                        node_name_and_namespace[1] == EXPECTED_NAMESPACE:
+                    is_correct_node_name_and_namespace = True
+            rclpy.spin_once(self.test_node, timeout_sec=0.2)
+                
+        assert is_correct_node_name_and_namespace, f"reset node initialized incorrectly, default namespace should be /hybrid_automaton and name should be resets: {node_names_and_namespaces}"
 
-    def test_service_metadata(self):
-        """Verify the reset service exists with correct type."""
-        print (f"test_service_metadata")
+    def test_node_srvs_metadata(self):
+        """
+        Tests if the reset node services exist
+        """
+        start_time = time.time()
+        timeout_period = 5.0
 
-        client = self.node.create_client(
-            Reset,
-            '/hybrid_automaton/resets_node/reset'
-        )
-        client.wait_for_service(timeout_sec=5.0)
+        EXPECTED_SRVS_AND_TYPES = {'/hybrid_automaton/resets_node/reset': 'colav_interfaces/srv/Reset'}
+        is_srvs_and_types_value = False
 
-        services = self.node.get_service_names_and_types_by_node(
-            node_name=EXPECTED_NODE_NAME,
-            node_namespace=EXPECTED_NAMESPACE
-        )
-        assert any(
-            name == '/hybrid_automaton/resets_node/reset' and 'colav_interfaces/srv/Reset' in types
-            for name, types in services
-        ), f"Service '/hybrid_automaton/resets_node/reset' not found in {services}"
+        while (time.time() - start_time) < timeout_period:
+            try:
+                node_srvs_and_types = self.test_node.get_service_names_and_types_by_node(
+                    node_name=EXPECTED_NODE_NAME,
+                    node_namespace=EXPECTED_NAMESPACE
+                )
 
-    def test_topic_publications(self):
-        """Verify the waypoints topic is published with correct type."""
-        print (f"test_topic_publications")
-        timeout = 5.0
-        deadline = time.time() + timeout
+                found = set()
+                for srv_name, srv_type_list in node_srvs_and_types:
+                    expected_type = EXPECTED_SRVS_AND_TYPES.get(srv_name)
+                    if expected_type and expected_type in srv_type_list:
+                        found.add(srv_name)
 
-        while time.time() < deadline:
-            rclpy.spin_once(self.node, timeout_sec=0.2)
-            topics = self.node.get_topic_names_and_types()
-            if any(
-                name == '/hybrid_automaton/waypoints' and 'colav_interfaces/msg/Waypoints' in types
-                for name, types in topics
-            ):
-                return
-        pytest.fail(
-            "Topic '/hybrid_automaton/waypoints' with type 'colav_interfaces/msg/Waypoints' not found."
-        )
+                if found == set(EXPECTED_SRVS_AND_TYPES.keys()):
+                    is_srvs_and_types_value = True
+                    break
+            except Exception: 
+                pass
+
+            time.sleep(0.2)  # wait a bit before retrying
+
+        assert is_srvs_and_types_value, f"❌ Expected services not found within timeout expected: {EXPECTED_SRVS_AND_TYPES} actual: {node_srvs_and_types}"
+
+    def test_node_topics_init(self):
+        """
+        Test if the topics for the reset node are there
+        """
+        start_time = time.time()
+        timeout_period = 5.0
+
+        # Define expected topics and their types
+        EXPECTED_TOPICS = {"/hybrid_automaton/waypoints": "colav_interfaces/msg/Waypoints"}  # Topic names and their expected types
+        is_topics_and_types_value = False
+
+        # Retry loop with timeout
+        while (time.time() - start_time) < timeout_period:
+            try:
+                # Get the node's topics and types
+                node_topics_and_types = self.test_node.get_topic_names_and_types()
+
+                found = set()
+                for topic_name, topic_types in node_topics_and_types:
+                    # Compare each topic's name and its types
+                    expected_type = EXPECTED_TOPICS.get(topic_name)  # Get expected type for the topic
+                    if expected_type and expected_type in topic_types:
+                        found.add(topic_name)  # Add to found topics if types match
+
+                # Check if all expected topics were found
+                if found == set(EXPECTED_TOPICS.keys()):
+                    is_topics_and_types_value = True
+                    break
+            except Exception:
+                pass  # Handle exceptions gracefully
+
+            time.sleep(0.2)  # Wait a bit before retrying
+
+        # Assert that the expected topics were found within the timeout
+        assert is_topics_and_types_value, f"❌ Expected topics not found within timeout. Expected: {EXPECTED_TOPICS}, Actual: {node_topics_and_types}"
+
 
     @parameterized.expand([
+        # Test Case 1: invalid transition name
         (
-            "invalid_transition",
+            "test invalid transition name", 
             Waypoints(),
             Reset.Request(transition_name='None'),
             Waypoints(),
-            Reset.Response(success=False, message='Reset transition name does not exist: None'),
+            Reset.Response(success=False, message=f'Reset transition name does not exist: None')
         ),
+        # Test Case 2: waypoint_reached_to_cruise transition with no waypoints in list
         (
-            "no_waypoints, waypoint_reached_to_cruise",
+            "Test invalid waypoint_reached_to_cruise request no waypoints in state", 
             Waypoints(),
             Reset.Request(transition_name='waypoint_reached_to_cruise'),
             Waypoints(),
-            Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
+            Reset.Response(success=False, message=f'waypoints list size less than 1, something has went wrong is guard condition')
         ),
+        # Test Case 2: waypoint_reached_to_cruise transition with no waypoints in list
         (
-            "single_waypoint, waypoint_reached_to_cruise",
+            "Test invalid waypoint_reached_to_cruise request only one waypoint in states", 
             Waypoints(waypoints=[Waypoint()]),
             Reset.Request(transition_name='waypoint_reached_to_cruise'),
             Waypoints(waypoints=[Waypoint()]),
-            Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
+            Reset.Response(success=False, message=f'waypoints list size less than 1, something has went wrong is guard condition')
         ),
         (
-            "valid_reset, waypoint_reached_to_cruise",
-            Waypoints(waypoints=[Waypoint(acceptance_radius=10.0), Waypoint(acceptance_radius=20.0)]),
+            "Test Valid Reset waypoint_reached_to_cruise, 2 waypoints in list", 
+            Waypoints(waypoints=[Waypoint(acceptance_radius=float(10)), Waypoint(acceptance_radius=float(20))]),
             Reset.Request(transition_name='waypoint_reached_to_cruise'),
-            Waypoints(waypoints=[Waypoint(acceptance_radius=20.0)]),
-            Reset.Response(success=True, message='Reset successfully applied'),
+            Waypoints(waypoints=[Waypoint(acceptance_radius=float(20))]),
+            Reset.Response(success=True, message=f'Reset successfully applied')
         ),
-        (
-            "no_waypoints, cruise_to_t2los",
-            Waypoints(),
-            Reset.Request(transition_name='cruise_to_t2los'),
-            Waypoints(),
-            Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
-        ),
-        (
-            "single_waypoint, cruise_to_t2los",
-            Waypoints(waypoints=[Waypoint()]),
-            Reset.Request(transition_name='cruise_to_t2los'),
-            Waypoints(waypoints=[Waypoint()]),
-            Reset.Response(success=False, message='waypoints list size less than 1, something has went wrong is guard condition'),
-        ),
-        # TODO: Add tests for cruise_to_t2los test.
     ])
-    def test_reset_service(
+    def test_reset_srv(
         self,
-        name,
-        input_waypoints,
-        request,
-        expected_waypoints,
-        expected_response,
+        description: str,
+        before_waypoints: Waypoints,
+        request: Reset.Request,
+        expected_waypoints: Waypoints,
+        expected_response: Reset.Response
     ):
-        """Test the reset service behavior."""
-        print (f"test_reset_service: Test Case: {name}")
+        """
+        Tests is reset service works as expected 
+        """
+        self.test_node.get_logger().info(f'Starting test: {description}')
+        
+        if before_waypoints is not None:
+            self._waypoints_pub.publish(before_waypoints)
+        
+        rclpy.spin_once(self.test_node, timeout_sec=1.0)
+        timeout_period = 5.0
+        try:
+            reset_cli = self.test_node.create_client(
+                Reset,
+                '/hybrid_automaton/resets_node/reset'
+            )
+            reset_cli.wait_for_service(timeout_sec=timeout_period)
+        except Exception as e:
+            assert False, f"Exception occured during test: {str(e)}"
 
-        if input_waypoints.waypoints:
-            self.publisher.publish(input_waypoints)
-            rclpy.spin_once(self.node, timeout_sec=0.2)
+        future = reset_cli.call_async(request)
+        rclpy.spin_until_future_complete(self.test_node, future, timeout_sec=5.0)
 
-        client = self.node.create_client(
-            Reset, '/hybrid_automaton/resets_node/reset'
-        )
-        client.wait_for_service(timeout_sec=5.0)
+        if not future.done():
+            assert False, f"Future failed to return response"
 
-        future = client.call_async(request)
-        rclpy.spin_until_future_complete(self.node, future, timeout_sec=5.0)
+        actual_response: Reset.Response = future.result()
 
-        response = future.result()
-        assert response.success == expected_response.success, \
-            f"Expected success={expected_response.success}, got={response.success}"
-        assert response.message == expected_response.message, \
-            f"Expected message='{expected_response.message}', got='{response.message}'"
-
-        # Ensure updated waypoints are received
-        rclpy.spin_once(self.node, timeout_sec=1.0)
+        assert actual_response.success == expected_response.success, \
+            f"Test failed for {description}, Expected success={expected_response.success}, got {actual_response.success}"
+        assert actual_response.message == expected_response.message, \
+            f"Expected message={expected_response.message}, got {actual_response.message}"
+        
+        rclpy.spin_once(self.test_node, timeout_sec=1.0) # spin so that subscriber sees the waypoints update
         assert self.waypoints == expected_waypoints, \
-            f"Expected waypoints={expected_waypoints}, got={self.waypoints}"
+            f"Expected waypoints={expected_waypoints}, got {self.waypoints}"

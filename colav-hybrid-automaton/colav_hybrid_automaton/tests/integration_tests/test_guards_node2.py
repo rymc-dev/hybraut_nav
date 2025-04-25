@@ -11,29 +11,27 @@ interfaces are working as expected
 :date: April 24, 2025
 """
 
+# NOTE: Ensure guards_node not already running on ROS system otherwise there will be test conflicts
 
 import os
 import sys
 import time
+import unittest
+from typing import List, Tuple
 
 import pytest
 import rclpy
 from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch_testing.actions import ReadyToTest
+import launch_ros
+import launch_ros.actions
+import launch_testing.actions
 from parameterized import parameterized
 
-from colav_interfaces.srv import Reset
-from colav_interfaces.msg import Waypoint, Waypoints
 from hybrid_automaton.config.qos_config import QOS_PROFILE
 from std_srvs.srv import Trigger
 
-# Add package path for local imports
-FILE_PATH = os.path.dirname(__file__)
-# PKG_PATH = os.path.abspath(
-#     os.path.join(FILE_PATH, "..", "install", "colav_hybrid_eval", "lib", "python3.10", "site-packages")
-# )
-# sys.path.insert(0, PKG_PATH)
+from colav_interfaces.msg import GuardsStatus, UnsafeSet, AgentUpdate, ObstaclesUpdate, Waypoints
+from std_msgs.msg import String
 
 EXPECTED_NODE_NAME = 'guards_node'
 EXPECTED_NAMESPACE = '/hybrid_automaton'
@@ -42,28 +40,28 @@ EXPECTED_NAMESPACE = '/hybrid_automaton'
 @pytest.mark.rostest
 def generate_test_description():
     """
-    Launch guards feature node for this integration testing module
+    Launch reset feature node for testing
     """
-    guards_node = Node(
-        executable=sys.executable,
-        arguments=[
-            os.path.join(FILE_PATH, "..", "colav_hybrid_eval", "execute_guards_node.py")
-        ],
-        additional_env={'PYTHONBUFFERED': '1'},
+    file_path = os.path.join(os.path.dirname(__file__), '..', '..', 'hybrid_automaton', 'execute_guards_node.py') 
+
+    guards_node = launch_ros.actions.Node(
+        executable=sys.executable, # sys.executable python interpreted
+        arguments=[file_path],
+        additional_env={'PYTHONBUFFERED':'1'}, # std::out std::error streams being sent straight to terminal in real time
     )
+    return (LaunchDescription([guards_node, launch_testing.actions.ReadyToTest()]), {'guards_node': guards_node})
 
-    return LaunchDescription([guards_node, ReadyToTest()]), {'guards_node': guards_node}
-
-class TestGuardsNode:
+class TestGuardsNode(unittest.TestCase):
     """tests for guards node"""
 
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         rclpy.init()
     
     @classmethod
-    def teardown_class(cls):
-        rclpy.shutdown()
+    def tearDownClass(cls):
+        if rclpy.ok():
+            rclpy.shutdown()
 
     def setUp(self):
         self.node = rclpy.create_node('test_guards_node')
@@ -81,6 +79,7 @@ class TestGuardsNode:
         # )
 
     
+    @pytest.mark.run(order=1)
     def test_node_name_and_namespace(self):
         """Verify the reset node name and namespace."""
         print (f"test_node_name_and_namespace")
@@ -98,6 +97,7 @@ class TestGuardsNode:
             f"Available nodes: {nodes}"
         )
 
+    @pytest.mark.run(order=2)
     def test_node_srvs_exist(self):
         """
         test vertifies that guards node services are available
@@ -127,6 +127,7 @@ class TestGuardsNode:
 
         assert True
 
+    @pytest.mark.run(order=3)
     def test_start_guards_eval_srv(self):
         """
         test verifies that the start_guards_eval service works as expected
@@ -152,4 +153,32 @@ class TestGuardsNode:
         if not future.done():
             assert False, 'Test: test_node_srvs_exists failed!, Timeout occured while waiting for /hybrid_automaton/start_guards_eval service response'
         
-        assert True
+        rclpy.spin_once(self.node)
+
+        topic_names_and_types:List[Tuple[str, List[str]]] = self.node.get_topic_names_and_types()
+        expected_topic_names_and_types = {
+            '/hybrid_automaton/guards': GuardsStatus,
+            '/hybrid_automaton/mode': String,
+            '/hybrid_automaton/waypoints': Waypoints,
+            '/agent_update': AgentUpdate,
+            '/obstacles_update': ObstaclesUpdate,
+            '/unsafe_set': UnsafeSet
+        }
+        # for topic_name_and_types in topic_names_and_types:
+        #     if topic_name_and_types[0] in expected_topic_names_and_types.items():
+        #         if topic_name_and_types[1] == expected_topic_names_and_types[topic_names_and_types[0]]:
+        #             expected_topic_names_and_types = expected_topic_names_and_types.popitem(topic_name_and_types[0])
+
+        # if len(expected_topic_names_and_types.items()) > 0:
+        #     assert False, 'Test failed: not all expected topics subed/pubed to by guards node'
+        
+        # should check logs
+    
+        assert  True
+
+    # @pytest.mark.run(order=4)
+
+
+
+
+    

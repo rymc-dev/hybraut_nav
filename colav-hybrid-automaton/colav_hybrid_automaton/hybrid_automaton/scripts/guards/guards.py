@@ -30,7 +30,7 @@ def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
                             unsafe_set: UnsafeSet,
                             waypoint: Waypoint,
                             dsf: float = DSF,
-                            tolerance: float = Duration(sec=1)) -> bool:
+                            tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from CRUISE to T2LOS (Guard 1)
 

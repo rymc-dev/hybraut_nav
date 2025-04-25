@@ -35,8 +35,8 @@ from hybrid_automaton.scripts.guards import (
     guard_T2LOS_to_FB,
     guard_WAYPOINT_REACHED_to_CRUISE,
 )
-from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
-
+from hybrid_automaton.utils import get_current_ros_time
+from builtin_interfaces.msg import Duration
 
 """CRUISE Guards Tests"""
 @pytest.mark.parametrize("input_args, expected_output, description", [
@@ -71,7 +71,8 @@ from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
             Waypoint(
                 position=Point32(x=float(500), y=float(100))
             ),
-            float(float(50))
+            float(50),
+            Duration(sec=10)
         ),
         True,
         "unsafe set on los within distance threshold"
@@ -107,7 +108,8 @@ from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
             Waypoint(
                 position=Point32(x=float(500), y=float(100))
             ),
-            float(float(50))
+            float(50),
+            Duration(sec=10)
         ),
         False,
         "unsafe_set on los but outside distance threshold"
@@ -143,7 +145,8 @@ from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
             Waypoint(
                 position=Point32(x=float(500), y=float(100))
             ),
-            float(50)
+            float(50),
+            Duration(sec=10)
         ),
         False,
         "unsafe set within distance threshold but not on los"
@@ -179,7 +182,8 @@ from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
             Waypoint(
                 position=Point32(x=float(500), y=float(100))
             ),
-            float(50)
+            float(50),
+            Duration(sec=10)
         ),
         False,
         "unsafe set outside distance threshold off line of sight"
@@ -207,7 +211,7 @@ from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
     #     (),
     #     False,
     #     "static obstacle outside distance threshold outside line of sight"
-    # )
+    # ),
     # Test Case 9: agent_update out of sync
     (
         (
@@ -246,7 +250,7 @@ from hybrid_automaton.utils.validate_timestamps import get_current_ros_time
     ),
 ])
 def test_guard_CRUISE_to_T2LOS_1(
-    input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float],
+    input_args: Tuple[AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, float, Duration],
     expected_output: Union[bool, Exception],
     description: str
 ):
