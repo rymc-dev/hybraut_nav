@@ -1,3 +1,11 @@
+#!/usr/bin/python3
+"""
+script for running the colav_hybrid_eval ResetNode
+
+Version: 0.0.1
+Author: Ryan McKee
+Date: April 28, 2025
+"""
 
 
 import rclpy
