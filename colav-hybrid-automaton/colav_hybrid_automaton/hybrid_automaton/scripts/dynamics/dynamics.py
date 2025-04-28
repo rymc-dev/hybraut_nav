@@ -5,6 +5,8 @@ from colav_interfaces.msg import AgentUpdate, Waypoint
 from colav_interfaces.msg import Dynamics
 import math
 from hybrid_automaton.utils.rotation_utils import quaternion_to_heading
+from hybrid_automaton.utils import get_current_ros_time, validate_timestamps_within_tolerance
+from builtin_interfaces.msg import Duration
 
 # constant target velocity for now but in the future would like to change
 # this t obe based on agent static dynamic params Convert knots to meters
@@ -15,7 +17,7 @@ TARGET_VELOCITY = 25 * 0.514444
 MAX_ACCELERATION = 1.0
 
 
-def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> Dynamics:
+def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Dynamics:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
@@ -37,9 +39,24 @@ def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1) -> Dynamics:
     Raises:
         ValueError: (Not currently raised, placeholder for future use if needed.)
     """
-    if agent_state is None:
-        raise ValueError(
-            'agent state received is of none type not type AgentUpdate')
+    if not isinstance(agent_state, AgentUpdate):
+        raise ValueError("agent state received is of none type not type AgentUpdate")
+
+    if not isinstance(dt, float):
+        raise ValueError("delta time must be type float")
+    if dt < 0.01:
+        raise ValueError("delta time must be greater than or equal to 0.01")
+    
+    try:
+        validate_timestamps_within_tolerance(
+            agent_state.header.stamp,
+            get_current_ros_time(),
+            tolerance
+        )
+    except TimeoutError:
+        raise TimeoutError("timeout occurred in dynamics cruise")
+    except Exception as e:
+        raise
 
     current_velocity = agent_state.velocity
     velocity_change = TARGET_VELOCITY - current_velocity
@@ -60,7 +77,9 @@ def dynamics_T2LOS(
         waypoint: Waypoint,
         dt: float = 0.1,
         error_tolerance: float = 0.01,
-        proportional_gain: float = 1.0) -> Dynamics:
+        proportional_gain: float = 1.0,
+        tolerance: Duration = Duration(sec=1, nanosec=0)) -> Dynamics:
+    # TODO: Need to implmenet this as a continuous proporitional controller P-control with a low-pass filter on the rudder
     """
     Computes the dynamics of the COLAV Hybrid Automaton T2LOS control mode
 
@@ -79,12 +98,39 @@ def dynamics_T2LOS(
     Raises:
         ValueError: (TODO: Not currently set.)
     """
-    if agent_state is None:
-        raise ValueError(
-            'agent state received is of none type not type AgentUpdate')
+    if not isinstance(agent_state, AgentUpdate):
+        raise ValueError("agent state received is of none type not type AgentUpdate")
+    
+    if not isinstance(waypoint, Waypoint):
+        raise ValueError("waypoint not an instance of Waypoint")
 
-    if waypoint is None:
-        raise ValueError("waypoint received is None type not Waypoint type")
+    if not isinstance(dt, float):
+        raise ValueError("delta time must be type float")
+    if dt < 0.01:
+        raise ValueError("delta time must be greater than or equal to 0.01")
+    
+    if not isinstance(error_tolerance, float):
+        raise ValueError('Heading error tolerance invalid, should be type float')
+
+    if error_tolerance < 0.001:
+        raise ValueError('Heading error tolerance invalid, should be greater than or equal to 0.001')
+
+    if not isinstance(proportional_gain, float):
+        raise ValueError("proportional gain must be type float")
+    
+    if proportional_gain <= 0.0 or proportional_gain > 10:
+        raise ValueError('proportional gain must be greater than 0 and less than 10')
+
+    try:
+        validate_timestamps_within_tolerance(
+            agent_state.header.stamp,
+            get_current_ros_time(),
+            tolerance
+        )
+    except TimeoutError:
+        raise TimeoutError("timeout occurred in dynamics cruise")
+    except Exception as e:
+        raise
 
     # Current agent heading
     current_heading = quaternion_to_heading(

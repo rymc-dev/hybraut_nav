@@ -139,7 +139,7 @@ class GuardsNode(Node):
     def _start_guards_evaluation_callback(
         self,
         request: Trigger.Request,
-        _
+        response: Trigger.Response
     ) -> Trigger.Response:
         """
         Callback to start guard evaluation:

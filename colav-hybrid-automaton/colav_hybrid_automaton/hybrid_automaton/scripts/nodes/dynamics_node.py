@@ -136,13 +136,13 @@ class DynamicsNode(Node):
             return {
                 "start_dynamic_evaluations": self.create_service(
                     srv_type=Trigger,
-                    srv_name=f'{node_name}/start_dynamics_evaluation',
+                    srv_name=f'/hybrid_automaton/start_dynamics_eval',
                     callback=self._start_dynamics_evaluation_callback
 
                 ),
                 "stop_dynamics_evaluations": self.create_service(
                     srv_type=Trigger,
-                    srv_name=f'{node_name}/stop_dynamics_evaluation',
+                    srv_name=f'/hybrid_automaton/stop_dynamics_eval',
                     callback=self._stop_dynamics_evaluation_callback
                 )
             }

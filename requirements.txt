@@ -7,3 +7,6 @@ pydocstyle
 autopep8
 pytest-cov
 parameterized
+pytest-xdist
+pytest-ordering 
+pytest-dependency 

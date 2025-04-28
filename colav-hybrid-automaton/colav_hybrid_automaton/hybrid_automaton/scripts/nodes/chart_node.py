@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
 from std_msgs.msg import String
 from colav_interfaces.msg import GuardsStatus, Waypoints, ControllerFeedback
 from hybrid_automaton.utils import get_current_ros_time
@@ -8,8 +13,6 @@ from colav_interfaces.srv import StartHybridAutomaton
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, DynamicsUpdate
 import rclpy
 from rclpy.node import Node
-import os
-import sys
 
 # Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
 # allowing imports to work correctly without relying on the build process.
@@ -118,7 +121,6 @@ class ChartNode(Node):
         """
         super().__init__(name, namespace=namespace)
         self._NODE_SUBS = self._init_node_subs()
-        self._NODE_CLIS = self._init_ha_clis()
         self._current_dynamics = None
         # Create services to start and stop the hybrid automaton.
         self.create_service(
@@ -141,26 +143,25 @@ class ChartNode(Node):
         Callback to start the hybrid automaton.
         """
         try:
+            # validate request, it should have waypoint and request should be within a valid timestamp range
             self.get_logger().info(
                 f"/start_hybrid_automaton service called with request at time: secs: {request.stamp.sec}, nanosecs: {request.stamp.nanosec} with goal_waypoint of: {request.goal_waypoint}")
             self._ha_pubs = self._init_ha_pubs()  # Initialize controller feedback publisher
             self._init_ha(request)
 
             # Start hybrid_automaton_eval processes required by this chart
-            # start the guards_evaluation
-            # future = 
-            self._NODE_CLIS["start_guards_evaluation"].call_async(
-                Trigger.Request())
-            # future_response = future.result()
-            # Blocking until service responds:
-            # if not response.success: # TODO: NEED TO FIGURE OUT WHY THE FUTURE CLI IS NOT RECEIVING A RESPONSE
-            #     raise Exception(f'Failed to start guards_evaluation: reason: {response.message}')
+            start_guard_cli = self.create_client(Trigger, '/hybrid_automaton/start_guards_eval')
+            if not start_guard_cli.wait_for_service(timeout_sec=2.0):
+                raise RuntimeError(f"/hybird_automaton/start_guards_eval service cli failed")
+            future = start_guard_cli.call_async(Trigger.Request())
+            # rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
+            # if not future.done():
+            #     raise RuntimeError(f"/hybrid_automaton/start_guard eval request failed")
 
-            # start the dynamics evluation
-            # future = 
-            self._NODE_CLIS["start_dynamics_evaluation"].call_async(
-                Trigger.Request())
-            # future_response = future.result()
+            start_dynamics_cli = self.create_client(Trigger, '/hybrid_automaton/start_dynamics_eval')
+            if not start_dynamics_cli.wait_for_service(timeout_sec=2.0):
+                raise RuntimeError(f"/hybrid_automaton/start_dynamics_eval service cli failed")
+            future = start_dynamics_cli.call_async(Trigger.Request())
 
             self._dynamics_sub = self.create_subscription(
                 msg_type=DynamicsUpdate,
@@ -188,37 +189,37 @@ class ChartNode(Node):
     def _dynamics_callback(self, msg: DynamicsUpdate):
         self._current_dynamics = msg
 
-    def _init_ha_clis(self) -> dict:
-        """
-        Creates hybrid automaton-specific service clients.
-        """
-        try:
-            return {
-                "start_guards_evaluation": create_cli(
-                    node=self,
-                    srv_type=Trigger,
-                    srv_name='/hybrid_automaton/start_guards_eval'
-                ),
-                "stop_guards_evaluation": create_cli(
-                    node=self,
-                    srv_type=Trigger,
-                    srv_name='/hybrid_automaton/stop_guards_eval'
-                ),
-                "start_dynamics_evaluation": create_cli(
-                    node=self,
-                    srv_type=Trigger,
-                    srv_name="/hybrid_automaton/dynamics_node/start_dynamics_evaluation"
-                ),
-                "stop_dynamics_evaluation": create_cli(
-                    node=self,
-                    srv_type=Trigger,
-                    srv_name="/hybrid_automaton/dynamics_node/stop_dynamics_evaluation"
-                )
-            }
-        except Exception as e:
-            self.get_logger().error(
-                f"Error occurred in client initialization: {str(e)}")
-            raise e
+    # def _init_ha_clis(self) -> dict:
+    #     """
+    #     Creates hybrid automaton-specific service clients.
+    #     """
+    #     try:
+    #         return {
+    #             "start_guards_evaluation": create_cli(
+    #                 node=self,
+    #                 srv_type=Trigger,
+    #                 srv_name='/hybrid_automaton/start_guards_eval'
+    #             ),
+    #             "stop_guards_evaluation": create_cli(
+    #                 node=self,
+    #                 srv_type=Trigger,
+    #                 srv_name='/hybrid_automaton/stop_guards_eval'
+    #             ),
+    #             "start_dynamics_evaluation": create_cli(
+    #                 node=self,
+    #                 srv_type=Trigger,
+    #                 srv_name="/hybrid_automaton/dynamics_node/start_dynamics_evaluation"
+    #             ),
+    #             "stop_dynamics_evaluation": create_cli(
+    #                 node=self,
+    #                 srv_type=Trigger,
+    #                 srv_name="/hybrid_automaton/dynamics_node/stop_dynamics_evaluation"
+    #             )
+    #         }
+    #     except Exception as e:
+    #         self.get_logger().error(
+    #             f"Error occurred in client initialization: {str(e)}")
+    #         raise e
 
     def _init_ha_pubs(self):
         """
@@ -452,12 +453,16 @@ class ChartNode(Node):
                 'Subscriptions',
                 f'error occured initializing subscriptions: {str(e)}')
 
+from rclpy.executors import SingleThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
     node = ChartNode()
+
     try:
-        rclpy.spin(node)
+        executor = SingleThreadedExecutor()
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     except Exception as e:

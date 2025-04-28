@@ -1,5 +1,11 @@
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet
 from rclpy.node import Node
+
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from hybrid_automaton.config.qos_config import QOS_PROFILE
 import rclpy
 from colav_interfaces.msg import Waypoints, Waypoint

@@ -126,7 +126,7 @@ class ResetNode(Node):
             return {
                 "reset": self.create_service(
                     srv_type=Reset,
-                    srv_name='resets_node/reset',
+                    srv_name='reset',
                     callback=self._reset_callback
                 )
             }

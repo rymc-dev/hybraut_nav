@@ -20,7 +20,7 @@ from parameterized import parameterized
 
 from colav_interfaces.srv import Reset
 from colav_interfaces.msg import Waypoint, Waypoints
-from hybrid_automaton.config.qos_config import QOS_PROFILE
+from hybrid_automaton.config import QOS_PROFILE
 
 @pytest.mark.rostest
 def generate_test_description():

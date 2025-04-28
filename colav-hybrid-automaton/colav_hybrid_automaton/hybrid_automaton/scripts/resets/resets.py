@@ -1,20 +1,25 @@
 import numpy as np
 from colav_interfaces.msg import Waypoints, Waypoint, AgentUpdate, ObstaclesUpdate, UnsafeSet
 from geometry_msgs.msg import Point32
+from builtin_interfaces.msg import Duration
 from shapely import Polygon, LineString
+from hybrid_automaton.utils import validate_timestamps_within_tolerance, get_current_ros_time
 
 VW_ACCEPTANCE_RADIUS = 10
 
 
 def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     """pops the first item in the queue of waypoints"""
+    # validate arg
     if not isinstance(waypoints, Waypoints):
         raise ValueError(
             'exception occured: waypoints arg passed in invalid type, should be type: "colav_interfaces.msg.waypoints"'
         )
+
     if len(waypoints.waypoints) < 2:
         raise ValueError(
             'waypoints list size less than 1, something has went wrong is guard condition')
+    
     waypoints.waypoints = waypoints.waypoints[1:]
     return waypoints
 
@@ -23,7 +28,8 @@ def reset_CRUISE_to_T2LOS(
         agent_state: AgentUpdate,
         obstacles_update: ObstaclesUpdate,
         unsafe_set: UnsafeSet,
-        waypoints: Waypoints) -> Waypoints:
+        waypoints: Waypoints,
+        tolerance: Duration = Duration(sec=1)) -> Waypoints:
     """
     Reset from CRUISE to T2LOS when the guard condition is triggered.
     This function finds the rightmost visible vertex on the unsafe set from the agent's perspective,
@@ -32,13 +38,20 @@ def reset_CRUISE_to_T2LOS(
     # TODO: validate values
     if not isinstance(agent_state, AgentUpdate) or \
         not isinstance(obstacles_update, ObstaclesUpdate) or \
-            not isinstance(unsafe_set, UnsafeSet) or \
+        not isinstance(unsafe_set, UnsafeSet) or \
         not isinstance(waypoints, Waypoints):
         raise ValueError(
             'exception occured: input args to function have incorrect types')
 
     # TODO: validate timestamps
-
+    try:
+        sys_stamp = get_current_ros_time()
+        validate_timestamps_within_tolerance(agent_state.header.stamp, sys_stamp, tolerance)
+        validate_timestamps_within_tolerance(obstacles_update.header.stamp, sys_stamp, tolerance)
+        validate_timestamps_within_tolerance(unsafe_set.header.stamp, sys_stamp, tolerance)
+    except TimeoutError as e:
+        raise TimeoutError(f'Timeour error at reset_CRUISE_to_T2LOS during timestamp validation: {e}')
+    
     # TODO: check if unsafe set is valid polyshape
 
     # TODO: check if any static obstacles exist in environment
