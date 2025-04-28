@@ -52,6 +52,15 @@ from builtin_interfaces.msg import Time, Duration
     ((5, 5), (5, 15), 10.0, "Vertical line: distance should equal the difference in y values"),
 ])
 def test_euclidean_distance(point1, point2, expected, description):
+    """
+    Test to ensure euclidean_distance calculation works correctly
+
+    This test verifies:
+    1. 
+    2. 
+
+    :raises: AssertionError if any test fails
+    """
     result = euclidean_distance(point1, point2)
     # Using np.isclose to account for any floating point arithmetic issues
     assert np.isclose(result, expected), f"{description}: expected {expected}, got {result}"
@@ -89,6 +98,16 @@ def test_euclidean_distance(point1, point2, expected, description):
     )
 ])
 def test_generate_circle_points(input_args, expected_output, description):
+    """
+    Test to ensure generate_circle_points works as expected
+
+    This test verifies:
+    1. 
+    2.
+    
+    :raises: AssertionError if any test fails
+    """
+
     x, y, radius, num_points = input_args
     x_points, y_points = generate_circle_points(x, y, radius, num_points)
 
@@ -172,7 +191,7 @@ def test_delta_heading(
         3. Accuracy when agent and waypoint are co-located or facing the same
         direction
 
-    :raises:
+    :raises: AssertionError if any test fails
     """
     actual = delta_heading(*input_args)
     assert np.isclose(actual, expected_output, atol=1e-6), f"{description}: expected {expected_output}, got {actual}"
@@ -196,6 +215,15 @@ def test_delta_heading(
     ],
 )
 def test_normalize_angle(input_args, expected_output, description):
+    """
+    Test to ensure normalize_angle works as expected
+
+    This test verifies: 
+    1. 
+    2. 
+
+    :raises: AssertionError if any tests fails
+    """
     actual = normalize_angle(input_args)
     # allow tiny floating‐point slop
     assert pytest.approx(actual, rel=1e-9, abs=1e-12) == expected_output, description
@@ -238,6 +266,15 @@ def test_normalize_angle(input_args, expected_output, description):
     ),
 ])
 def test_quaternion_to_heading(input_args, expected_output, description):
+    """
+    This test ensures quaternion_to_heading function is working
+
+    This test verifies: 
+    1. 
+    2. 
+
+    :raises: AssertionError if any test fails
+    """
     qx, qy, qz, qw = input_args
     if isinstance(expected_output, type) and issubclass(expected_output, Exception):
         with pytest.raises(Exception):
@@ -309,6 +346,12 @@ def test_quaternion_to_heading(input_args, expected_output, description):
 def test_get_current_ros_time(monkeypatch, fake_time, exp_sec, description):
     """
     Test to ensure get_current_ros_time is working as expected
+
+    This test verifies:
+    1. 
+    2.
+    
+    :raises: AssertionError occurs if any test fails
     """
     # Patch time.time() so we know exactly what comes back
     monkeypatch.setattr(time, "time", lambda: fake_time)
@@ -353,6 +396,12 @@ def test_validate_timestamps_within_tolerance(
 ):
     """
     Test to ensure the validate timestamps within tolerance working as expected
+
+    This test verifes:
+    1. 
+    2.
+
+    :raises: AssertionError if any test fails
     """
     # Arrange: create Time objects with internal fields
     t1 = Time(); t1._sec,   t1._nanosec   = t1_vals

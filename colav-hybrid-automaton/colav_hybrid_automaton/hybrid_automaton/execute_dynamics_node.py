@@ -10,20 +10,23 @@ Date: April 17, 2025
 
 import rclpy
 from hybrid_automaton.scripts.nodes import DynamicsNode
-
+from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
-    rclpy.init()
-    node = DynamicsNode()
-
+    rclpy.init(args=args)
+    node = None
     try:
-        rclpy.spin(node)
+        node = DynamicsNode()
+        executor = MultiThreadedExecutor()  # Create a multi-threaded executor
+        executor.add_node(node)  # Add your node to the executor
+        executor.spin()  # Spin the executor instead of rclpy.spin
     except KeyboardInterrupt:
-        print("KeyboardInterrupt received. Shutting down node.")
+        pass
     except Exception as e:
-        print(f"Exception occurred: {e}")
+        print(f'Exception occurred: {str(e)}')
     finally:
-        node.destroy_node()
+        if node:
+            node.destroy_node()  # Ensure the node is properly destroyed after spinning
         rclpy.shutdown()
 
 

@@ -46,6 +46,8 @@ def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Durati
         raise ValueError("delta time must be type float")
     if dt < 0.01:
         raise ValueError("delta time must be greater than or equal to 0.01")
+    if not isinstance(tolerance, Duration):
+        raise ValueError('tolerance must be Duration type')
     
     try:
         validate_timestamps_within_tolerance(
@@ -121,6 +123,9 @@ def dynamics_T2LOS(
     if proportional_gain <= 0.0 or proportional_gain > 10:
         raise ValueError('proportional gain must be greater than 0 and less than 10')
 
+    if not isinstance(tolerance, Duration):
+        raise ValueError('tolerance must be Duration type')
+
     try:
         validate_timestamps_within_tolerance(
             agent_state.header.stamp,
@@ -178,7 +183,7 @@ def dynamics_WAYPOINT_REACHED() -> Dynamics:
     return Dynamics()
 
 
-def dynamics_FB() -> Dynamics:
+def dynamics_FALLBACK() -> Dynamics:
     # Initially controller for fallback will return 0,0 commands therefore
     # enabling the controller on ATL vessel to ramp down by itself
     return Dynamics()

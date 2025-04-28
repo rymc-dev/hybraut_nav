@@ -47,7 +47,7 @@ from hybrid_automaton.config.qos_config import QOS_PROFILE
 from hybrid_automaton.scripts.dynamics import (
     dynamics_CRUISE,
     dynamics_T2LOS,
-    dynamics_FB,
+    dynamics_FALLBACK,
     dynamics_WAYPOINT_REACHED
 )
 from hybrid_automaton.utils import get_current_ros_time
@@ -104,7 +104,7 @@ class DynamicsNode(Node):
     _DYNAMICS = {  # Dict shows the dynamics controllers associated the different modes
         _MODES[1]: dynamics_CRUISE,
         _MODES[2]: dynamics_T2LOS,
-        _MODES[3]: dynamics_FB,
+        _MODES[3]: dynamics_FALLBACK,
         _MODES[4]: dynamics_WAYPOINT_REACHED
     }
 
@@ -122,6 +122,24 @@ class DynamicsNode(Node):
         self._agent_state = None
         self._obstalces_state = None
         self._waypoint = None
+        self._control_mode_sub = self.create_subscription(
+            msg_type=String,
+            topic='/hybrid_automaton/mode',
+            callback=lambda msg: self.__setattr__('_control_mode', msg.data),
+            qos_profile=QOS_PROFILE
+        )
+        self._agent_state_sub = self.create_subscription(
+            msg_type=AgentUpdate,
+            topic='/agent_update',
+            callback=lambda msg: self.__setattr__('_agent_state', msg),
+            qos_profile=QOS_PROFILE
+        )
+        self._waypoints_sub = self.create_subscription(
+            msg_type=Waypoints,
+            topic='/hybrid_automaton/waypoints',
+            callback=self._waypoints_callback,
+            qos_profile=QOS_PROFILE
+        )
 
         self._init_node_srvs()
         self.get_logger().info(f"{namespace}/{name} node initialised!")
@@ -162,25 +180,6 @@ class DynamicsNode(Node):
                 topic='/hybrid_automaton/dynamics',
                 qos_profile=QOS_PROFILE
             )
-            self._control_mode_sub = self.create_subscription(
-                msg_type=String,
-                topic='/hybrid_automaton/mode',
-                callback=lambda msg: self.__setattr__(
-                    '_control_mode',
-                    msg.data),
-                qos_profile=QOS_PROFILE)
-            self._agent_state_sub = self.create_subscription(
-                msg_type=AgentUpdate,
-                topic='/agent_update',
-                callback=lambda msg: self.__setattr__('_agent_state', msg),
-                qos_profile=QOS_PROFILE
-            )
-            self._waypoints_sub = self.create_subscription(
-                msg_type=Waypoints,
-                topic='/hybrid_automaton/waypoints',
-                callback=self._waypoints_callback,
-                qos_profile=QOS_PROFILE
-            )
             self._dynamics_timer = self.create_timer(
                 float(0.1),
                 self._update_dynamics_callback
@@ -216,25 +215,25 @@ class DynamicsNode(Node):
 
             if self._control_mode == self._MODES[1]:
                 # CRUISE DYNAMICS
+                dynamics_update.control_mode = self._MODES[1]
                 dynamics: Dynamics = self._DYNAMICS[self._MODES[1]](
                     agent_state=self._agent_state, dt=0.1)  # TODO: NEED DT TO BE CONFIGED BY COLAV_PARAMS
-                dynamics_update.control_mode = self._MODES[1]
 
             elif self._control_mode == self._MODES[2]:
                 # T2LOS DYNAMICS
+                dynamics_update.control_mode = self._MODES[2]
                 dynamics: Dynamics = self._DYNAMICS[self._MODES[2]](
                     agent_state=self._agent_state, waypoint=self._waypoint)
-                dynamics_update.control_mode = self._MODES[2]
 
             elif self._control_mode == self._MODES[3]:
                 # FALLBACK DYNAMICS
-                dynamics: Dynamics = self._DYNAMICS[self._MODES[3]]()
                 dynamics_update.control_mode = self._MODES[3]
+                dynamics: Dynamics = self._DYNAMICS[self._MODES[3]]()
 
             elif self._control_mode == self._MODES[4]:
                 # WAYPOINT_REACHE DYNAMICS
-                dynamics: Dynamics = self._DYNAMICS[self._MODES[4]]()
                 dynamics_update.control_mode = self._MODES[4]
+                dynamics: Dynamics = self._DYNAMICS[self._MODES[4]]()
 
             else:  # EDGE CASE
                 raise RuntimeError('something went wrong here.')
@@ -249,18 +248,26 @@ class DynamicsNode(Node):
         self._dynamics_pub.publish(dynamics_update)
 
 
+import rclpy
+from rclpy.executors import MultiThreadedExecutor
+
 def main(args=None):
     rclpy.init(args=args)
     node = None
     try:
         node = DynamicsNode()
-        rclpy.spin(node)
+        executor = MultiThreadedExecutor()  # Create a multi-threaded executor
+        executor.add_node(node)  # Add your node to the executor
+        executor.spin()  # Spin the executor instead of rclpy.spin
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f'Exception occured: {str(e)}')
+        print(f'Exception occurred: {str(e)}')
+    finally:
+        if node:
+            node.destroy_node()  # Ensure the node is properly destroyed after spinning
+        rclpy.shutdown()
 
-    rclpy.shutdown()
 
 
 if __name__ == '__main__':

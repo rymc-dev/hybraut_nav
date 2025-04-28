@@ -12,27 +12,23 @@ and confirm the expected functionality of each guard.
 
 # TODO: NEED TO VALIDATE TOLERANCE DURATION ISINSTANCE 'Duration'
 
-from typing import Tuple, Union
+import pytest
+from typing import Tuple, Optional, Type
+
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point32
-
-import sys
-import pytest
+from builtin_interfaces.msg import Time
 
 from colav_interfaces.msg import AgentUpdate, Dynamics, Waypoint
 
 from hybrid_automaton.scripts.dynamics import (
     dynamics_CRUISE,
-    dynamics_FB,
     dynamics_T2LOS,
+    dynamics_FALLBACK,
     dynamics_WAYPOINT_REACHED
 )
-from builtin_interfaces.msg import Time
-from typing import Tuple, Optional
-from hybrid_automaton.utils import get_current_ros_time
 
-import pytest
-from typing import Tuple, Optional, Type
+from hybrid_automaton.utils import get_current_ros_time
 
 TARGET_VELOCITY = 25 * 0.514444
 
@@ -71,7 +67,15 @@ TARGET_VELOCITY = 25 * 0.514444
             "timeout occurred in dynamics cruise",
             "timeout on out-of-sync timestamp"
         ),
-        # 5. valid input
+        # 5. invalid duration
+        (
+            (AgentUpdate(header=Header(stamp=get_current_ros_time()), velocity=10.0), 0.5, None),
+            None,
+            ValueError,
+            "tolerance must be Duration type",
+            "reject not-Duration tolerance"
+        ),
+        # 6. valid input
         (
             (AgentUpdate(header=Header(stamp=get_current_ros_time()), velocity=10.0), 0.5),
             Dynamics(velocity=10.5),  # or whatever the correct expected value is
@@ -103,6 +107,15 @@ def test_dynamics_CRUISE(
     exception_msg: Optional[str],
     description: str
 ):
+    """
+    Test if dynamics_CRUISE is working correctly
+
+    This test verifies:
+    1. input args are correctly validated and correct excpetions are returned
+    2. CRUISE dynamics are returned as expected from the controller
+
+    :raises: AssertionError if any of the checks fails
+    """
     if exception_cls is None:
         # no exception expected
         result = dynamics_CRUISE(*input_args)
@@ -117,7 +130,8 @@ def test_dynamics_CRUISE(
             f"got {str(excinfo.value)!r}"
         )
 
-@pytest.mark.parametrize("input_args, expected, exception_cls, exception_msg, description", [
+@pytest.mark.parametrize(
+    "input_args, expected, exception_cls, exception_msg, description", [
     # Test Case 1: Bad agent state
     (
         (
@@ -244,7 +258,22 @@ def test_dynamics_CRUISE(
         "proportional gain must be greater than 0 and less than 10",
         "reject proportional_gain > 10"
     ),
-    # Test case 10: out of sync agentUpdate
+    #Test Case 10: tolerance must be Duration type
+    (
+        (
+            AgentUpdate(),
+            Waypoint(),
+            0.5,
+            0.1,
+            9.0,
+            None
+        ),
+        None,
+        ValueError,
+        "tolerance must be Duration type",
+        "reject non-Duration tolerance"
+    ),
+    # Test case 11: out of sync agentUpdate
     (
         (
             AgentUpdate(),
@@ -258,7 +287,7 @@ def test_dynamics_CRUISE(
         "timeout occurred in dynamics cruise",
         "reject (stamp.now() - AgentUpdate.header.stamp) > tolerance "
     ),
-    # Test 11: valid args: TODO: NEED TO FULLY VALIDATE THE OUTPUTS MANUALLY
+    # Test 12: valid args: TODO: NEED TO FULLY VALIDATE THE OUTPUTS MANUALLY
     (
         (
             AgentUpdate(yaw_rate=0.2, velocity = 10.0, header=Header(stamp=get_current_ros_time())),
@@ -280,6 +309,15 @@ def test_dynamics_T2LOS(
     exception_msg: Optional[str],
     description: str
 ):
+    """
+    Test if dynamics_T2LOS is working correctly
+
+    This test verifies:
+    1. input args are correctly validated and correct excpetions are returned
+    2. T2LOS dynamics are returned as expected from the controller
+
+    :raises: AssertionError if any of the checks fails
+    """
     if exception_cls is None:
         # no exception expected
         result = dynamics_T2LOS(*input_args)
@@ -294,23 +332,30 @@ def test_dynamics_T2LOS(
             f"got {str(excinfo.value)!r}"
         )
 
+# NOTE: FOR NOW FALLBACK MODE DYNAMICS ARE GOING TO HANDLER BY CONTROLLER ON BOAT WHICH WILL TAKE velocity=0.0, yaw_rate=0.0 which will stop the boat slowly
+def test_dynamics_FALLBACK():
+    """
+    Test if FALLBACK dynamics is working correctly
 
+    This test verifies:
+    1. input args are correctly validated and correct excpetions are returned
+    2. FALLBACK dynamics are returned as expected from the controller
 
-# @pytest.mark.parametrize("input_args, expected, description", [
-#     # Test Case 1
-#     (
-#         (
+    :raises: AssertionError if any of the checks fails
+    """
+    assert dynamics_FALLBACK() == Dynamics(), \
+        f"Test failed: expected: {Dynamics()}, got: {dynamics_FALLBACK()}"
 
-#         )
-#     )
-# ])
-# def test_dynamics_FB(input_args, expected, description):
-#     pass
+# NOTE: FOR NOW WAYPOINT_REACHED DYNAMICS ARE GIONG TO BE HANDLED BY CONTROLLER ON BOAT WHICH WILL TAKE velocity=0.0, yaw_rate=0.0 which will stop the boat slowly
+def test_dynamics_WAYPOINT_REACHED():
+    """
+    Test if WAYPOINT_REACHED dynamics is working correctly
 
+    This test verifies:
+    1. input args are correctly validated and correct excpetions are returned
+    2. WAYPOINT_REACHED dynamics are returned as expected from the controller
 
-# @pytest.mark.parametrize("input_args, expected, description", [
-#     # Test Case 1
-#     ()
-# ])
-# def test_dynamics_WAYPOINT_REACHED(input_args, expected, description):
-#     pass
+    :raises: AssertionError if any of the checks fails
+    """
+    assert dynamics_WAYPOINT_REACHED() == Dynamics(), \
+        f"Test failed: expected {Dynamics()}, got: {dynamics_WAYPOINT_REACHED()}"

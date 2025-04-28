@@ -13,7 +13,7 @@ def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     # validate arg
     if not isinstance(waypoints, Waypoints):
         raise ValueError(
-            'exception occured: waypoints arg passed in invalid type, should be type: "colav_interfaces.msg.waypoints"'
+            'exception occured: waypoints arg passed in invalid type, should be type: "colav_interfaces.msg.waypoints'
         )
 
     if len(waypoints.waypoints) < 2:

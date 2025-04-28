@@ -25,7 +25,15 @@ from typing import List
 @pytest.mark.parametrize(
     "input_arg, expected_length, expected_waypoints, exception, description",
     [
-        # Test Case 1: validation test — test with one valid virtual waypoint should return a list with one waypoint.
+        # # 1. validation Test if invalid input sent
+        # (
+        #     None,
+        #     0,
+        #     None,
+        #     ValueError('exception occured: waypoints arg passed in invalid type, should be type: "colav_interfaces.msg.waypoints'),
+        #     'test to ensure invalid waypoints is handled'
+        # ),
+        # 2. validation test — test with one valid virtual waypoint should return a list with one waypoint.
         (
             Waypoints(
                 waypoints=[
@@ -48,7 +56,7 @@ from typing import List
             None,
             "Reset with list containing 1 virtual waypoint"
         ),
-        # Test Case 2: exception handling — test with no valid virtual waypoints should return an exception
+        # 3: exception handling — test with no valid virtual waypoints should return an exception
         (
             Waypoints(
                 waypoints=[
@@ -60,9 +68,7 @@ from typing import List
             ValueError('waypoints list size less than 1, something has went wrong is guard condition'),
             "Reset with no virtual waypoints"
         ),
-    ]
-    # TODO: Test case on invalid arg type benig passed in
-)
+])
 def test_reset_WAYPOINT_REACHED_to_CRUISE(
     input_arg: Waypoints,
     expected_length: float,
