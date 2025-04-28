@@ -121,106 +121,95 @@ class TestDynamicsNode(unittest.TestCase):
     @pytest.mark.run(order=3)
     def test_dynamics_pub(self):
         """
-        This test verifies the communication of the dynamics node!
+        This test verifies the communication and correct behavior of the dynamics node.
 
-        This test verifies:
-        1. 
-        2. 
-
-        :raises: AssertionError if any test fail
+        It checks:
+        1. Service call to start dynamics evaluation.
+        2. Correct dynamics messages are received for different control modes.
+        3. Proper error messages are set when state updates are missing.
+        
+        :raises: AssertionError if any test fails
         """
+        # Helper function: wait for a message on /hybrid_automaton/dynamics
+        def wait_for_dynamics(expected_mode=None, timeout_sec=10.0):
+            self.dynamics = None
+            start_time = time.time()
+            while (time.time() - start_time) < timeout_sec:
+                rclpy.spin_once(self.node, timeout_sec=0.1)
+                if self.dynamics:
+                    if expected_mode is None or self.dynamics.control_mode == expected_mode:
+                        return True
+            return False
+
+        # Step 1: Call /hybrid_automaton/start_dynamics_eval service
         start_dynamics_eval_cli = self.node.create_client(
-            Trigger,
-            '/hybrid_automaton/start_dynamics_eval'
+            Trigger, '/hybrid_automaton/start_dynamics_eval'
         )
         if not start_dynamics_eval_cli.wait_for_service(timeout_sec=5.0):
-            assert False, 'Test: test_node_srvs exists failed!, Timeout occured while waiting for /hybrid_automaton/start_dynamics_eval'
+            assert False, 'Timeout while waiting for /hybrid_automaton/start_dynamics_eval service'
+
         future = start_dynamics_eval_cli.call_async(Trigger.Request())
         rclpy.spin_until_future_complete(node=self.node, future=future, timeout_sec=5.0)
-        if not future.done():
-            assert False, 'Test: test_dynamics_pub srv call timeout occured!'
+        assert future.done(), 'Service call to start_dynamics_eval timed out'
+        assert future.result()._success, f'Service call failed: {future.result()._message}'
 
-        if not future.result()._success:
-            assert False, f'/hybrid_automaton/start_dynamics_eval service call failed: {future.result()._message}'
-        
-        # create a subscription and then to /hybrid_automaton/guards_status
+        # Step 2: Subscribe to /hybrid_automaton/dynamics
         self.node.create_subscription(
             msg_type=DynamicsUpdate,
             topic='/hybrid_automaton/dynamics',
-            callback=lambda msg: self.__setattr__('dynamics', msg),
+            callback=lambda msg: setattr(self, 'dynamics', msg),
             qos_profile=QOS_PROFILE
         )
-        timeout_sec = 10.0
-        start_time = time.time()
-        is_dynamics_received = False
-        
-        # Loop until timeout is reached or dynamics are received
-        while (time.time() - start_time) < timeout_sec:
-            rclpy.spin_once(self.node, timeout_sec=0.1)
-            if self.dynamics is not None:
-                is_dynamics_received = True
-                break
-        
-        # TODO: VALIDATE TIMESTAMP WITHIN TESTING TOLERANCE
-        assert is_dynamics_received, f"Dynamics not received within {timeout_sec} seconds."
-        assert self.dynamics.error == True, \
-            "error occured"
-        assert self.dynamics.error_message == "Error occured: control mode received: None not in MODES", \
-            "error occured"
-        
+
+        # Step 3: Validate initial error without control mode
+        assert wait_for_dynamics(timeout_sec=10.0), "Dynamics message not received initially"
+        assert self.dynamics.error, "Expected error due to missing control mode"
+        assert self.dynamics.error_message == "Error occured: control mode received: None not in MODES"
+
+        # Step 4: Create mode publisher
         mode_pub = self.node.create_publisher(
             msg_type=String,
             topic='/hybrid_automaton/mode',
             qos_profile=QOS_PROFILE
         )
 
-        # Validate CRUISE without state updates
-        self.dynamics = None
-        mode_pub.publish(String(data="CRUISE"))
-        start_time = time.time()
-        while (time.time() - start_time) < timeout_sec:
-            rclpy.spin_once(self.node, timeout_sec=0.1)
-            if self.dynamics is not None:
-                is_dynamics_received = True
-                break
-        # TODO: VALIDATE TIMESTAMP WITHIN TESTING TOLERANCE
-        assert self.dynamics.control_mode == 'CRUISE', \
-            f"dynamics control mode node updates, expected 'CRUISE', got: {self.dynamics.control_mode}"
-        assert self.dynamics.error == True, \
-            f"dynamics control mode updated, but error should have occured since there is no state updates"
-        
-        error_message = 'error_occured'
-        assert self.dynamics.error_message == "Error occured: agent state received is of none type not type AgentUpdate", \
-            f"dynamics control mode updates, but errro message should be been given, expected: {error_message}, got: {self.dynamics.error_message}"
+        # Helper function to test a mode
+        def test_mode(mode_name, expect_error, expected_error_message=""):
+            mode_pub.publish(String(data=mode_name))
+            assert wait_for_dynamics(expected_mode=mode_name), \
+                f"Expected dynamics update for mode '{mode_name}' not received"
 
+            assert self.dynamics.control_mode == mode_name, \
+                f"Expected control mode '{mode_name}', got '{self.dynamics.control_mode}'"
 
-        # validate T2LOS without state updates
-        self.dynamics = None
-        mode_pub.publish(String(data='T2LOS'))
-        start_time = time.time()
-        while (time.time() - start_time) < timeout_sec:
-            rclpy.spin_once(self.node, timeout_sec=0.1)
-            if self.dynamics is not None:
-                is_dynamics_received = True
-                break
-        # TODO: VALIDATE TIMESTAMP WITHIN TESTING TOLERANCE
-        assert self.dynamics.control_mode == 'T2LOS', \
-            f"dynamics control mode node updates, expected 'T2LOS', got: {self.dynamics.control_mode}"
-        assert self.dynamics.error == True, \
-            f"dynamics control mode updated, but error should have occured since there is no state updates"
-        
-        error_message = 'error_occured'
-        assert self.dynamics.error_message == "Error occured: agent state received is of none type not type AgentUpdate", \
-            f"dynamics control mode updates, but errro message should be been given, expected: {error_message}, got: {self.dynamics.error_message}"
-        
-        # validate FALLBACK without state updates
-        mode_pub.publish(String(data='FALLBACK'))
-        
-        # validate WAYPOINT_REACHED without state updates
-        mode_pub.publish(String(data='WAYPOINT_REACHED'))
+            assert self.dynamics.error == expect_error, \
+                f"Unexpected error state for mode '{mode_name}'"
 
+            assert self.dynamics.error_message == expected_error_message, \
+                f"Unexpected error message for mode '{mode_name}', got '{self.dynamics.error_message}'"
 
-        
+        # Step 5: Test different modes
+        test_mode(
+            mode_name="CRUISE",
+            expect_error=True,
+            expected_error_message="Error occured: agent state received is of none type not type AgentUpdate"
+        )
+        test_mode(
+            mode_name="T2LOS",
+            expect_error=True,
+            expected_error_message="Error occured: agent state received is of none type not type AgentUpdate"
+        )
+        test_mode(
+            mode_name="FB",
+            expect_error=False,
+            expected_error_message=""
+        )
+        test_mode(
+            mode_name="WAYPOINT_REACHED",
+            expect_error=False,
+            expected_error_message=""
+        )
+
 
         # print(self.node.dynamics)
         #
