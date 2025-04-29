@@ -151,7 +151,7 @@ class GuardsNode(Node):
             # Log the initialization start
             self.get_logger().info('Initializing guards evaluation components...')
 
-            self._current_control_mode = self._MODES[1]
+            # self._current_control_mode = self._MODES[1]
             # Initialize node subscribers
             self._node_subs = self._init_node_subs()
             self.get_logger().debug(
@@ -318,146 +318,119 @@ class GuardsNode(Node):
     def _evaluate_transitions(self):
         """Evaluate transitions based on the control mode."""
         guards_status = GuardsStatus()
-        try:
-            current_time = get_current_ros_time()
+        current_time = get_current_ros_time()
 
+        def publish_error(message):
+            guards_status.error = True
+            guards_status.error_message = message
+            guards_status.timestamp = current_time
+            self._node_pubs["guards_status"].publish(guards_status)
+
+        try:
             if self._current_control_mode is None:
+                publish_error("Current control mode has not been published to /hybrid_automaton/waypoints")
                 guards_status.control_mode = "NA"
-                guards_status.error = True
-                guards_status.error_message = "Transition evalustd_srvs/srv/Triggeration states required not updated"
-                guards_status.timestamp = current_time
-                self._node_pubs["guards_status"].publish(guards_status)
                 return
 
-            # Map control modes to shorthand for readability
-            mode_cruise = self._MODES[1]
-            mode_t2los = self._MODES[2]
-            mode_fallback = self._MODES[3]
-            mode_waypoint_reached = self._MODES[4]
+            mode = self._current_control_mode
+            mode_map = {
+                self._MODES[1]: "CRUISE",
+                self._MODES[2]: "T2LOS",
+                self._MODES[3]: "FALLBACK",
+                self._MODES[4]: "WAYPOINT_REACHED"
+            }
 
-            # Evaluate based on current control mode
-            if self._current_control_mode == mode_cruise:
-                # CRUISE
-                guards_status.control_mode = mode_cruise
+            if mode not in mode_map:
+                self.get_logger().info("Unknown control mode encountered")
+                self._node_pubs["guards_status"].publish(
+                    GuardsStatus(control_mode="NA", timestamp=current_time)
+                )
+                return
+
+            mode_name = mode_map[mode]
+            guards_status.control_mode = mode
+
+            if not self._validate_state_updates(mode):
+                publish_error("State updates not received for guard evaluation")
+                return
+
+            # Common tolerance used across all guards
+            common_tolerance = Duration(sec=3000)
+
+            if mode_name == "CRUISE":
                 guards_status.guard_names = [
                     "cruise_to_t2los_1",
                     "cruise_to_t2los_2",
                     "cruise_to_fb",
-                    "cruise_to_waypoint_reached"]
-                if not self._validate_state_updates(mode_cruise):
-                    guards_status.error = True
-                    guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
-                    guards_status.timestamp = current_time
-                    self._node_pubs["guards_status"].publish(guards_status)
-                    return
-
-                # TODO: validate timestamps
-                # mock duration for tolerance for now
-                # Evaluate CRUISE transitions
-
+                    "cruise_to_waypoint_reached"
+                ]
                 guards_status.cruise_to_t2los_1 = guard_CRUISE_to_T2LOS_1(
                     agent_state=self._current_agent_state,
                     obstacles_state=self._current_obstacles_state,
                     unsafe_set=self._current_unsafe_set,
                     waypoint=self._current_waypoint,
                     dsf=80,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
                 guards_status.cruise_to_t2los_2 = guard_CRUISE_to_T2LOS_2(
                     agent_state=self._current_agent_state,
                     current_waypoint=self._current_waypoint,
                     heading_error_tolerance=0.1,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
                 guards_status.cruise_to_fb = guard_CRUISE_to_FB(
                     agent_state=self._current_agent_state,
                     obstacles_state=self._current_obstacles_state,
                     unsafe_set=self._current_unsafe_set,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
                 guards_status.cruise_to_waypoint_reached = guard_CRUISE_to_WAYPOINT_REACHED(
                     agent_state=self._current_agent_state,
                     current_waypoint=self._current_waypoint,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
 
-            elif self._current_control_mode == mode_t2los:
-                # T2LOS
-                guards_status.control_mode = mode_t2los
+            elif mode_name == "T2LOS":
                 guards_status.guard_names = [
-                    "t2los_to_cruise", "t2los_to_fb", "t2los_to_waypoint_reached"]
-                if not self._validate_state_updates(mode_t2los):
-                    guards_status.error = True
-                    guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
-                    guards_status.timestamp = current_time
-                    self._node_pubs["guards_status"].publish(guards_status)
-                    return
-
-                # TODO: validate timestamps
-
+                    "t2los_to_cruise",
+                    "t2los_to_fb",
+                    "t2los_to_waypoint_reached"
+                ]
                 guards_status.t2los_to_cruise = guard_T2LOS_to_CRUISE(
                     agent_state=self._current_agent_state,
                     current_waypoint=self._current_waypoint,
                     heading_error_tolerance=0.1,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
                 guards_status.t2los_to_fb = guard_T2LOS_to_FB(
                     agent_state=self._current_agent_state,
                     obstacles_state=self._current_obstacles_state,
                     unsafe_set=self._current_unsafe_set,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
                 guards_status.t2los_to_waypoint_reached = guard_T2LOS_to_WAYPOINT_REACHED(
                     agent_state=self._current_agent_state,
                     current_waypoint=self._current_waypoint,
-                    tolerance=Duration(sec=3000)
+                    tolerance=common_tolerance
                 )
 
-            elif self._current_control_mode == mode_fallback:
-                guards_status.control_mode = mode_fallback
+            elif mode_name == "FALLBACK":
+                # Placeholder for future logic
+                pass
 
-                if not self._validate_state_updates(mode_fallback):
-                    guards_status.error = True
-                    guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
-                    guards_status.timestamp = current_time
-                    self._node_pubs["guards_status"].publish(guards_status)
-                    return
-
-                # TODO: Validate timestamps for FALLBACK mode if needed
-                # Add FALLBACK-specific evaluations here
-
-            elif self._current_control_mode == mode_waypoint_reached:
-                # WAYPOINT_REACHED
-                guards_status.control_mode = mode_waypoint_reached
+            elif mode_name == "WAYPOINT_REACHED":
                 guards_status.guard_names = ["waypoint_reached_to_cruise"]
-
-                if not self._validate_state_updates(mode_waypoint_reached):
-                    guards_status.error = True
-                    guards_status.error_message = "Control mode set, but state updates not received for guard evaluation"
-                    guards_status.timestamp = current_time
-                    self._node_pubs["guards_status"].publish(guards_status)
-                    return
-
-                # TODO: validate timestamps if necessary
                 guards_status.waypoint_reached_to_cruise = guard_WAYPOINT_REACHED_to_CRUISE(
-                    waypoints=self._current_waypoints)
-
-            else:
-                self.get_logger().info("Unknown control mode encountered")
-                self._node_pubs["guards_status"].publish(
-                    GuardsStatus(
-                        control_mode="NA",
-                        timestamp=current_time,
-                    )
+                    waypoints=self._current_waypoints
                 )
-                return
 
         except Exception as e:
-            guards_status.error = True
-            guards_status.error_message = str(e)
+            publish_error(str(e))
+            return
 
         guards_status.timestamp = get_current_ros_time()
         self._node_pubs["guards_status"].publish(guards_status)
+
 
 
 def main(args=None):

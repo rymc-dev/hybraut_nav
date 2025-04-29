@@ -17,7 +17,7 @@ TARGET_VELOCITY = 25 * 0.514444
 MAX_ACCELERATION = 1.0
 
 
-def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Dynamics:
+def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Dynamics:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
@@ -74,7 +74,7 @@ def dynamics_CRUISE(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Durati
     return cruise_dynamics
 
 
-def dynamics_T2LOS(
+def proportional_yaw_rate_controller(
         agent_state: AgentUpdate,
         waypoint: Waypoint,
         dt: float = 0.1,
@@ -177,13 +177,7 @@ def dynamics_T2LOS(
     return t2los_dynamics
 
 
-def dynamics_WAYPOINT_REACHED() -> Dynamics:
-    # Initially controller for fallback will return 0,0 commands therefore
-    # enabling the controller on ATL vessel to ramp down by itself
-    return Dynamics()
-
-
-def dynamics_FALLBACK() -> Dynamics:
+def no_op_controller() -> Dynamics:
     # Initially controller for fallback will return 0,0 commands therefore
     # enabling the controller on ATL vessel to ramp down by itself
     return Dynamics()

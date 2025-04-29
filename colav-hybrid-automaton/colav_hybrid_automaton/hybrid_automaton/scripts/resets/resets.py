@@ -8,7 +8,7 @@ from hybrid_automaton.utils import validate_timestamps_within_tolerance, get_cur
 VW_ACCEPTANCE_RADIUS = 10
 
 
-def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
+def remove_first_waypoint(waypoints: Waypoints) -> Waypoints:
     """pops the first item in the queue of waypoints"""
     # validate arg
     if not isinstance(waypoints, Waypoints):
@@ -24,7 +24,7 @@ def reset_WAYPOINT_REACHED_to_CRUISE(waypoints: Waypoints) -> Waypoints:
     return waypoints
 
 
-def reset_CRUISE_to_T2LOS(
+def create_virtual_waypoint(
         agent_state: AgentUpdate,
         obstacles_update: ObstaclesUpdate,
         unsafe_set: UnsafeSet,

@@ -1,0 +1,116 @@
+settings:
+  initial_mode: CRUISE
+  final_modes: 
+    - WAYPOINT_REACHED
+    - FALLBACK
+
+params:
+  transition_evaluation_hz: 5.0
+  agent_update_hz: 10.0
+  obstacles_update_hz: 4.0
+  unsafe_set_update_hz: 2.0
+
+  agent_staleness_threshold: 0.5
+  obstacles_staleness_threshold: 1.0
+  unsafe_set_staleness_threshold: 1.5
+
+  heading_error_tolerance_rad: 0.1
+  dsf: 80.0
+  transition_guard_timeout_s: 3.0
+
+modes:
+  - name: CRUISE
+    index: 0
+    dynamics: proportional_velocity_controller
+    invariants: []
+    transitions:
+      - name: cruise_to_t2los_1
+        priority: 2
+      - name: cruise_to_t2los_2
+        priority: 3
+      - name: cruise_to_fb
+        priority: 0
+      - name: cruise_to_waypoint_reached
+        priority: 1
+
+  - name: T2LOS
+    index: 1
+    dynamics: proportional_yaw_rate_controller
+    invariants: []
+    transitions:
+      - name: t2los_to_cruise
+        priority: 2
+      - name: t2los_to_fb
+        priority: 0
+      - name: t2los_to_waypoint_reached
+        priority: 1
+
+  - name: WAYPOINT_REACHED
+    index: 2
+    dynamics: no_op_controller
+    invariants: []
+    transitions:
+      - name: waypoint_reached_to_cruise
+        priority: 0
+
+  - name: FALLBACK
+    index: 3
+    dynamics: no_op_controller
+    invariants: []
+    transitions: []
+
+states:
+  - name: agent
+    topic: '/agent_update'
+    type: 'colav_interfaces.msg.AgentUpdate'
+
+  - name: obstacles
+    topic: '/obstacles_update'
+    type: 'colav_interfaces.msg.ObstaclesUpdate'
+
+  - name: unsafe_set
+    topic: '/unsafe_set'
+    type: 'colav_interfaces.msg.UnsafeSet'
+
+  - name: waypoints
+    topic: '/hybrid_automaton/waypoints'
+    type: 'colav_interfaces.msg.Waypoints'
+
+transitions: 
+  - cruise_to_t2los_1:
+      guard: is_los_clear_to_waypoint
+      reset: create_virtual_waypoint
+
+  - cruise_to_t2los_2:
+      guard: is_heading_not_within_tolerance
+      reset: none
+
+  - cruise_to_fb:
+      guard: check_for_unsafe_conditions
+      reset: none 
+
+  - cruise_to_waypoint_reached:
+      guard: is_waypoint_reached
+      reset: none  
+
+  - t2los_to_cruise:
+      guard: is_heading_within_tolerance
+      reset: none  
+
+  - t2los_to_fb:
+      guard: is_unsafe_conditions
+      reset: none
+
+  - t2los_to_waypoint_reached:
+      guard: is_waypoint_reached
+      reset: none 
+
+  - waypoint_reached_to_cruise:
+      guard: is_virtual_waypoints
+      reset: remove_first_waypoint
+
+invariants: [] # Reserved for future mode constraints
+
+
+
+

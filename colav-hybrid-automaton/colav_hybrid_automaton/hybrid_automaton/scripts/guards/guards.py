@@ -22,10 +22,7 @@ max_yaw_rate = 0.2
 # 180degree maneuver total angle to turn/ in radians / max_yaw_rate
 Tp = ((1 * np.pi) / max_yaw_rate)
 
-"""1. CRUISE Guard Functions"""
-
-
-def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
+def is_los_clear_to_waypoint(agent_state: AgentUpdate,
                             obstacles_state: ObstaclesUpdate,
                             unsafe_set: UnsafeSet,
                             waypoint: Waypoint,
@@ -90,7 +87,7 @@ def guard_CRUISE_to_T2LOS_1(agent_state: AgentUpdate,
     return False
 
 
-def guard_CRUISE_to_T2LOS_2(agent_state: AgentUpdate,
+def is_heading_within_tolerance(agent_state: AgentUpdate,
                             current_waypoint: Waypoint,
                             heading_error_tolerance: float = 0.1,
                             tolerance: Duration = Duration(sec=1)) -> bool:
@@ -132,7 +129,7 @@ def guard_CRUISE_to_T2LOS_2(agent_state: AgentUpdate,
     return bool(waypoint_heading_error < heading_error_tolerance)
 
 
-def guard_CRUISE_to_FB(agent_state: AgentUpdate,
+def is_unsafe_conditions(agent_state: AgentUpdate,
                        obstacles_state: ObstaclesUpdate,
                        unsafe_set: UnsafeSet,
                        tolerance: Duration = Duration(sec=1)) -> bool:
@@ -173,7 +170,7 @@ def guard_CRUISE_to_FB(agent_state: AgentUpdate,
     return False
 
 
-def guard_CRUISE_to_WAYPOINT_REACHED(
+def is_waypoint_reached(
     agent_state: AgentUpdate,
     current_waypoint: Waypoint,
     tolerance: Duration = Duration(
@@ -218,11 +215,7 @@ def guard_CRUISE_to_WAYPOINT_REACHED(
 
     return False
 
-
-"""2. T2LOS Guard Functions"""
-
-
-def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate,
+def is_heading_not_within_tolerance(agent_state: AgentUpdate,
                           current_waypoint: Waypoint,
                           heading_error_tolerance: float,
                           tolerance: Duration = Duration(sec=1)) -> bool:
@@ -242,77 +235,14 @@ def guard_T2LOS_to_CRUISE(agent_state: AgentUpdate,
         bool: True if the agent should transition back to CRUISE, otherwise False.
     """
     # Transition back to CRUISE if the heading alignment is not met.
-    return not guard_CRUISE_to_T2LOS_2(
+    return not is_heading_within_tolerance(
         agent_state,
         current_waypoint,
         heading_error_tolerance,
         tolerance)
 
-
-def guard_T2LOS_to_FB(agent_state: AgentUpdate,
-                      obstacles_state: ObstaclesUpdate,
-                      unsafe_set: UnsafeSet,
-                      tolerance: Duration = Duration(sec=1)) -> bool:
-    """
-    Guard for transition from T2LOS to FB (Fallback)
-
-    Transition condition:
-      - Reuses the CRUISE to FB condition for imminent danger detection.
-
-    Parameters:
-        agent_state: Current state of the agent.
-        obstacles_state: State information about obstacles.
-        unsafe_set: The unsafe polygon data.
-        tolerance: A time tolerance for validations (default provided if None).
-
-    Returns:
-        bool: True if a transition to fallback is required, otherwise False.
-    """
-    return guard_CRUISE_to_FB(
-        agent_state,
-        obstacles_state,
-        unsafe_set,
-        tolerance)
-
-
-def guard_T2LOS_to_WAYPOINT_REACHED(
-    agent_state: AgentUpdate,
-    current_waypoint: Waypoint,
-    tolerance: Duration = Duration(
-        sec=1)) -> bool:
-    """
-    Guard for transition from T2LOS to WAYPOINT_REACHED
-
-    Transition conditions:
-     - Reuses the CRUISE to WAYPOINT_REACHED condition to check if agent_state is within current_waypoints acceptance radius
-
-    Parameters:
-        agent_state (AgentUpdate): Current state of the agent.
-        current_waypoint (Waypoint): current waypoint for the hybrid automaton
-        tolerance (float): tolerance duration for valid messages.
-
-    Returns:
-        bool: True is transition to WAYPOINT_REACHED is required, otherwise False
-    """
-    return bool(
-        guard_CRUISE_to_WAYPOINT_REACHED(
-            agent_state=agent_state,
-            current_waypoint=current_waypoint,
-            tolerance=tolerance))
-
-
-"""3. FB Guard Functions"""
-# Currently no transitions out of the fallback state; therefore, no guards
-# are implemented.
-
-
-"""4. WAYPOINT_REACHED Guard Functions"""
-
-
-def guard_WAYPOINT_REACHED_to_CRUISE(
-    waypoints: Waypoints,
-    tolerance: Duration = Duration(
-        sec=1)) -> bool:
+def is_virtual_waypoints(
+    waypoints: Waypoints) -> bool:
     """
     Guard for transitioning from WAYPOINT_REACHED to CRUISE
 
@@ -330,4 +260,10 @@ def guard_WAYPOINT_REACHED_to_CRUISE(
         TimeoutError: If the evaluation takes too long.
         ValueError: If input values are invalid.
     """
+    if not isinstance(waypoints, Waypoints):
+        raise TypeError(
+            f"Invalid argument type for 'waypoints'. Expected type: 'Waypoints', but got type: '{type(waypoints).__name__}'. "
+            "Please ensure the 'waypoints' argument is an instance of the Waypoints class."
+    )
+    
     return len(waypoints._waypoints) > 1
