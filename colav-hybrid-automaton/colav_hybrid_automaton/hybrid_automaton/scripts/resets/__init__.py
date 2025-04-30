@@ -1,6 +1,6 @@
-from .resets import reset_CRUISE_to_T2LOS, reset_WAYPOINT_REACHED_to_CRUISE
+from .resets import remove_first_waypoint, create_virtual_waypoint
 
 __all__ = [
-    'reset_CRUISE_to_T2LOS',
-    'reset_WAYPOINT_REACHED_to_CRUISE'
+    'remove_first_waypoint',
+    'create_virtual_waypoint'
 ]

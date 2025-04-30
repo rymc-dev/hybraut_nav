@@ -1,0 +1,9 @@
+# EvaluateTransitions.srv
+
+# Request: the reset name
+string transition_name
+
+---
+# Response: overall result and detailed results for each transition
+bool success                         # Indicates if all transitions were successfully evaluated
+string message                               # General message or summary information

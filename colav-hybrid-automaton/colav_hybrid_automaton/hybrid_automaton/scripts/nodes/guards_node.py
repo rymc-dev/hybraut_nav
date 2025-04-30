@@ -27,42 +27,87 @@ Date: April 17, 2025
 
 
 # === Standard Library Imports ===
+import os
+import sys
+sys.path.append(
+    os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            '..',
+            '..',
+            '..')))
+
+
 from hybrid_automaton.config import QOS_PROFILE
-from hybrid_automaton.scripts.guards import (
-    guard_CRUISE_to_FB,
-    guard_CRUISE_to_T2LOS_1,
-    guard_CRUISE_to_T2LOS_2,
-    guard_CRUISE_to_WAYPOINT_REACHED,
-    guard_T2LOS_to_CRUISE,
-    guard_T2LOS_to_FB,
-    guard_T2LOS_to_WAYPOINT_REACHED,
-    guard_WAYPOINT_REACHED_to_CRUISE
-)
+# from hybrid_automaton.scripts.guards import (
+#     is_los_clear_to_waypoint,
+#     is_heading_within_tolerance,
+#     is_unsafe_conditions,
+#     is_waypoint_reached,
+#     is_heading_not_within_tolerance,
+#     is_virtual_waypoints
+# )
 from hybrid_automaton.utils import get_current_ros_time
 from colav_interfaces.msg import (
     AgentUpdate,
     GuardsStatus,
     ObstaclesUpdate,
     UnsafeSet,
-    Waypoints
+    Waypoints,
+    TransitionPending
 )
+from functools import partial
+from ament_index_python.packages import get_package_share_directory
 from std_srvs.srv import Trigger
 from std_msgs.msg import String
 from builtin_interfaces.msg import Duration
 from rclpy.node import Node
 import rclpy
-import os
-import sys
 
-# Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
-# allowing imports to work correctly without relying on the build process.
-sys.path.append(
-    os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            '..',
-            '..')))
+import importlib
+import yaml
 
+
+hybrid_automaton_config_path = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'hybrid_automaton_config.yml')
+
+def load_module_attribute(module_path: str, attr_name: str):
+    """Dynamically import a module and retrieve an attribute (e.g., class or function)."""
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, attr_name)
+    except (ImportError, AttributeError) as e:
+        raise ImportError(f"Failed to import '{attr_name}' from '{module_path}': {e}")
+
+def initialize_automaton_config(hybrid_automaton_config_path: str, self_ref: object):
+    with open(hybrid_automaton_config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    # Initialize state variables and load message types
+    for idx, state in enumerate(config['states']):
+        state_name = state['name']
+        state_type = state['type']
+
+        # Set dynamic state variable
+        setattr(self_ref, f"current_{state_name}_state", None)
+
+        # Import and replace state type with actual class
+        module_path, class_name = state_type.rsplit('.', 1)
+        msg_class = load_module_attribute(module_path, class_name)
+        config['states'][idx]['type'] = msg_class
+
+    # Import guards and resets once
+    guard_mod = importlib.import_module("hybrid_automaton.scripts.guards")
+    reset_mod = importlib.import_module("hybrid_automaton.scripts.resets")
+
+    # Assign actual guard/reset functions
+    for transition in config['transitions']['list']:
+        guard_name = transition.get('guard')
+        reset_name = transition.get('reset')
+
+        transition['guard'] = getattr(guard_mod, guard_name) if isinstance(guard_name, str) else None
+        transition['reset'] = getattr(reset_mod, reset_name) if isinstance(reset_name, str) else None
+
+    return config
 
 class InitializationError(Exception):
     """Custom exception for initialization-related failures."""
@@ -84,62 +129,92 @@ class GuardsNode(Node):
     'guard_evaluations' topic.
     """
 
-    # Dict shows the different control modes
-    _MODES = {
-        1: "CRUISE",
-        2: "T2LOS",
-        3: "FB",
-        4: "WAYPOINT_REACHED"
-    }
-
-    def __init__(
-        self,
-        namespace: str = "hybrid_automaton",
-        name: str = "guards_node"
-    ):
+    def __init__(self, namespace: str = "hybrid_automaton", name: str = "guards_node"):
         """
         Initializes the guards_node
         """
         super().__init__(name, namespace=namespace)
 
-        self._current_agent_state = None
-        self._current_obstacles_state = None
-        self._current_waypoint = None
-        self._current_waypoints = None
-        self._current_unsafe_set = None
-        self._current_control_mode = None
+        # Load automaton configuration
+        self.config = initialize_automaton_config(hybrid_automaton_config_path, self)
 
-        self._NODE_SRVS = self._init_node_srvs()
-        self.get_logger().info(f"{namespace}/{name} node initialised!")
+        # Publishers
+        self.transition_pending_pub = self.create_publisher(
+            topic="/hybrid_automaton/transition_pending",
+            msg_type=TransitionPending,
+            qos_profile=QOS_PROFILE
+        )
 
-    def _init_node_srvs(self, node_name: str = 'guards_node'):
-        """
-        Initializes node services
-        - Initializes the start_guard_evaluations stop_guards_evaluation
-        - Raises InitializationError if exception thrown during service creation
-        """
-        try:
-            return {
-                "start_guards_evaluation": self.create_service(
-                    srv_type=Trigger,
-                    srv_name=f"/hybrid_automaton/start_guards_eval",
-                    callback=self._start_guards_evaluation_callback
-                ),
-                "stop_guards_evaluation": self.create_service(
-                    srv_type=Trigger,
-                    srv_name=f"/hybrid_automaton/stop_guards_eval",
-                    callback=self._stop_guards_evaluation_callback
-                )
-            }
-        except Exception:
-            raise InitializationError(
-                'Node Services',
-                "Excpetion occured initializing start/stop guard_evaluations services for this node")
+        self.guards_eval_pub = self.create_publisher(
+            topic="/hybrid_automaton/guards",
+            msg_type=GuardsStatus,
+            qos_profile=QOS_PROFILE
+        )
+
+        # Subscriptions
+        self.create_subscription(
+            topic="/hybrid_automaton/mode",
+            msg_type=String,
+            callback=self._mode_callback,
+            qos_profile=QOS_PROFILE
+        )
+
+        self.create_subscription(
+            topic="/hybrid_automaton/transition_pending",
+            msg_type=TransitionPending,
+            callback=self._transition_pending_callback,
+            qos_profile=QOS_PROFILE
+        )
+
+        for state in self.config['states']:
+            self.create_subscription(
+                topic=state['topic'],
+                msg_type=state['type'],
+                callback=partial(self._state_callback, state_name=state['name']),
+                qos_profile=QOS_PROFILE
+            )
+
+        # Services
+        self.create_service(
+            srv_type=Trigger,
+            srv_name="/hybrid_automaton/start_guards_eval",
+            callback=self._start_guards_evaluation_callback
+        )
+
+        self.create_service(
+            srv_type=Trigger,
+            srv_name="/hybrid_automaton/stop_guards_eval",
+            callback=self._stop_guards_evaluation_callback
+        )
+
+        # Internal state
+        self.transition_pending = False
+        self._current_mode = None
+        self._guards_status = None
+        self._resets_status = None
+
+        # Log initialization
+        self.get_logger().info(f"{namespace}/{name} node initialized.")
+        self.get_logger().debug("Publishers, subscribers, and services are ready.")
+
+    """callbacks"""
+    def _mode_callback(self, msg: String):
+        self._current_control_mode = msg.data
+        self.get_logger().debug("Received control mode: %s", msg.data)
+
+    def _transition_pending_callback(self, msg: TransitionPending):
+        self.transition_pending = msg
+        self.get_logger().debug("Transition pending status received.")
+
+    def _state_callback(self, msg, state_name: str):
+        setattr(self, f"current_{state_name}_state", msg)
+        self.get_logger().debug("Updated state for %s", state_name)
 
     def _start_guards_evaluation_callback(
         self,
         request: Trigger.Request,
-        response: Trigger.Response
+        response: Trigger.Response,
+        transition_eval_hz: float = 0.1
     ) -> Trigger.Response:
         """
         Callback to start guard evaluation:
@@ -151,21 +226,13 @@ class GuardsNode(Node):
             # Log the initialization start
             self.get_logger().info('Initializing guards evaluation components...')
 
-            # self._current_control_mode = self._MODES[1]
-            # Initialize node subscribers
-            self._node_subs = self._init_node_subs()
+            self.eval_timer = self.create_timer(
+                timer_period_sec=1.0/transition_eval_hz,
+                callback=self._eval_transitions
+            )
             self.get_logger().debug(
-                f'Node subscribers initialized: {self._node_subs}')
-
-            # Initialize node publishers
-            self._node_pubs = self._init_node_pubs()
-            self.get_logger().debug(
-                f'Node publishers initialized: {self._node_pubs}')
-
-            # Initialize timers
-            self._node_timers = self._init_node_timers()
-            self.get_logger().debug(
-                f'Node timers initialized: {self._node_timers}')
+                f"transition_eval_timer started, evaluating at '{transition_eval_hz}hz'."
+            )
 
             # Update response on success
             response.success = True
@@ -217,63 +284,6 @@ class GuardsNode(Node):
             response.message = str(e)
         return response
 
-    def _init_node_pubs(self):
-        """initialize the node publisher"""
-        try:
-            return {
-                "guards_status": self.create_publisher(
-                    msg_type=GuardsStatus,
-                    topic="/hybrid_automaton/guards",
-                    qos_profile=QOS_PROFILE
-                )
-            }
-        except Exception as e:
-            raise InitializationError(
-                "Publishers",
-                f"Failed to create one or more subscriptions: {e}")
-
-    def _init_node_subs(self):
-        """initialisation the nodes subscriptions for the guard_evaluation component."""
-        try:
-            return {
-                "mode": self.create_subscription(
-                    topic="/hybrid_automaton/mode",
-                    msg_type=String,
-                    callback=lambda msg: self.__setattr__(
-                        '_current_control_mode',
-                        msg.data),
-                    qos_profile=QOS_PROFILE),
-                "waypoints": self.create_subscription(
-                    topic="/hybrid_automaton/waypoints",
-                    msg_type=Waypoints,
-                    callback=self._waypoints_update_callback,
-                    qos_profile=QOS_PROFILE),
-                "agent_update": self.create_subscription(
-                    topic="/agent_update",
-                    msg_type=AgentUpdate,
-                    callback=lambda msg: self.__setattr__(
-                        '_current_agent_state',
-                        msg),
-                    qos_profile=QOS_PROFILE),
-                "obstacles_update": self.create_subscription(
-                    topic="/obstacles_update",
-                    msg_type=ObstaclesUpdate,
-                    callback=lambda msg: self.__setattr__(
-                        '_current_obstacles_state',
-                        msg),
-                    qos_profile=QOS_PROFILE),
-                "unsafe_set": self.create_subscription(
-                    topic="/unsafe_set",
-                    msg_type=UnsafeSet,
-                    callback=lambda msg: self.__setattr__(
-                        '_current_unsafe_set',
-                        msg),
-                    qos_profile=QOS_PROFILE)}
-        except Exception as e:
-            raise InitializationError(
-                "Subscribers",
-                f"Failed to create one or more subscriptions: {e}")
-
     def _waypoints_update_callback(self, waypoints: Waypoints):
         """
         Callback function for waypoints subscription.
@@ -289,19 +299,6 @@ class GuardsNode(Node):
         else:
             self._current_waypoint = None
 
-    def _init_node_timers(self):
-        """initialize the node timers"""
-        try:
-            return {
-                "transition_eval_timer": self.create_timer(
-                    timer_period_sec=float(0.1),
-                    callback=self._evaluate_transitions
-                )
-            }
-        except Exception as e:
-            raise InitializationError(
-                'timers', f"Failed to create one or more subscriptions: {e}")
-
     def _validate_state_updates(self, mode: str) -> bool:
         """Ensure all necessary state variables are available for the given mode."""
         required_states = [
@@ -315,123 +312,113 @@ class GuardsNode(Node):
             return False
         return True
 
-    def _evaluate_transitions(self):
+    def _eval_transitions(self):
         """Evaluate transitions based on the control mode."""
         guards_status = GuardsStatus()
         current_time = get_current_ros_time()
 
-        def publish_error(message):
+        def publish_error(mode:str, message: str):
             guards_status.error = True
             guards_status.error_message = message
             guards_status.timestamp = current_time
-            self._node_pubs["guards_status"].publish(guards_status)
+            self.guards_eval_pub.publish(guards_status)
 
         try:
-            if self._current_control_mode is None:
-                publish_error("Current control mode has not been published to /hybrid_automaton/waypoints")
-                guards_status.control_mode = "NA"
-                return
-
             mode = self._current_control_mode
-            mode_map = {
-                self._MODES[1]: "CRUISE",
-                self._MODES[2]: "T2LOS",
-                self._MODES[3]: "FALLBACK",
-                self._MODES[4]: "WAYPOINT_REACHED"
-            }
 
-            if mode not in mode_map:
-                self.get_logger().info("Unknown control mode encountered")
-                self._node_pubs["guards_status"].publish(
-                    GuardsStatus(control_mode="NA", timestamp=current_time)
-                )
+            if mode is None:
+                publish_error("NULL", "Hybrid Automaton Mode has not been published to /hybrid_automaton/mode.")
                 return
 
-            mode_name = mode_map[mode]
+            if mode not in [mode['name'] for mode in self.config['modes']]:
+                publish_error(mode, f"Current Hybrid Automaton Mode published to /hybrid_automaton/mode: '{mode}' is not among Hybrid Automaton Mode configuration: '{[mode['name'] for mode in self.config['modes']]}'")
+                return
+            
+            # Validate_state_updates should raise an exception
+            if self._validate_state_updates(mode):
+                publish_error(mode, f"")
+                return
+
             guards_status.control_mode = mode
 
-            if not self._validate_state_updates(mode):
-                publish_error("State updates not received for guard evaluation")
-                return
 
-            # Common tolerance used across all guards
-            common_tolerance = Duration(sec=3000)
 
-            if mode_name == "CRUISE":
-                guards_status.guard_names = [
-                    "cruise_to_t2los_1",
-                    "cruise_to_t2los_2",
-                    "cruise_to_fb",
-                    "cruise_to_waypoint_reached"
-                ]
-                guards_status.cruise_to_t2los_1 = guard_CRUISE_to_T2LOS_1(
-                    agent_state=self._current_agent_state,
-                    obstacles_state=self._current_obstacles_state,
-                    unsafe_set=self._current_unsafe_set,
-                    waypoint=self._current_waypoint,
-                    dsf=80,
-                    tolerance=common_tolerance
-                )
-                guards_status.cruise_to_t2los_2 = guard_CRUISE_to_T2LOS_2(
-                    agent_state=self._current_agent_state,
-                    current_waypoint=self._current_waypoint,
-                    heading_error_tolerance=0.1,
-                    tolerance=common_tolerance
-                )
-                guards_status.cruise_to_fb = guard_CRUISE_to_FB(
-                    agent_state=self._current_agent_state,
-                    obstacles_state=self._current_obstacles_state,
-                    unsafe_set=self._current_unsafe_set,
-                    tolerance=common_tolerance
-                )
-                guards_status.cruise_to_waypoint_reached = guard_CRUISE_to_WAYPOINT_REACHED(
-                    agent_state=self._current_agent_state,
-                    current_waypoint=self._current_waypoint,
-                    tolerance=common_tolerance
-                )
+        #     # Common tolerance used across all guards
+        #     common_tolerance = Duration(sec=3000)
 
-            elif mode_name == "T2LOS":
-                guards_status.guard_names = [
-                    "t2los_to_cruise",
-                    "t2los_to_fb",
-                    "t2los_to_waypoint_reached"
-                ]
-                guards_status.t2los_to_cruise = guard_T2LOS_to_CRUISE(
-                    agent_state=self._current_agent_state,
-                    current_waypoint=self._current_waypoint,
-                    heading_error_tolerance=0.1,
-                    tolerance=common_tolerance
-                )
-                guards_status.t2los_to_fb = guard_T2LOS_to_FB(
-                    agent_state=self._current_agent_state,
-                    obstacles_state=self._current_obstacles_state,
-                    unsafe_set=self._current_unsafe_set,
-                    tolerance=common_tolerance
-                )
-                guards_status.t2los_to_waypoint_reached = guard_T2LOS_to_WAYPOINT_REACHED(
-                    agent_state=self._current_agent_state,
-                    current_waypoint=self._current_waypoint,
-                    tolerance=common_tolerance
-                )
+        #     if mode_name == "CRUISE":
+        #         guards_status.guard_names = [
+        #             "cruise_to_t2los_1",
+        #             "cruise_to_t2los_2",
+        #             "cruise_to_fb",
+        #             "cruise_to_waypoint_reached"
+        #         ]
+        #         guards_status.cruise_to_t2los_1 = guard_CRUISE_to_T2LOS_1(
+        #             agent_state=self._current_agent_state,
+        #             obstacles_state=self._current_obstacles_state,
+        #             unsafe_set=self._current_unsafe_set,
+        #             waypoint=self._current_waypoint,
+        #             dsf=80,
+        #             tolerance=common_tolerance
+        #         )
+        #         guards_status.cruise_to_t2los_2 = guard_CRUISE_to_T2LOS_2(
+        #             agent_state=self._current_agent_state,
+        #             current_waypoint=self._current_waypoint,
+        #             heading_error_tolerance=0.1,
+        #             tolerance=common_tolerance
+        #         )
+        #         guards_status.cruise_to_fb = guard_CRUISE_to_FB(
+        #             agent_state=self._current_agent_state,
+        #             obstacles_state=self._current_obstacles_state,
+        #             unsafe_set=self._current_unsafe_set,
+        #             tolerance=common_tolerance
+        #         )
+        #         guards_status.cruise_to_waypoint_reached = guard_CRUISE_to_WAYPOINT_REACHED(
+        #             agent_state=self._current_agent_state,
+        #             current_waypoint=self._current_waypoint,
+        #             tolerance=common_tolerance
+        #         )
 
-            elif mode_name == "FALLBACK":
-                # Placeholder for future logic
-                pass
+        #     elif mode_name == "T2LOS":
+        #         guards_status.guard_names = [
+        #             "t2los_to_cruise",
+        #             "t2los_to_fb",
+        #             "t2los_to_waypoint_reached"
+        #         ]
+        #         guards_status.t2los_to_cruise = guard_T2LOS_to_CRUISE(
+        #             agent_state=self._current_agent_state,
+        #             current_waypoint=self._current_waypoint,
+        #             heading_error_tolerance=0.1,
+        #             tolerance=common_tolerance
+        #         )
+        #         guards_status.t2los_to_fb = guard_T2LOS_to_FB(
+        #             agent_state=self._current_agent_state,
+        #             obstacles_state=self._current_obstacles_state,
+        #             unsafe_set=self._current_unsafe_set,
+        #             tolerance=common_tolerance
+        #         )
+        #         guards_status.t2los_to_waypoint_reached = guard_T2LOS_to_WAYPOINT_REACHED(
+        #             agent_state=self._current_agent_state,
+        #             current_waypoint=self._current_waypoint,
+        #             tolerance=common_tolerance
+        #         )
 
-            elif mode_name == "WAYPOINT_REACHED":
-                guards_status.guard_names = ["waypoint_reached_to_cruise"]
-                guards_status.waypoint_reached_to_cruise = guard_WAYPOINT_REACHED_to_CRUISE(
-                    waypoints=self._current_waypoints
-                )
+        #     elif mode_name == "FALLBACK":
+        #         # Placeholder for future logic
+        #         pass
+
+        #     elif mode_name == "WAYPOINT_REACHED":
+        #         guards_status.guard_names = ["waypoint_reached_to_cruise"]
+        #         guards_status.waypoint_reached_to_cruise = guard_WAYPOINT_REACHED_to_CRUISE(
+        #             waypoints=self._current_waypoints
+        #         )
 
         except Exception as e:
             publish_error(str(e))
             return
 
         guards_status.timestamp = get_current_ros_time()
-        self._node_pubs["guards_status"].publish(guards_status)
-
-
+        self.guards_eval_pub.publish(guards_status)
 
 def main(args=None):
     rclpy.init(args=args)

@@ -1,0 +1,9 @@
+# StartHybridAutomaton
+# Request
+builtin_interfaces/Time stamp
+colav_interfaces/Waypoint goal_waypoint
+
+---
+# Response
+bool success
+string message
