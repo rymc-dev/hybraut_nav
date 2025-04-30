@@ -9,30 +9,32 @@ endif()
 find_package(ament_cmake REQUIRED)
 
 # ADDED dependencies ------------------------------
+find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(unique_identifier_msgs)
 find_package(builtin_interfaces REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
+
 
 # ADDED dependencies END --------------------------
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg//Waypoint.msg"
+  "msg/Waypoint.msg"
   "msg/Waypoints.msg"
   "msg/Dynamics.msg"
-  "msg/DynamicsUpdate.msg"
-  "msg/hybrid_automaton/GuardsStatus.msg"
-  "msg/hybrid_automaton/ResetAck.msg"
-  "msg/hybrid_automaton/TransitionPending.msg"
-  "srv/hybrid_automaton/Reset.srv"
-  "srv/hybrid_automaton/StartHybridAutomaton.srv"
-  "action/MissionExecutor.action"
-  
-  DEPENDENCIES geometry_msgs
-  DEPENDENCIES nav_msgs
-  DEPENDENCIES std_msgs
-  DEPENDENCIES builtin_interfaces
+  "msg/DynamicsTimer.msg"
+  "msg/Mode.msg"
+  "msg/Transition.msg"
+  "msg/TransitionPending.msg"
+  "msg/TransitionTimer.msg"
+
+  "srv/Reset.srv"
+  "srv/StartHybridAutomaton.srv"
+  "srv/StopHybridAutomaton.srv"
+
+  DEPENDENCIES geometry_msgs nav_msgs std_msgs builtin_interfaces unique_identifier_msgs
 )
+
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)

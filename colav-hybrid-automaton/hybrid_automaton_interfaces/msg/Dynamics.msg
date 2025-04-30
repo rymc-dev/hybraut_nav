@@ -23,7 +23,6 @@ float64 yaw_rate      # Angular velocity around the Z-axis (yaw rate)
 
 # --- Custom Dynamic Parameters End ---
 
-
 # Timestamp of when the dynamic update was published.
 builtin_interfaces/Time stamp
 
