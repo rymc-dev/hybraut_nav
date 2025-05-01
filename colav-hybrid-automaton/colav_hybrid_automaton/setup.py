@@ -6,14 +6,14 @@ package_name = 'colav_hybrid_automaton'
 setup(
     name=package_name,
     version='0.0.1',
-    packages=['hybrid_automaton', 'hybrid_automaton.utils', 'hybrid_automaton.scripts.dynamics', 'hybrid_automaton.scripts.guards', 'hybrid_automaton.scripts.nodes', 'hybrid_automaton.scripts.resets', 'hybrid_automaton.config'],
+    packages=['hybrid_automaton', 'hybrid_automaton.utils', 'hybrid_automaton.utils.framework', 'hybrid_automaton.utils.colav', 'hybrid_automaton.scripts.dynamics', 'hybrid_automaton.scripts.guards', 'hybrid_automaton.scripts.nodes', 'hybrid_automaton.scripts.resets', 'hybrid_automaton.config'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
         ('share/' + package_name + '/config', glob('config/*.yml')),
-        ('share/' + package_name + '/schemas', glob('schemas*.schema.json'))
+        ('share/' + package_name + '/schemas', glob('schemas/*.schema.json'))
     ],
     install_requires=['setuptools', 'launch_testing'],
     zip_safe=True,

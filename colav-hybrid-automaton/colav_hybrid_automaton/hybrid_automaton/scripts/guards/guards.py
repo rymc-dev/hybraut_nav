@@ -3,7 +3,7 @@ from builtin_interfaces.msg import Duration
 from shapely.geometry import Polygon, LineString
 import numpy as np
 
-from colav_hybrid_automaton.hybrid_automaton.utils.hybrid_automaton.unsafe_set_utils import is_inside_unsafe_set, is_imminent_collision
+from hybrid_automaton.utils import is_inside_unsafe_set, is_imminent_collision
 from hybrid_automaton.utils import (
     validate_timestamps_within_tolerance,
     delta_heading,

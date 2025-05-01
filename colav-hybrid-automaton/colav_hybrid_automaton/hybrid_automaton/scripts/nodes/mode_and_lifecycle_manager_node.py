@@ -9,6 +9,10 @@ as defined within the hybrid_automaton_config.yml
 import os
 import sys
 
+# TODO: Let's change the StartHybridAutomaton to a action server 
+#       instead of a service I think this would be better as feedback
+#       can be the output message. means less to think about.
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from std_msgs.msg import String

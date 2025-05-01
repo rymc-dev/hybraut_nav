@@ -5,12 +5,14 @@
 from .framework.validate_timestamps import validate_timestamps_within_tolerance
 from .framework.ros_timer_utils import get_current_ros_time
 from .framework.node_utils import create_cli
+from .framework.automaton_config_duct import duct_and_validate_automaton_config_yml
 
 # --- Custom Utilities (you may add to this section) ---
 
 from .colav.parametic_equations import generate_circle_points
 from .colav.unsafe_set_utils import extract_polygon_vertices
 from .colav.euclidean_distance import euclidean_distance
+from .colav.unsafe_set_utils import is_imminent_collision, is_inside_unsafe_set
 from .colav.rotation_utils import (
     quaternion_to_heading,
     normalize_angle,
@@ -24,6 +26,7 @@ __all__ = [
     "validate_timestamps_within_tolerance",
     "get_current_ros_time",
     "create_cli",
+    "duct_and_validate_automaton_config_yml"
 
     # Custom utils
     "generate_circle_points",
@@ -31,5 +34,7 @@ __all__ = [
     "euclidean_distance",
     "quaternion_to_heading",
     "normalize_angle",
-    "delta_heading"
+    "delta_heading",
+    "is_imminent_collision",
+    "is_inside_unsafe_set"
 ]

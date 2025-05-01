@@ -6,123 +6,201 @@
     "type": "object",
     "properties": {
         "states": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "topic": {"type": "string"},
-                    "type": {
-                        "type": "object",
-                        "properties": {
-                            "pkg": {"type": "string"},
-                            "msg": {"type": "string"}
-                        },
-                        "required": ["pkg", "msg"]
-                    },
-                    "params": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "update_hz": {"type": ["number", "null"]},
-                                "timeout_sec": {"type": ["number", "null"]}
-                            }
-                        }
-                    }
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+              "type": "object",
+              "required": ["topic", "type"],
+              "properties": {
+                "topic": {
+                  "type": "string"
                 },
-                "required": ["topic", "type"]
+                "type": {
+                  "type": "object",
+                  "required": ["pkg", "msg"],
+                  "properties": {
+                    "pkg": { "type": "string" },
+                    "msg": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                },
+                "params": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "maxProperties": 1,
+                    "patternProperties": {
+                      "^(update_hz|timeout_sec)$": { "type": "number" }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
             }
+          },
+          "additionalProperties": false
         },
         "resets": {
-            "type": "array",
-            "items": {
+            "type": "object",
+            "patternProperties": {
+              "^[a-zA-Z0-9_]+$": {
                 "type": "object",
+                "required": ["module", "function", "state_inputs", "state_outputs"],
                 "properties": {
                     "module": {"type": "string"},
                     "function": {"type": "string"},
                     "state_inputs": {
                         "type": "array",
                         "items": {
-                            "type": "object"
+                            "type": "string"
                         }
                     },
                     "state_outputs": {
                         "type": "array",
                         "items": {
-                            "type": "object"
+                            "type": "string"
                         }
                     }
                 },
-                "required": ["module", "function", "state_inputs", "state_outputs"]
-            }
-        },
-        "guards": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "module": {"type": "string"},
-                    "function": {"type": "string"},
-                    "state_inputs": {
-                        "type": "array",
-                        "items": {
-                            "type": "object"
-                        }
-                    }
-                },
-                "required": ["module", "function", "state_inputs"]
-            }
-        },
-        "dynamics": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "guard": {"type": "object"},
-                    "reset": {"type": "object"},
-                    "state_inputs": {
-                        "type": "array",
-                        "items": {
-                            "type": "object"
-                        }
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+      },
+      "guards": {
+        "type": "object",
+        "patternProperties": {
+        "^[a-zA-Z0-9_]+$": {
+            "type": "object",
+            "required": ["module", "function", "state_inputs"],
+            "properties": {
+                "module": {"type": "string"},
+                "function": {"type": "string"},
+                "state_inputs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 }
+            },
+            "additionalProperties": false
+        }
+        },
+        "additionalProperties": false
+    },
+    "invariants": {
+        "type": "object",
+        "patternProperties": {
+        "^[a-zA-Z0-9_]+$": {
+            "type": "object",
+            "required": ["module", "function", "state_inputs"],
+            "properties": {
+                "module": {"type": "string"},
+                "function": {"type": "string"},
+                "state_inputs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": false
+        }
+        },
+        "additionalProperties": false
+    },
+    "transitions": {
+        "type": "object",
+        "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+                "type": "object",
+                "properties": {
+                    "guard": {"type": "string"},
+                    "reset": {"type": "string"}
+                },
+            "additionalProperties": false
             }
         },
-        "invariants": {
-            "type": "array",
-            "items": {
+        "additionalProperties": false
+    },
+    "dynamics": {
+        "type": "object",
+        "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
                 "type": "object",
                 "properties": {
                     "module": {"type": "string"},
-                    "function": {"type": "string"},
-                    "state_inputs": {
-                        "type": "array",
-                        "items": {
-                            "type": "object"
-                        }
-                    }
+                    "function": {"type": "string"}
                 },
-                "required": ["module", "function", "state_inputs"]
+                "additionalProperties": false
             }
         },
-        "transitions": {
-            "type":"array",
-            "items": {
-                "guard": {"type": ["object", "null"]},
-                "reset": {"type": ["object", "null"]}
-               },
-                "required": ["guard", "reset"]
-        }, 
-        "modes": {
-            "type":"object"
+        "additionalProperties": false
+    },
+    "modes": {
+        "type": "object",
+        "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+                "type": "object",
+                "properties": {
+                    "index": {"type": "string"},
+                    "function": {"type": "string"},
+                    "transitions": {
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-zA-Z0-9_]+$": {
+                            "type": "object",
+                            "required": ["priority"],
+                            "properties": {
+                              "priority": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                },
+                "additionalProperties": false
+            }
         },
-        "mode_goals": {
-            "type": "object"
-        }, 
-        "init": {
-            "mode": {"type": "string"}
+        "additionalProperties": false
+    },
+    "modes_goal": {
+        "type": "array",
+        "items": {
+            "type": "string"
         }
     },
-    "required": ["states", "resets", "guards", "dynamics", "invariants"]
+    "init": {
+        "type": "object",
+        "required": ["mode"],
+        "properties": {
+          "mode": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+    },
+    "params": {
+        "type": "object",
+        "required": ["transition_evaluation_hz", "transition_evaluation_timeout"],
+        "properties": {
+          "transition_evaluation_hz": {
+            "type": "number",
+            "minimum": 0
+          },
+          "transition_evaluation_timeout": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+    },
+    "required": ["states", "resets", "guards", "invariants", "transitions", "dynamics", "modes", "init", "params"]
 }

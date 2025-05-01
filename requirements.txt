@@ -10,3 +10,5 @@ parameterized
 pytest-xdist
 pytest-ordering 
 pytest-dependency 
+PyYAML
+jsonschema
