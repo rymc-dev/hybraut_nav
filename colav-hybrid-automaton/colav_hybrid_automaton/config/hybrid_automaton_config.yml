@@ -1,115 +1,287 @@
+# ROS2 Hybrid Automaton Configuration Framework
+#
+# This is the COLAV Hybrid Automaton framework for the ROS2 Hybrid Automaton Framework
+# It defines all the params of the hybrid automaton declaring modes, transitions, guards, resets, invariants 
+# init states for the hybrid automaton in a strucutre format making it slightly easier to interpret and make changes in the future
+#
+# NOTE: Link to python functions must be validated to be the correct return type with the correct module path and entry name
+#       it's important to link the functions for guards and resets in the __init__.__all__ = [] to allow the colav_hybrid 
+#       automaton framework to quickly access those functions because we don't use direct file paths.
+#       Hybrid Automaton assumes that modules provided and functions are in the build path.
 
-initial_mode: CRUISE
-final_modes: 
-  - WAYPOINT_REACHED
-  - FALLBACK
-params: './hybrid_automaton_params.yml'
+# states represents the continous states of the hybrid automaton, these states continously evolve in real time with the system 
 
-modes:
-  - name: CRUISE
-    index: 0
-    dynamics: proportional_velocity_controller
-    invariants: []
-    transitions:
-      - name: cruise_to_t2los_1
-        priority: 2
-      - name: cruise_to_t2los_2
-        priority: 3
-      - name: cruise_to_fb
-        priority: 0
-      - name: cruise_to_waypoint_reached
-        priority: 1
+#  The hybrid automaton is defined as:
+#         HA: (Q, Q_goal, X, F, Init, Inv, E, G, R)
 
-  - name: T2LOS
-    index: 1
-    dynamics: proportional_yaw_rate_controller
-    invariants: []
-    transitions:
-      - name: t2los_to_cruise
-        priority: 2
-      - name: t2los_to_fb
-        priority: 0
-      - name: t2los_to_waypoint_reached
-        priority: 1
+#     Where:
+#         Q: set of discrete states (Modes/Locations)
+#         Q_goal: Optional set of discrete state final modes where if deadlock occurs the hybrid automaton have completed it's goal
+#         X: Set of continously evolving states e.g. (obstacles_state)
+#         F: Dynamics (control policies for each mode)
+#         Init: Initial discrete and continuous states
+#         Inv: Invariants of the system, system can stay in mode which this invariant function returns true otherwsie must leave
+#         E: set of transitions
+#         G: guard conditions
+#         R: reset conditions
+#  
+# In actual programming for programmatic interpretabiliity of each of the sets in the Formal definition our yml file is more explicity 
+# with the variable names.
+#
+# Q == modes
+# Q_goal == goal_modes
+# x == states
+# f == dynamics
+# Init = init
+# Inv == invariants
+# E == transitions
+# r = resets
+# g = guards
+#
+# Within each of the variables we provide more information metadata function links and modules and so on...
 
-  - name: WAYPOINT_REACHED
-    index: 2
-    dynamics: no_op_controller
-    invariants: []
-    transitions:
-      - name: waypoint_reached_to_cruise
-        priority: 0
 
-  - name: FALLBACK
-    index: 3
-    dynamics: no_op_controller
-    invariants: []
-    transitions: []
 
+# states is from HA(X) we define this with a list of continous state information.
+# as these continous states are expected to come external of the hybrid automaton 
+# via ros2 topics we need to provide metadata associated with it this data includes topic name 
+# expected update_hz for the state and a timeout_value in seconds as well as the ros2 msg pkg name
+# and the msg name. 
+# within each of the list items we provide additional details including the name of the state
+# the topic name we.
 states:
-  - name: agent
+  agent_state:
     topic: '/state/agent'
-    type: 'colav_interfaces.msg.AgentUpdate'
-    update_hz: 10.0
-    timeout_sec: 0.5
+    type: 
+      pkg: 'colav_interfaces.msg' 
+      msg: 'AgentUpdate'
+    params: 
+      - update_hz: 10.0
+      - timeout_sec: 0.5
 
-  - name: obstacles
+  obstacles_state:
     topic: '/state/obstacles'
-    type: 'colav_interfaces.msg.ObstaclesUpdate'
-    update_hz: 4.0
-    timeout_sec: 1.0
+    type: 
+      pkg: 'colav_interfaces.msg'
+      msg: 'ObstaclesUpdate'
 
-  - name: unsafe_set
+    params: 
+      - update_hz: 4.0
+      - timeout_sec: 1.0
+
+
+  unsafe_set_state:
     topic: '/state/unsafe_set'
-    type: 'colav_interfaces.msg.UnsafeSet'
-    update_hz: 2.0
-    timeout_sec: 1.5
+    type: 
+      pkg: 'colav_interfaces.msg'
+      msg: 'UnsafeSet'
 
-  - name: waypoints
+    params: 
+      - update_hz: 2.0
+      - timeout_sec: 1.5
+
+
+  waypoints_state:
     topic: '/hybrid_automaton/state/waypoints'
-    type: 'colav_interfaces.msg.Waypoints'
-    update_hz: null
-    timeout_sec: null
+    type: 
+      pkg: 'colav_interfaces.msg'
+      msg: Waypoints
 
+# reset functions are functions which are functions called on transitions which modify the continous state of the system when the hybrid automaton transitions from one mode 
+# to another
+resets: # This will give additional metadata for the reset functions including arg types and arg names and so that the reset node can properly call the reset function!
+  remove_first_waypoint:
+    module: hybrid_automaton.scripts.resets 
+    function: remove_first_waypoint
+    state_inputs: 
+      - 'waypoints_state'
+    state_outputs:
+      - 'waypoints_state'
+
+  create_virtual_waypoint:
+    module: hybrid_automaton.scripts.resets 
+    function: create_virtual_waypoint
+    state_inputs: 
+      - 'agent_state'
+      - 'obstacles_state'
+      - 'unsafe_set_state'
+      - 'waypoints_state' 
+    
+    state_outputs: 
+      - 'waypoints_state'
+
+# Guards are conditional functions evaluated at each hybrid automaton transition evaluation which return True or false, this true or false represents if a transition should be made
+# to the next mode
+guards:
+  is_los_clear_to_waypoint:
+    module: hybrid_automaton.scripts.guards
+    function: is_los_clear_to_waypoint
+    state_inputs:
+      - 'agent_state'
+      - 'obstacles_state'
+      - 'unsafe_set_state'
+      - 'waypoints_state'
+
+  is_heading_within_tolerance:
+    module: hybrid_automaton.scripts.guards
+    function: is_heading_within_tolerance
+    state_inputs:
+      - 'agent_state'
+      - 'waypoints_state'
+    
+  is_heading_not_within_tolerance:
+    module: hybrid_automaton.scripts.guards
+    function: is_heading_within_tolerance
+    state_inputs:
+      - 'agent_state'
+      - 'waypoints_state'
+
+  is_virtual_waypoints:
+    module: hybrid_automaton.scripts.guards
+    function: is_virtual_waypoints
+    state_inputs:
+      - 'waypoints_state'
+
+  is_unsafe_conditions:
+    module: hybrid_automaton.scripts.guards
+    function: is_unsafe_conditions
+    state_inputs:
+      - 'agent_state'
+      - 'obstacles_state'
+      - 'unsafe_set_state'
+
+  is_waypoint_reached:
+    module: hybrid_automaton.scripts.guards
+    function: is_waypoint_reached
+    state_inputs:
+      - 'agent_state'
+      - 'waypoints_state'
+
+invariants: []
+
+# Transitions define the data associated with transitions
 transitions:
-  guard_params: './guard_params.yml'
-  reset_params: './reset_params.yml'
-  list:
-    - name: cruise_to_t2los_1
-      guard: is_los_clear_to_waypoint
-      reset: create_virtual_waypoint
+  cruise_to_t2los_1:
+    guard: 'is_los_clear_to_waypoint'
+    reset: 'create_virtual_waypoint'
 
-    - name: cruise_to_t2los_2
-      guard: is_heading_not_within_tolerance
-      reset: null
+  cruise_to_t2los_2:
+    guard: 'is_heading_not_within_tolerance'
+    reset: null
 
-    - name: cruise_to_fb
-      guard: is_unsafe_conditions
-      reset: null 
+  cruise_to_fallback:
+    guard: 'is_unsafe_conditions'
+    reset: null 
 
-    - name: cruise_to_waypoint_reached
-      guard: is_waypoint_reached
-      reset: null  
+  cruise_to_waypoint_reached:
+    guard: 'is_waypoint_reached'
+    reset: null  
 
-    - name: t2los_to_cruise
-      guard: is_heading_within_tolerance
-      reset: null  
+  t2los_to_cruise:
+    guard: 'is_heading_within_tolerance'
+    reset: null  
 
-    - name: t2los_to_fb
-      guard: is_unsafe_conditions
-      reset: null
+  t2los_to_fallback:
+    guard: 'is_unsafe_conditions'
+    reset: null
 
-    - name: t2los_to_waypoint_reached
-      guard: is_waypoint_reached
-      reset: null 
+  t2los_to_waypoint_reached:
+    guard: 'is_waypoint_reached'
+    reset: null 
 
-    - name: waypoint_reached_to_cruise
-      guard: is_virtual_waypoints
-      reset: remove_first_waypoint
-
+  waypoint_reached_to_cruise:
+    guard: 'is_virtual_waypoints'
+    reset_ref: 'remove_first_waypoint'
 
 invariants: [] # Reserved for future mode constraints
 
+dynamics: 
+  proportional_velocity_controller:
+    module: 'hybrid_automaton.scripts.dynamics'
+    function: proportional_velocity_controller
+
+  proportional_yaw_rate_controller:
+    module: 'hybrid_automaton.scripts.dynamics'
+    function: proportional_yaw_rate_controller
+
+  no_op_controller:
+    module: 'hybrid_automaton.scripts.dynamics'
+    function: no_op_controller
+
+modes:
+
+  cruise:
+    index: 0
+
+    dynamics: 'proportional_velocity_controller'
+
+    invariants: []
+
+    transitions:
+      cruise_to_fallback: 
+        transition: 'cruise_to_fallback'
+        priority: 0
+
+      cruise_to_waypoint_reached:
+        transition: 'cruise_to_waypoint_reached'
+        priority: 1
+
+      cruise_to_t2los_1:
+        transition: 'cruise_to_t2los_1'
+        priority: 2
+
+      cruise_to_t2los_2:
+        transition: 'cruise_to_t2los_2'
+        priority: 3
+
+  t2los:
+    index: 1
+
+    dynamics: 'proportional_yaw_rate_controller'
+
+    invariants: []
+
+    transitions:
+      - ref: 't2los_to_fallback'
+        priority: 0
+
+      - ref: 't2los_to_cruise'
+        priority: 2
+
+      - ref: 't2los_to_waypoint_reached'
+        priority: 3
+
+
+  waypoint_reached:
+    index: 2
+
+    dynamics: 'no_op_controller'
+
+    invariants: []
+
+    transitions:
+      - ref: 'waypoint_reached_to_cruise'
+        priority: 0
+
+
+  fallback:
+    index: 3
+    dynamics: 'no_op_controller'
+
+    invariants: []
+
+    transitions: []
+
+modes_goal: 
+  - waypoint_reached 
+  - fallback 
+
+Init:
+  mode: 'cruise'
 
 
 
+transition_evaluation_hz: 0.1
+
+
+# params: './hybrid_automaton_params.yml'

@@ -7,9 +7,9 @@ Author: Ryan McKee
 Date: April 28, 2025
 """
 
-
 import rclpy
 from hybrid_automaton.scripts.nodes import ResetNode
+
 
 def main(args=None):
     rclpy.init(args=args)

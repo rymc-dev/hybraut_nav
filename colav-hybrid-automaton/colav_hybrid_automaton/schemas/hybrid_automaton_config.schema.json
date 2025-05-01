@@ -1,0 +1,128 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Hybrid Automaton Framework Schema",
+    "description": "This schema defines the structure for validating JSON data related to the Hybrid Automaton Configuration",
+    "version": "1.0.0",
+    "type": "object",
+    "properties": {
+        "states": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "topic": {"type": "string"},
+                    "type": {
+                        "type": "object",
+                        "properties": {
+                            "pkg": {"type": "string"},
+                            "msg": {"type": "string"}
+                        },
+                        "required": ["pkg", "msg"]
+                    },
+                    "params": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "update_hz": {"type": ["number", "null"]},
+                                "timeout_sec": {"type": ["number", "null"]}
+                            }
+                        }
+                    }
+                },
+                "required": ["topic", "type"]
+            }
+        },
+        "resets": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "module": {"type": "string"},
+                    "function": {"type": "string"},
+                    "state_inputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "state_outputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "required": ["module", "function", "state_inputs", "state_outputs"]
+            }
+        },
+        "guards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "module": {"type": "string"},
+                    "function": {"type": "string"},
+                    "state_inputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "required": ["module", "function", "state_inputs"]
+            }
+        },
+        "dynamics": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "guard": {"type": "object"},
+                    "reset": {"type": "object"},
+                    "state_inputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
+        "invariants": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "module": {"type": "string"},
+                    "function": {"type": "string"},
+                    "state_inputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "required": ["module", "function", "state_inputs"]
+            }
+        },
+        "transitions": {
+            "type":"array",
+            "items": {
+                "guard": {"type": ["object", "null"]},
+                "reset": {"type": ["object", "null"]}
+               },
+                "required": ["guard", "reset"]
+        }, 
+        "modes": {
+            "type":"object"
+        },
+        "mode_goals": {
+            "type": "object"
+        }, 
+        "init": {
+            "mode": {"type": "string"}
+        }
+    },
+    "required": ["states", "resets", "guards", "dynamics", "invariants"]
+}

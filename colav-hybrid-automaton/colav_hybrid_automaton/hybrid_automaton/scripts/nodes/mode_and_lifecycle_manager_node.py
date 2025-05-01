@@ -1,12 +1,33 @@
+
+
+"""
+ROS2 Hybrid Automaton node. performs lifecycle managements of the hybrid automaton 
+starting and stopping the mode based on requests while managing control mode of the hybrid automaton
+as defined within the hybrid_automaton_config.yml
+"""
+
 import os
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from std_msgs.msg import String
+from hybrid_automaton_interfaces.msg import (
+    Mode,
+    Transition,
+    TransitionPending,
+    TransitionTimer,
+    Waypoint,
+    Waypoints,
+    output
+)
+from hybrid_automaton_interfaces.srv import (
+    StartHybridAutomaton,
+    StopHybridAutomaton
+)
 from colav_interfaces.msg import GuardsStatus, Waypoints, ControllerFeedback
 from hybrid_automaton.utils import get_current_ros_time
-from hybrid_automaton.utils.node_utils import create_cli
+from colav_hybrid_automaton.hybrid_automaton.utils.hybrid_automaton.node_utils import create_cli
 from hybrid_automaton.config import QOS_PROFILE
 from std_srvs.srv import Trigger
 from colav_interfaces.srv import StartHybridAutomaton
@@ -113,9 +134,10 @@ class ChartNode(Node):
     _INVARIANTS = {}
 
     def __init__(
-            self,
-            namespace: str = "hybrid_automaton",
-            name: str = "chart"):
+        self,
+        namespace: str = "hybrid_automaton",
+        name: str = "chart"
+    ):
         """
         Initialize the COLAV Hybrid Automaton Chart node.
         """

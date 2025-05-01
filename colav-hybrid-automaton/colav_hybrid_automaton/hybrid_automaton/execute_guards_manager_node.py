@@ -7,7 +7,6 @@ Author: Ryan McKee
 Date: April 17, 2025
 """
 
-
 import rclpy
 from hybrid_automaton.scripts.nodes import GuardsNode
 

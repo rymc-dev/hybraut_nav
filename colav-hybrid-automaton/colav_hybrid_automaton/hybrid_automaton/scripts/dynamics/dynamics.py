@@ -4,7 +4,7 @@
 from colav_interfaces.msg import AgentUpdate, Waypoint
 from colav_interfaces.msg import Dynamics
 import math
-from hybrid_automaton.utils.rotation_utils import quaternion_to_heading
+from colav_hybrid_automaton.hybrid_automaton.utils.hybrid_automaton.rotation_utils import quaternion_to_heading
 from hybrid_automaton.utils import get_current_ros_time, validate_timestamps_within_tolerance
 from builtin_interfaces.msg import Duration
 
