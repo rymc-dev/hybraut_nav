@@ -1,13 +1,11 @@
 from .dynamics import (
-    dynamics_CRUISE,
-    dynamics_FALLBACK,
-    dynamics_T2LOS,
-    dynamics_WAYPOINT_REACHED
+    proportional_velocity_controller,
+    proportional_yaw_rate_controller,
+    no_op_controller
 )
 
 __all__ = [
-    'dynamics_CRUISE',
-    'dynamics_FALLBACK',
-    'dynamics_T2LOS',
-    'dynamics_WAYPOINT_REACHED'
+    'proportional_velocity_controller',
+    'proportional_yaw_rate_controller',
+    'no_op_controller'
 ]

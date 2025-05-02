@@ -5,7 +5,8 @@
 from .framework.validate_timestamps import validate_timestamps_within_tolerance
 from .framework.ros_timer_utils import get_current_ros_time
 from .framework.node_utils import create_cli
-from .framework.automaton_config_duct import duct_and_validate_automaton_config_yml
+from .framework.config_duct import process_automaton_config
+from .framework.yaml_utils import load_yml
 
 # --- Custom Utilities (you may add to this section) ---
 
@@ -26,7 +27,9 @@ __all__ = [
     "validate_timestamps_within_tolerance",
     "get_current_ros_time",
     "create_cli",
-    "duct_and_validate_automaton_config_yml"
+    "duct_and_validate_automaton_config_yml",
+    "process_automaton_config",
+    "load_yml",
 
     # Custom utils
     "generate_circle_points",
