@@ -2,7 +2,7 @@
 # while in each mode.
 
 from colav_interfaces.msg import AgentUpdate, Waypoint
-from colav_interfaces.msg import Dynamics
+from hybrid_automaton_interfaces.msg import DynamicParameter
 import math
 from hybrid_automaton.utils import quaternion_to_heading
 from hybrid_automaton.utils import get_current_ros_time, validate_timestamps_within_tolerance
@@ -17,7 +17,7 @@ TARGET_VELOCITY = 25 * 0.514444
 MAX_ACCELERATION = 1.0
 
 
-def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Dynamics:
+def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> DynamicParameter:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
@@ -39,6 +39,7 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     Raises:
         ValueError: (Not currently raised, placeholder for future use if needed.)
     """
+    dynamic_parameters = DynamicParameter(controller_name="p-velocity controller")
     if not isinstance(agent_state, AgentUpdate):
         raise ValueError("agent state received is of none type not type AgentUpdate")
 
@@ -68,10 +69,9 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
         min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)
     new_velocity = current_velocity + acceleration * dt
 
-    cruise_dynamics = Dynamics(
-        velocity=new_velocity,
-    )
-    return cruise_dynamics
+    dynamic_parameters.dynamics_names = ['velocity']
+    dynamic_parameters.dynamics_values = [new_velocity]
+    return dynamic_parameters
 
 
 def proportional_yaw_rate_controller(
@@ -80,7 +80,7 @@ def proportional_yaw_rate_controller(
         dt: float = 0.1,
         error_tolerance: float = 0.01,
         proportional_gain: float = 1.0,
-        tolerance: Duration = Duration(sec=1, nanosec=0)) -> Dynamics:
+        tolerance: Duration = Duration(sec=1, nanosec=0)) -> DynamicParameter:
     # TODO: Need to implmenet this as a continuous proporitional controller P-control with a low-pass filter on the rudder
     """
     Computes the dynamics of the COLAV Hybrid Automaton T2LOS control mode
@@ -100,6 +100,7 @@ def proportional_yaw_rate_controller(
     Raises:
         ValueError: (TODO: Not currently set.)
     """
+    dynamics_parameters = DynamicParameter(controller_name = "P-yaw_rate controller")
     if not isinstance(agent_state, AgentUpdate):
         raise ValueError("agent state received is of none type not type AgentUpdate")
     
@@ -169,15 +170,16 @@ def proportional_yaw_rate_controller(
 
     # Keep the velocity unchanged since we're just controlling the heading
     new_velocity = agent_state.velocity
-    t2los_dynamics = Dynamics(
-        velocity=float(new_velocity),
-        yaw_rate=float(yaw_rate)
-    )
 
-    return t2los_dynamics
+    dynamics_parameters.parameter_names = ['velocity', 'yaw_rate']
+    dynamics_parameters.parameter_values = [float(new_velocity), float(yaw_rate)]
+    dynamics_parameters.parameter_types = ['m/s', 'rad/s']
+
+    return dynamics_parameters
 
 
-def no_op_controller() -> Dynamics:
+def no_op_controller() -> DynamicParameter:
     # Initially controller for fallback will return 0,0 commands therefore
     # enabling the controller on ATL vessel to ramp down by itself
-    return Dynamics()
+
+    return DynamicParameter(controller_name="no-op controller")

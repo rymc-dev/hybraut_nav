@@ -47,7 +47,13 @@ from hybrid_automaton.config import QOS_PROFILE
 #     is_heading_not_within_tolerance,
 #     is_virtual_waypoints
 # )
-from hybrid_automaton.utils import get_current_ros_time, load_yml, process_automaton_config
+from hybrid_automaton.utils import (
+    get_current_ros_time, 
+    load_yml,
+    process_automaton_config,
+    create_state_subscriptions
+)
+
 from colav_interfaces.msg import (
     AgentUpdate,
     ObstaclesUpdate,
@@ -95,7 +101,7 @@ class InitializationError(Exception):
         self.message = message
 
 
-class GuardsNode(Node):
+class TransitionEvaluatorNode(Node):
     """
     GuardsNode is an rclpy node that implements real-time Guard evaluations
     for the COLAV Hybrid Automaton.
@@ -171,22 +177,7 @@ class GuardsNode(Node):
         )   
 
         # TODO: NEED TO MAKE STATES APART OF THERE PYTHON DICTS SO THAT I CAN ACCESS THE VALUES LOCALLY AND PUBLISH THE DATA
-
-        def state_callback(msg, key:str): 
-            self.config['states'][key].__setitem__('state', msg)
-
-        """create ros2 state subscriptions""" # TODO: FOR STATES NEED TO ADD TIMEOUT EXCEPTIONS BASED ON PARAMS
-        for key, value in self.config['states'].items():
-            self.config['states'][key]['state'] = None
-            state_sub = self.create_subscription(
-                topic=value['topic'],
-                msg_type=value['type'],
-                callback = partial(state_callback, key=key),
-                qos_profile=QOS_PROFILE
-            )
-            self.config['states'][key]['sub'] = state_sub
-            del self.config['states'][key]['topic']
-            del self.config['states'][key]['type']
+        create_state_subscriptions(node=self)
 
         # Services
         self.create_service(
@@ -396,7 +387,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
-    node = GuardsNode()
+    node = TransitionEvaluatorNode()
     try:
         # executor = MultiThreadedExecutor()
         # executor.add_node(node)

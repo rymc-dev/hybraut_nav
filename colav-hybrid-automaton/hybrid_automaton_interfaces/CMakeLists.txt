@@ -21,6 +21,7 @@ find_package(builtin_interfaces REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Waypoint.msg"
   "msg/Waypoints.msg"
+  "msg/DynamicParameter.msg"
   "msg/Dynamics.msg"
   "msg/DynamicsTimer.msg"
   "msg/Mode.msg"
@@ -33,6 +34,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/Reset.srv"
   "srv/StartHybridAutomaton.srv"
   "srv/StopHybridAutomaton.srv"
+
+  "action/HybridAutomaton.action"
 
   DEPENDENCIES geometry_msgs nav_msgs std_msgs builtin_interfaces unique_identifier_msgs
 )

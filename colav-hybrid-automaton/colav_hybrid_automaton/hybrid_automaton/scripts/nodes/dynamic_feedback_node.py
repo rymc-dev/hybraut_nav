@@ -50,7 +50,12 @@ from hybrid_automaton.scripts.dynamics import (
     dynamics_FALLBACK,
     dynamics_WAYPOINT_REACHED
 )
-from hybrid_automaton.utils import get_current_ros_time
+from hybrid_automaton.utils import (
+    get_current_ros_time, 
+    process_automaton_config, 
+    load_yml,
+    create_state_subscriptions
+)
 from colav_interfaces.msg import (
     AgentUpdate,
     Waypoints,
@@ -63,6 +68,12 @@ from rclpy.node import Node
 import rclpy
 import os
 import sys
+
+from ament_index_python.packages import get_package_share_directory
+from rcl_interfaces.msg import ParameterDescriptor
+from functools import partial
+
+import importlib
 
 # Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
 # allowing imports to work correctly without relying on the build process.
@@ -83,6 +94,16 @@ class InitializationError(Exception):
         self.message = message
 
 
+default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
+
+def load_module_attribute(module_path: str, attr_name: str):
+    """Dynamically import a module and retrieve an attribute (e.g., class or function)."""
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, attr_name)
+    except (ImportError, AttributeError) as e:
+        raise ImportError(f"Failed to import '{attr_name}' from '{module_path}': {e}")
+
 class DynamicsNode(Node):
     """
     DynamicsNode is an rclpy node that implemenst real-time dynamics evaluations
@@ -94,20 +115,6 @@ class DynamicsNode(Node):
     a dedicated `dynamics` topic.
     """
 
-    _MODES = {  # Dict shows different control modes
-        1: "CRUISE",
-        2: "T2LOS",
-        3: "FB",
-        4: "WAYPOINT_REACHED"
-    }
-
-    _DYNAMICS = {  # Dict shows the dynamics controllers associated the different modes
-        _MODES[1]: dynamics_CRUISE,
-        _MODES[2]: dynamics_T2LOS,
-        _MODES[3]: dynamics_FALLBACK,
-        _MODES[4]: dynamics_WAYPOINT_REACHED
-    }
-
     def __init__(
         self,
         namespace: str = "hybrid_automaton",
@@ -117,57 +124,56 @@ class DynamicsNode(Node):
         Initializes the dynamics_node
         """
         super().__init__(name, namespace=namespace)
+        self.declare_parameter(
+            'hybrid_automaton_config_path',
+            value=default_hybrid_automaton_config,
+            descriptor=ParameterDescriptor(description='Path to the Hybrid Automaton configuration file')
+        )
+        self.config = load_yml(
+            self.get_parameter('hybrid_automaton_config_path').get_parameter_value().string_value
+        )
+        self.config = process_automaton_config(self.config)
 
-        self._control_mode = None
-        self._agent_state = None
-        self._obstalces_state = None
-        self._waypoint = None
+        self.declare_parameter(
+            'transition_evaluation_hz',
+            value=self.config['params']['transition_evaluation_hz'],
+            descriptor=ParameterDescriptor(description='transition evaluation hz for guard evaluations')
+        )
+
+        self._dynamics_pub = self.create_publisher(
+            msg_type=DynamicsUpdate,
+            topic='/hybrid_automaton/dynamics',
+            qos_profile=QOS_PROFILE
+        )
+
+        # Internal communication subscriptions
         self._control_mode_sub = self.create_subscription(
             msg_type=String,
             topic='/hybrid_automaton/mode',
-            callback=lambda msg: self.__setattr__('_control_mode', msg.data),
-            qos_profile=QOS_PROFILE
-        )
-        self._agent_state_sub = self.create_subscription(
-            msg_type=AgentUpdate,
-            topic='/agent_update',
-            callback=lambda msg: self.__setattr__('_agent_state', msg),
-            qos_profile=QOS_PROFILE
-        )
-        self._waypoints_sub = self.create_subscription(
-            msg_type=Waypoints,
-            topic='/hybrid_automaton/waypoints',
-            callback=self._waypoints_callback,
+            callback=lambda msg: self.__setattr__('_current_mode', msg.data),
             qos_profile=QOS_PROFILE
         )
 
-        self._init_node_srvs()
+        # subscribe to state updates
+        create_state_subscriptions(node=self)
+
+        # create the node services
+        self.create_service(
+            srv_type=Trigger,
+            srv_name=f'/hybrid_automaton/start_dynamics_eval',
+            callback=self._start_dynamics_evaluation_callback
+        )
+        self.create_service(
+            srv_type=Trigger,
+            srv_name=f'/hybrid_automaton/stop_dynamics_eval',
+            callback=self._stop_dynamics_evaluation_callback
+        )
+
+
+        # Internal State
+        self._control_mode = None
+
         self.get_logger().info(f"{namespace}/{name} node initialised!")
-
-    def _init_node_srvs(self, node_name: str = "dynamics_node"):
-        """
-        Initializes node services
-        - the start_dynamic_evaluations and stop_dynamics_evaluations
-        - Raises InitializationError if exception thrown during service creation
-        """
-        try:
-            return {
-                "start_dynamic_evaluations": self.create_service(
-                    srv_type=Trigger,
-                    srv_name=f'/hybrid_automaton/start_dynamics_eval',
-                    callback=self._start_dynamics_evaluation_callback
-
-                ),
-                "stop_dynamics_evaluations": self.create_service(
-                    srv_type=Trigger,
-                    srv_name=f'/hybrid_automaton/stop_dynamics_eval',
-                    callback=self._stop_dynamics_evaluation_callback
-                )
-            }
-        except Exception:
-            raise InitializationError(
-                'Node Services',
-                "Excpetion occured initializing start/stop guard_evaluations services for this node")
 
     def _start_dynamics_evaluation_callback(
             self,
@@ -175,13 +181,8 @@ class DynamicsNode(Node):
             response: Trigger.Response):
         """callback for starting dynamics evaluation callback"""
         try:
-            self._dynamics_pub = self.create_publisher(
-                msg_type=DynamicsUpdate,
-                topic='/hybrid_automaton/dynamics',
-                qos_profile=QOS_PROFILE
-            )
             self._dynamics_timer = self.create_timer(
-                float(0.1),
+                1/self.get_parameter('transition_evaluation_hz').value,
                 self._update_dynamics_callback
             )
             response.success = True
@@ -194,15 +195,12 @@ class DynamicsNode(Node):
 
         return response
 
-    def _waypoints_callback(self, msg: Waypoints):
-        """callback to get the current waypoint"""
-        if len(msg.waypoints) > 0:
-            self._waypoint = msg.waypoints[0]
 
     def _stop_dynamics_evaluation_callback(
             self,
             request: Trigger.Request,
             response: Trigger.Response):
+        # TODO
         pass
 
     def _update_dynamics_callback(self):

@@ -15,13 +15,7 @@ unique_identifier_msgs/UUID dynamic_uuid
 # The name of the current control mode. Must match one of the configured mode names.
 string mode
 
-# --- Custom Dynamics Parameters Start ---
-# Add or modify fields below to define the dynamic behavior for your control modes.
-
-float64 velocity      # Linear velocity of the system
-float64 yaw_rate      # Angular velocity around the Z-axis (yaw rate)
-
-# --- Custom Dynamic Parameters End ---
+hybrid_automaton_interfaces/DynamicParameter dynamic_parameters
 
 # Timestamp of when the dynamic update was published.
 builtin_interfaces/Time stamp
