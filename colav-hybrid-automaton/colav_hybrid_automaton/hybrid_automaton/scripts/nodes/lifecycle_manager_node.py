@@ -10,6 +10,10 @@ import time
 from std_msgs.msg import String
 from hybrid_automaton.config import QOS_PROFILE
 import uuid
+from unique_identifier_msgs.msg import UUID
+from hybrid_automaton_interfaces.msg import Dynamics, TransitionPending, Waypoints, TransitionTimer, DynamicParameter
+from hybrid_automaton.utils import subtract_time
+from builtin_interfaces.msg import Time
 
 class LifeCycleManager(Node):
     def __init__(self, name: str = 'lifecycle_manager', namespace: str = 'hybrid_automaton'):
@@ -22,9 +26,25 @@ class LifeCycleManager(Node):
             callback=lambda msg: self.__setattr__('mode', msg),
             qos_profile=QOS_PROFILE
         )
-        self.create_subscription(
 
+        self.create_subscription(
+            topic="/hybrid_automaton/mode",
+            msg_type=String,
+            callback=lambda msg: self.__setattr__('mode', msg),
+            qos_profile=QOS_PROFILE
         )
+        self.create_subscription(
+            topic='/hybrid_automaton/transition_pending',
+            msg_type=TransitionPending,
+            callback=lambda msg: self.__setattr__('transition_pending', msg),
+            qos_profile=QOS_PROFILE
+        )
+        self.create_subscription(
+            topic='/hybrid_automaton/transition_timer',
+            msg_type=TransitionTimer,
+            callback=lambda msg: self.__setattr__('transition_time', msg), # need to implement this
+            qos_profile=QOS_PROFILE
+        )   
 
         self.mission_start_time = None
         self.automaton_uuid = None
@@ -32,16 +52,16 @@ class LifeCycleManager(Node):
         self.dynamics = None
         self.time_since_last_transition = None
         self.waypoints = None
-        
+        self.transition_pending = None
 
 
         self._hybrid_automaton_action_server = ActionServer(
-            self,
-            HybridAutomaton,
-            'hybrid_automaton_action_server',
-            self.execute_callback,
+            node=self,
+            action_type=HybridAutomaton,
+            action_name='hybrid_automaton_action_server',
+            execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
-            cancel_callback=self.cancel_callback
+            cancel_callback=self._cancel_callback
         )
 
     def goal_callback(self, mission_request: HybridAutomaton.Goal, mission_request_tolerance: Duration = Duration(sec=1)):
@@ -57,9 +77,9 @@ class LifeCycleManager(Node):
         except Exception as e: 
             self.get_logger().error(f"Mission Request: \n\n'{mission_request}' \n\Rejected due to Exception: {str(e)}")
             return GoalResponse.REJECT
-        
+        self.mission_start_time = mission_request.stamp
         self.automaton_uuid = uuid.uuid4()
-        self.ros_automaton_uuid = list(self.automaton_uuid.bytes)
+        self.ros_automaton_uuid = UUID(uuid=list(self.automaton_uuid.bytes))
         self.mission_active = True
         self.get_logger().info(f"Mission Request: \n\n'{mission_request}' \n\nAccepted, Starting Hybrid Automaton...")
         return GoalResponse.ACCEPT
@@ -79,45 +99,37 @@ class LifeCycleManager(Node):
         result = HybridAutomaton.Result(success = True, message='Mission Completed!')
         return result
 
-    def cancel_callback(self, goal_handle):
+    def _feedback_timer_callback(self):
+        """
+            provides automaton output to the action server cli.
+        """
+        try:
+            feedback = HybridAutomaton.Feedback()
+            self.get_logger().info('feedback....')
+            feedback.feedback.automaton_uuid = self.ros_automaton_uuid
+            feedback.feedback.mode = self.mode if self.mode is not None else ''
+            feedback.feedback.status = self.status if self.status is not None else ''
+            feedback.feedback.dynamics = self.dynamics if self.dynamics is not None else DynamicParameter()
+            feedback.feedback.time_since_last_transition = self.time_since_last_transition if self.time_since_last_transition is not None else Duration()
+            feedback.feedback.transition_pending = self.transition_pending if self.transition_pending is not None else TransitionPending()
+            stamp = get_current_ros_time()
+            feedback.feedback.stamp = stamp
+            feedback.feedback.elapsed_time = subtract_time(stamp, self.mission_start_time)
+            feedback.feedback.waypoints = self.waypoints if self.waypoints is not None else Waypoints()
+
+            feedback.feedback.error = False
+            feedback.feedback.message = ''
+            self._current_goal_handle.publish_feedback(feedback)
+        except Exception as e:
+            raise e
+        
+    def _cancel_callback(self, goal_handle):
         """Action server cancel callback function."""
         self.get_logger().info('Received request to cancel goal')
         if self._is_thread:  
             self._thread_events['stop_event'].set()
-        self.mission_active = False
-        return CancelResponse.ACCEPT
+        return CancelResponse.ACCEPT  
 
-    def _feedback_timer_callback(self, feedback: HybridAutomaton.Feedback):
-        """
-            provides automaton output to the action server cli.
-        """
-        self.get_logger().info('feedback....')
-        feedback.automaton_uuid = self.ros_automaton_uuid
-        feedback.mode = self.mode
-        feedback.status = self.status
-        feedback.dynamics = self.dynamics
-        feedback.time_since_last_transition = None
-        feedback.transition_pending = None
-        stamp = get_current_ros_time()
-        feedback.stamp = stamp
-        feedback.elapsed_time = subtract_time(stamp, self.mission_start_time)
-        feedback.waypoints = None
-
-        feedback.error = ''
-        feedback.message = ''
-
-from builtin_interfaces.msg import Time
-
-def subtract_time(t1: Time, t0: Time) -> Duration:
-    sec_diff = t1.sec - t0.sec
-    nanosec_diff = t1.nanosec - t0.nanosec
-
-    # Normalize nanoseconds to be in [0, 1e9)
-    if nanosec_diff < 0:
-        sec_diff -= 1
-        nanosec_diff += int(1e9)
-
-    return Duration(sec=sec_diff, nanosec=nanosec_diff)
 
 def main(args=None):
     rclpy.init()

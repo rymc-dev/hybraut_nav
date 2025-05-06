@@ -188,14 +188,23 @@ dynamics:
   proportional_velocity_controller:
     module: 'hybrid_automaton.scripts.dynamics'
     function: proportional_velocity_controller
+    output: 
+      velocity: 'm/s' 
+      yaw_rate: 'rad/s'  
 
   proportional_yaw_rate_controller:
     module: 'hybrid_automaton.scripts.dynamics'
     function: proportional_yaw_rate_controller
+    output: 
+      velocity: 'm/s' 
+      yaw_rate: 'rad/s'
 
   no_op_controller:
     module: 'hybrid_automaton.scripts.dynamics'
     function: no_op_controller
+    output:
+      velocity: 'm/s' 
+      yaw_rate: 'rad/s'
 
 # ============================================================================
 # Modes (Q)

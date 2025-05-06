@@ -10,10 +10,10 @@
 
 unique_identifier_msgs/UUID automaton_uuid  # Unique identifier for the automaton instance
 
-hybrid_automaton_interfaces/Mode mode       # Current system mode of the automaton
+string mode       # Current system mode of the automaton
 string status                                # Status string (e.g., "ACTIVE", "COMPLETE", etc.)
 
-hybrid_automaton_interfaces/Dynamics dynamics             # Current system dynamics
+hybrid_automaton_interfaces/DynamicParameter dynamics             # Current system dynamics
 builtin_interfaces/Duration time_since_last_transition # Time since the last mode transition
 hybrid_automaton_interfaces/TransitionPending transition_pending  # Indicates if a transition is pending
 

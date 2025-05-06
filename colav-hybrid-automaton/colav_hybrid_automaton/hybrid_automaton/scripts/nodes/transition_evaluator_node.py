@@ -54,11 +54,6 @@ from hybrid_automaton.utils import (
     create_state_subscriptions
 )
 
-from colav_interfaces.msg import (
-    AgentUpdate,
-    ObstaclesUpdate,
-    UnsafeSet,
-)
 from hybrid_automaton_interfaces.msg import (
     Transition,
     TransitionPending,
@@ -383,15 +378,10 @@ class TransitionEvaluatorNode(Node):
         self.transition_eval_pub.publish(transition_eval)
         self.transition_pending_pub.publish(transition_pending)
 
-from rclpy.executors import MultiThreadedExecutor
-
 def main(args=None):
     rclpy.init(args=args)
     node = TransitionEvaluatorNode()
     try:
-        # executor = MultiThreadedExecutor()
-        # executor.add_node(node)
-        # executor.spin()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass

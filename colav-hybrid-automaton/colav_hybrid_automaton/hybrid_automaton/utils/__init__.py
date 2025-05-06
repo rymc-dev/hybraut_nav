@@ -3,7 +3,7 @@
 # NOTE: DO NOT MODIFY framework utils or imports below
 
 from .framework.validate_timestamps import validate_timestamps_within_tolerance
-from .framework.ros_timer_utils import get_current_ros_time
+from .framework.ros_timer_utils import get_current_ros_time, subtract_time
 from .framework.node_utils import create_cli
 from .framework.config_duct import process_automaton_config
 from .framework.yaml_utils import load_yml

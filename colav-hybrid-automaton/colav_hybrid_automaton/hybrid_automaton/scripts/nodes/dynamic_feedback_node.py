@@ -44,23 +44,11 @@ Date: April 17, 2025
 
 
 from hybrid_automaton.config.qos_config import QOS_PROFILE
-from hybrid_automaton.scripts.dynamics import (
-    dynamics_CRUISE,
-    dynamics_T2LOS,
-    dynamics_FALLBACK,
-    dynamics_WAYPOINT_REACHED
-)
 from hybrid_automaton.utils import (
     get_current_ros_time, 
     process_automaton_config, 
     load_yml,
     create_state_subscriptions
-)
-from colav_interfaces.msg import (
-    AgentUpdate,
-    Waypoints,
-    DynamicsUpdate,
-    Dynamics
 )
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -72,8 +60,11 @@ import sys
 from ament_index_python.packages import get_package_share_directory
 from rcl_interfaces.msg import ParameterDescriptor
 from functools import partial
-
+import uuid
+from unique_identifier_msgs.msg import UUID
 import importlib
+
+from hybrid_automaton_interfaces.msg import Dynamics
 
 # Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
 # allowing imports to work correctly without relying on the build process.
@@ -141,7 +132,7 @@ class DynamicsNode(Node):
         )
 
         self._dynamics_pub = self.create_publisher(
-            msg_type=DynamicsUpdate,
+            msg_type=Dynamics,
             topic='/hybrid_automaton/dynamics',
             qos_profile=QOS_PROFILE
         )
@@ -171,7 +162,7 @@ class DynamicsNode(Node):
 
 
         # Internal State
-        self._control_mode = None
+        self._current_mode = None
 
         self.get_logger().info(f"{namespace}/{name} node initialised!")
 
@@ -205,11 +196,40 @@ class DynamicsNode(Node):
 
     def _update_dynamics_callback(self):
         """updating dynamics"""
-        dynamics_update = DynamicsUpdate()
+        dynamics_update = Dynamics()
+        ros_stamp = get_current_ros_time()
+        dynamics_update.stamp = ros_stamp
+        generated_uuid = uuid.uuid4()
+
+        ros_uuid = UUID()
+        ros_uuid.uuid = list(generated_uuid.bytes)
+
+        dynamics_update.dynamic_uuid = ros_uuid
+
+        def publish_error(mode:str, message: str):
+            dynamics_update.success = False
+            dynamics_update.error_message = message
+            dynamics_update.stamp = ros_stamp
+            self._dynamics_pub.publish(dynamics_update)
+
         try:
-            if self._control_mode not in list(self._MODES.values()):
-                raise ValueError(
-                    f'control mode received: {self._control_mode} not in MODES')
+            try: 
+                current_mode = self._current_mode.lower()
+            except Exception as e: 
+                raise ValueError('Hybrid Automaton Control Mode not received /hybrid_automaton/mode')
+            
+            if current_mode not in [mode for mode in self.config['modes']]:
+                publish_error(current_mode, f"Current Hybrid Automaton Mode published to /hybrid_automaton/mode: '{current_mode}' is not among Hybrid Automaton Mode configuration: '{[mode for mode in self.config['modes']]}'")
+                return
+
+            dynamics_update.mode = current_mode
+            self.config['dynamics'][self.config['modes'][current_mode]['dynamics']]
+            dynamics_update.dynamic_parameters.controller_name = self.config['modes'][current_mode]['dynamics']
+            dynamics_update.dynamic_parameters.dynamic_name = list(self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]['output'].keys())
+            dynamics_update.dynamic_parameters.dynamic_units = list(self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]['output'].values())
+
+            dynamic_function =  self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]['function']
+            dynamics_update.dynamic_parameters.dynamic_value = dynamic_function()
 
             if self._control_mode == self._MODES[1]:
                 # CRUISE DYNAMICS
@@ -239,10 +259,9 @@ class DynamicsNode(Node):
             dynamics_update.dynamics = dynamics
             dynamics_update.error = False
         except Exception as e:
-            dynamics_update.error = True
-            dynamics_update.error_message = f"Error occured: {str(e)}"
-
-        dynamics_update.timestamp = get_current_ros_time()
+            publish_error(mode='', message=str(f"Exception occured: {e}"))
+            return
+        
         self._dynamics_pub.publish(dynamics_update)
 
 
