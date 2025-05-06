@@ -68,6 +68,9 @@ from rclpy.node import Node
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
 from rcl_interfaces.msg import ParameterValue
+import uuid
+from unique_identifier_msgs.msg import UUID
+
 
 import importlib
 import yaml
@@ -107,22 +110,13 @@ class GuardsNode(Node):
         """
         Initializes the guards_node
         """
+        
         super().__init__(name, namespace=namespace)
 
-        # Declare the parameter correctly
         self.declare_parameter(
             'hybrid_automaton_config_path',
             value=default_hybrid_automaton_config,
             descriptor=ParameterDescriptor(description='Path to the Hybrid Automaton configuration file')
-        )
-        # declare parameter for transition evaluation hz
-        self.declare_parameter(
-            'transition_evaluation_hz',
-            value=ParameterValue.double_value,
-            descriptor=ParameterDescriptor(description='transition evaluation hz for guard evaluations')
-        )
-        self.declare_parameter(
-            ''
         )
 
         # Load automaton configuration
@@ -131,6 +125,16 @@ class GuardsNode(Node):
         )
         self.config = process_automaton_config(self.config)
 
+        # Declare the parameter correctly
+
+        from rcl_interfaces.msg import Parameter
+        # declare parameter for transition evaluation hz
+        self.declare_parameter(
+            'transition_evaluation_hz',
+            value=self.config['params']['transition_evaluation_hz'],
+            descriptor=ParameterDescriptor(description='transition evaluation hz for guard evaluations')
+        )
+
         # Publishers
         self.transition_pending_pub = self.create_publisher(
             topic="/hybrid_automaton/transition_pending",
@@ -138,8 +142,8 @@ class GuardsNode(Node):
             qos_profile=QOS_PROFILE
         )
 
-        self.guards_eval_pub = self.create_publisher(
-            topic="/hybrid_automaton/guards",
+        self.transition_eval_pub = self.create_publisher(
+            topic="/hybrid_automaton/transitions",
             msg_type=Transition,
             qos_profile=QOS_PROFILE
         )
@@ -166,16 +170,22 @@ class GuardsNode(Node):
             qos_profile=QOS_PROFILE
         )   
 
-        """create ros2 state subscriptions"""
+        # TODO: NEED TO MAKE STATES APART OF THERE PYTHON DICTS SO THAT I CAN ACCESS THE VALUES LOCALLY AND PUBLISH THE DATA
+
+        def state_callback(msg, key:str): 
+            self.config['states'][key].__setitem__('state', msg)
+
+        """create ros2 state subscriptions""" # TODO: FOR STATES NEED TO ADD TIMEOUT EXCEPTIONS BASED ON PARAMS
         for key, value in self.config['states'].items():
-            self.__setattr__(f"{key}_buffer", deque(maxlen=10))
+            self.config['states'][key]['state'] = None
             state_sub = self.create_subscription(
-                topic=f"/hybrid_automaton/{key}",
+                topic=value['topic'],
                 msg_type=value['type'],
-                callback=partial(self._state_callback, buffer_name=f"{key}_buffer"),
+                callback = partial(state_callback, key=key),
                 qos_profile=QOS_PROFILE
             )
-            self.config['states'][key]['topic'] = state_sub
+            self.config['states'][key]['sub'] = state_sub
+            del self.config['states'][key]['topic']
             del self.config['states'][key]['type']
 
         # Services
@@ -202,25 +212,25 @@ class GuardsNode(Node):
 
     """callbacks"""
     def _mode_callback(self, msg: String):
-        self._current_control_mode = msg.data
-        self.get_logger().debug("Received control mode: %s", msg.data)
+        self._current_mode = msg.data
+        self.get_logger().debug(f"Received control mode: {self._current_mode}")
 
     def _transition_pending_callback(self, msg: TransitionPending):
         self.transition_pending = msg
         self.get_logger().debug("Transition pending status received.")
 
-    def _state_callback(self, msg, buffer_name: str):
-        """a generaised state callback for state buffers"""
-        buffer: deque = self.__getattribute__(buffer_name)
-        buffer.append(msg)
-        self.get_logger().debug(f"Updated state buffer for {buffer_name}")
-
+    # def _buffer_callback(self, msg, key: str):
+    #     """a generased buffer callback"""
+    # def _state_callback(self, msg, buffer_name: str):
+    #     """a generaised state callback for state buffers"""
+    #     buffer: deque = self.__getattribute__(buffer_name)
+    #     buffer.append(msg)
+    #     self.get_logger().debug(f"Updated state buffer for {buffer_name}")
 
     def _start_guards_evaluation_callback(
         self,
         request: Trigger.Request,
-        response: Trigger.Response,
-        transition_eval_hz: float = 0.1
+        response: Trigger.Response
     ) -> Trigger.Response:
         """
         Callback to start guard evaluation:
@@ -231,13 +241,13 @@ class GuardsNode(Node):
         try:
             # Log the initialization start
             self.get_logger().info('Initializing guards evaluation components...')
-
+            transition_evaluation_hz=self.get_parameter('transition_evaluation_hz').value
             self.eval_timer = self.create_timer(
-                timer_period_sec=1.0/transition_eval_hz,
+                1.0/transition_evaluation_hz,
                 callback=self._eval_transitions
             )
             self.get_logger().debug(
-                f"transition_eval_timer started, evaluating at '{transition_eval_hz}hz'."
+                f"transition_eval_timer started, evaluating at '{transition_evaluation_hz}hz'."
             )
 
             # Update response on success
@@ -308,9 +318,10 @@ class GuardsNode(Node):
     def _validate_state_updates(self, mode: str) -> bool:
         """Ensure all necessary state variables are available for the given mode."""
         required_states = [
-            self._current_agent_state,
-            self._current_obstacles_state,
-            self._current_unsafe_set,
+            
+            self.agent_state_buffer,
+            self.obstacles_state_buffer,
+            self.unsafe_set_state_buffer,
             self._current_waypoints,
             self._current_waypoint,
         ]
@@ -319,117 +330,77 @@ class GuardsNode(Node):
         return True
 
     def _eval_transitions(self):
-        """Evaluate transitions based on the control mode."""
-        guards_status = GuardsStatus()
-        current_time = get_current_ros_time()
+        """Evaluate transitions based on the control mode.""" 
+        # 1. Get metadata for transition
+        
+        ros_stamp = get_current_ros_time()
+        generated_uuid = uuid.uuid4()
 
+        ros_uuid = UUID()
+        ros_uuid.uuid = list(generated_uuid.bytes)
+
+        transition_eval = Transition(stamp=ros_stamp, transition_uuid=ros_uuid)
+        transition_pending = TransitionPending(stamp=ros_stamp, transition_uuid=ros_uuid)
+        
         def publish_error(mode:str, message: str):
-            guards_status.error = True
-            guards_status.error_message = message
-            guards_status.timestamp = current_time
-            self.guards_eval_pub.publish(guards_status)
+            transition_eval.success = False
+            transition_eval.error_message = message
+            transition_eval.stamp = ros_stamp
+            self.transition_eval_pub.publish(transition_eval)
 
         try:
-            mode = self._current_control_mode
+            try: 
+                current_mode = self._current_mode.lower()
+            except Exception as e: 
+                raise ValueError('Hybrid Automaton Control Mode not received /hybrid_automaton/mode')
 
-            if mode is None:
+            # validate state data for this transition evaluation
+            if current_mode is None:
                 publish_error("NULL", "Hybrid Automaton Mode has not been published to /hybrid_automaton/mode.")
                 return
 
-            if mode not in [mode['name'] for mode in self.config['modes']]:
-                publish_error(mode, f"Current Hybrid Automaton Mode published to /hybrid_automaton/mode: '{mode}' is not among Hybrid Automaton Mode configuration: '{[mode['name'] for mode in self.config['modes']]}'")
+            if current_mode not in [mode for mode in self.config['modes']]:
+                publish_error(current_mode, f"Current Hybrid Automaton Mode published to /hybrid_automaton/mode: '{current_mode}' is not among Hybrid Automaton Mode configuration: '{[mode for mode in self.config['modes']]}'")
                 return
             
-            # Validate_state_updates should raise an exception
-            if self._validate_state_updates(mode):
-                publish_error(mode, f"")
-                return
+            # Make transition evaluations 
+            transition_eval.mode = current_mode
 
-            guards_status.control_mode = mode
-
+            transitions = self.config['modes'][transition_eval.mode]['transitions']
+            transition_names = list(transitions.keys()) if len(transitions) > 0 else []
 
 
-        #     # Common tolerance used across all guards
-        #     common_tolerance = Duration(sec=3000)
+            transition_eval.transition_names = transition_names    
+            values = []
+            for transition in transition_names:
+                guard_func = self.config['guards'][(self.config['transitions'][transition]['guard'])]['function']
+                state_inputs = [self.config['states'][state]['state'] for state in (self.config['guards'][(self.config['transitions'][transition]['guard'])]['state_inputs'])]
+                value:bool = guard_func(*state_inputs)
+                values.append(value)
 
-        #     if mode_name == "CRUISE":
-        #         guards_status.guard_names = [
-        #             "cruise_to_t2los_1",
-        #             "cruise_to_t2los_2",
-        #             "cruise_to_fb",
-        #             "cruise_to_waypoint_reached"
-        #         ]
-        #         guards_status.cruise_to_t2los_1 = guard_CRUISE_to_T2LOS_1(
-        #             agent_state=self._current_agent_state,
-        #             obstacles_state=self._current_obstacles_state,
-        #             unsafe_set=self._current_unsafe_set,
-        #             waypoint=self._current_waypoint,
-        #             dsf=80,
-        #             tolerance=common_tolerance
-        #         )
-        #         guards_status.cruise_to_t2los_2 = guard_CRUISE_to_T2LOS_2(
-        #             agent_state=self._current_agent_state,
-        #             current_waypoint=self._current_waypoint,
-        #             heading_error_tolerance=0.1,
-        #             tolerance=common_tolerance
-        #         )
-        #         guards_status.cruise_to_fb = guard_CRUISE_to_FB(
-        #             agent_state=self._current_agent_state,
-        #             obstacles_state=self._current_obstacles_state,
-        #             unsafe_set=self._current_unsafe_set,
-        #             tolerance=common_tolerance
-        #         )
-        #         guards_status.cruise_to_waypoint_reached = guard_CRUISE_to_WAYPOINT_REACHED(
-        #             agent_state=self._current_agent_state,
-        #             current_waypoint=self._current_waypoint,
-        #             tolerance=common_tolerance
-        #         )
+            transition_eval.transition_values = values
+            transition_eval.success = True
 
-        #     elif mode_name == "T2LOS":
-        #         guards_status.guard_names = [
-        #             "t2los_to_cruise",
-        #             "t2los_to_fb",
-        #             "t2los_to_waypoint_reached"
-        #         ]
-        #         guards_status.t2los_to_cruise = guard_T2LOS_to_CRUISE(
-        #             agent_state=self._current_agent_state,
-        #             current_waypoint=self._current_waypoint,
-        #             heading_error_tolerance=0.1,
-        #             tolerance=common_tolerance
-        #         )
-        #         guards_status.t2los_to_fb = guard_T2LOS_to_FB(
-        #             agent_state=self._current_agent_state,
-        #             obstacles_state=self._current_obstacles_state,
-        #             unsafe_set=self._current_unsafe_set,
-        #             tolerance=common_tolerance
-        #         )
-        #         guards_status.t2los_to_waypoint_reached = guard_T2LOS_to_WAYPOINT_REACHED(
-        #             agent_state=self._current_agent_state,
-        #             current_waypoint=self._current_waypoint,
-        #             tolerance=common_tolerance
-        #         )
-
-        #     elif mode_name == "FALLBACK":
-        #         # Placeholder for future logic
-        #         pass
-
-        #     elif mode_name == "WAYPOINT_REACHED":
-        #         guards_status.guard_names = ["waypoint_reached_to_cruise"]
-        #         guards_status.waypoint_reached_to_cruise = guard_WAYPOINT_REACHED_to_CRUISE(
-        #             waypoints=self._current_waypoints
-        #         )
+            # if any transitions for current mode evlauted as true
+            if True in values: 
+                transition_pending.transition_pending = True
 
         except Exception as e:
-            publish_error(str(e))
+            publish_error(mode=self._current_mode, message=str(e))
             return
+        
+        self.transition_eval_pub.publish(transition_eval)
+        self.transition_pending_pub.publish(transition_pending)
 
-        guards_status.timestamp = get_current_ros_time()
-        self.guards_eval_pub.publish(guards_status)
+from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
     node = GuardsNode()
     try:
+        # executor = MultiThreadedExecutor()
+        # executor.add_node(node)
+        # executor.spin()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass

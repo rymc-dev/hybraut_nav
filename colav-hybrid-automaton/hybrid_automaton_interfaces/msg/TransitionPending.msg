@@ -8,4 +8,5 @@
 
 # UUID uniquely identifying this dynamic update instance
 unique_identifier_msgs/UUID transition_uuid
+builtin_interfaces/Time stamp
 bool transition_pending

@@ -24,8 +24,8 @@ Tp = ((1 * np.pi) / max_yaw_rate)
 
 def is_los_clear_to_waypoint(agent_state: AgentUpdate,
                             obstacles_state: ObstaclesUpdate,
-                            unsafe_set: UnsafeSet,
-                            waypoint: Waypoint,
+                            unsafe_set_state: UnsafeSet,
+                            waypoints_state: Waypoints,
                             dsf: float = DSF,
                             tolerance: Duration = Duration(sec=1)) -> bool:
     """
@@ -50,22 +50,42 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
     """
 
     # Validate timestamps of sync messages ensuring they are within tolerance
-    system_timestamp = get_current_ros_time()
-    validate_timestamps_within_tolerance(
-        system_timestamp, agent_state.header.stamp, tolerance)
-    validate_timestamps_within_tolerance(
-        system_timestamp, obstacles_state.header.stamp, tolerance)
-    validate_timestamps_within_tolerance(
-        system_timestamp, unsafe_set.header.stamp, tolerance)
+    # system_timestamp = get_current_ros_time()
+    # validate_timestamps_within_tolerance(
+    #     system_timestamp, agent_state.header.stamp, tolerance)
+    # validate_timestamps_within_tolerance(
+    #     system_timestamp, obstacles_state.header.stamp, tolerance)
+    # validate_timestamps_within_tolerance(
+    #     system_timestamp, unsafe_set.header.stamp, tolerance)
 
-    agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
-    goal_position = (waypoint.position.x, waypoint.position.y)
-    los_line = LineString([agent_position, goal_position])
+    if agent_state is None or \
+        obstacles_state is None or \
+            unsafe_set_state is None or \
+                waypoints_state is None: 
+        return False
+
+    agent_position = None
+    goal_position = None
+    los_line = None
+
+    if waypoints_state is not None: 
+        if len(waypoints_state.waypoints) > 0: 
+            current_waypoint = waypoints_state.waypoints[0]
+
+    if agent_position is not None:
+        agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
+
+    if current_waypoint is not None:
+        goal_position = (current_waypoint.position.x, current_waypoint.position.y)
+
+    if agent_position is not None and goal_position is not None:
+        los_line = LineString([agent_position, goal_position])
 
     # Create unsafe polygon from vertex data (assumes [x1, y1, x2, y2, ...])
-    unsafe_vertices = unsafe_set.vertices.data
-    unsafe_polygon = Polygon([(unsafe_vertices[i], unsafe_vertices[i + 1])
-                              for i in range(0, len(unsafe_vertices), 2)])
+    if unsafe_set_state is not None:
+        unsafe_vertices = unsafe_set_state.vertices.data
+        unsafe_polygon = Polygon([(unsafe_vertices[i], unsafe_vertices[i + 1])
+                                for i in range(0, len(unsafe_vertices), 2)])
 
     # Check for LOS intersection with unsafe polygon.
     if los_line.intersects(unsafe_polygon):
@@ -112,6 +132,10 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     """
     # Calculate the heading error between the agent's current heading and the
     # direction to the waypoint.
+    if agent_state is None or \
+        current_waypoint is None: 
+        return False
+    
     waypoint_heading_error = delta_heading(
         x_a=agent_state.pose.position.x,
         y_a=agent_state.pose.position.y,
@@ -152,27 +176,27 @@ def is_unsafe_conditions(agent_state: AgentUpdate,
         TimeoutError: If evaluation takes too long.
         ValueError: If input values are invalid or inconsistent.
     """
-    if tolerance is None:
-        tolerance = Duration(sec=1, nanosec=0)
+    
 
     # Check if unsafe set data exists and apply collision conditions.
-    if unsafe_set.vertices.data:
-        if is_inside_unsafe_set(
-                agent_state=agent_state,
-                unsafe_set=unsafe_set):
-            return True
+    if unsafe_set is not None:
+        if unsafe_set.vertices.data:
+            if is_inside_unsafe_set(
+                    agent_state=agent_state,
+                    unsafe_set=unsafe_set):
+                return True
 
-        if is_imminent_collision(
-                agent_state=agent_state,
-                unsafe_set=unsafe_set):
-            return True
+            if is_imminent_collision(
+                    agent_state=agent_state,
+                    unsafe_set=unsafe_set):
+                return True
 
     return False
 
 
 def is_waypoint_reached(
     agent_state: AgentUpdate,
-    current_waypoint: Waypoint,
+    waypoints_state: Waypoints,
     tolerance: Duration = Duration(
         sec=1)) -> bool:
     """
@@ -204,14 +228,17 @@ def is_waypoint_reached(
     #     raise ValueError('Timeout')
 
     # Use the imported euclidean_distance function.
-    agent_coords = [agent_state.pose.position.x, agent_state.pose.position.y]
-    waypoint_coords = [
-        current_waypoint.position.x,
-        current_waypoint.position.y]
-    if euclidean_distance(
-            agent_coords,
-            waypoint_coords) < current_waypoint.acceptance_radius:
-        return True
+    if agent_state is not None:
+        agent_coords = [agent_state.pose.position.x, agent_state.pose.position.y]
+    if waypoints_state is not None:
+        current_waypoint = waypoints_state.waypoints[0]
+        waypoint_coords = [
+            current_waypoint.position.x,
+            current_waypoint.position.y]
+        if euclidean_distance(
+                agent_coords,
+                waypoint_coords) < current_waypoint.acceptance_radius:
+            return True
 
     return False
 
