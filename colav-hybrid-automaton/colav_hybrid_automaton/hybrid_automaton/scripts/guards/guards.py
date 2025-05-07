@@ -68,24 +68,21 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
     goal_position = None
     los_line = None
 
-    if waypoints_state is not None: 
-        if len(waypoints_state.waypoints) > 0: 
-            current_waypoint = waypoints_state.waypoints[0]
+    if len(waypoints_state.waypoints) > 0: 
+        current_waypoint = waypoints_state.waypoints[0]
+    else:
+        return False
 
-    if agent_position is not None:
-        agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
+    agent_position = (agent_state.pose.position.x, agent_state.pose.position.y)
 
-    if current_waypoint is not None:
-        goal_position = (current_waypoint.position.x, current_waypoint.position.y)
+    goal_position = (current_waypoint.position.x, current_waypoint.position.y)
 
-    if agent_position is not None and goal_position is not None:
-        los_line = LineString([agent_position, goal_position])
+    los_line = LineString([agent_position, goal_position])
 
     # Create unsafe polygon from vertex data (assumes [x1, y1, x2, y2, ...])
-    if unsafe_set_state is not None:
-        unsafe_vertices = unsafe_set_state.vertices.data
-        unsafe_polygon = Polygon([(unsafe_vertices[i], unsafe_vertices[i + 1])
-                                for i in range(0, len(unsafe_vertices), 2)])
+    unsafe_vertices = unsafe_set_state.vertices.data
+    unsafe_polygon = Polygon([(unsafe_vertices[i], unsafe_vertices[i + 1])
+                            for i in range(0, len(unsafe_vertices), 2)])
 
     # Check for LOS intersection with unsafe polygon.
     if los_line.intersects(unsafe_polygon):
@@ -108,7 +105,7 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
 
 
 def is_heading_within_tolerance(agent_state: AgentUpdate,
-                            current_waypoint: Waypoint,
+                            waypoints: Waypoints,
                             heading_error_tolerance: float = 0.1,
                             tolerance: Duration = Duration(sec=1)) -> bool:
     """
@@ -133,7 +130,12 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     # Calculate the heading error between the agent's current heading and the
     # direction to the waypoint.
     if agent_state is None or \
-        current_waypoint is None: 
+        waypoints is None: 
+        return False
+    
+    if len(waypoints.waypoints) > 0: 
+        current_waypoint = waypoints.waypoints[0]
+    else:
         return False
     
     waypoint_heading_error = delta_heading(
@@ -150,7 +152,7 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     )
 
     # If the heading error is within the allowed tolerance, return True.
-    return bool(waypoint_heading_error < heading_error_tolerance)
+    return bool(waypoint_heading_error > heading_error_tolerance)
 
 
 def is_unsafe_conditions(agent_state: AgentUpdate,

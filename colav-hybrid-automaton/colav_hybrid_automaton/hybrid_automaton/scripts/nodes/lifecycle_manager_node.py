@@ -136,6 +136,9 @@ class LifeCycleManager(Node):
         transition_evaluator_cli = self.create_client(srv_type=Trigger, srv_name="/hybrid_automaton/start_transition_eval")
         while not transition_evaluator_cli.wait_for_service(timeout_sec=2.0):
             raise TimeoutError("timeout occured waiting for '/hybrid_automaton/start_transition_eval'")
+        transition_engine_cli = self.create_client(srv_type=Trigger, srv_name='/hybrid_automaton/start_transition_engine')
+        while not transition_engine_cli.wait_for_service(timeout_sec=2.0):
+            raise TimeoutError("timeout occured waiting for '/hybrid_automaton/start_transition_engine'")
 
         # wait for future
         future = dynamics_cli.call_async(Trigger.Request())
@@ -154,9 +157,19 @@ class LifeCycleManager(Node):
             rclpy.spin_until_future_complete(self, future=future, timeout_sec=2.0)
         except Exception as e: 
             raise e
-
+        
         if not future.done() or future.result().success is False:
             raise Exception(f"Exception occured while waiting for transition_evaluator")
+        
+        future = None
+        future = transition_engine_cli.call_async(Trigger.Request())
+        try: 
+            rclpy.spin_until_future_complete(self, future=future, timeout_sec=2.0)
+        except Exception as e: 
+            raise e
+        
+        if not future.done() or future.result().success is False:
+            raise Exception(f"Exception occured while wainting for transition_engine")
 
         # when the hybrid automaton components have been started. start the feedback callback.
         # wait until mission is completed.
@@ -182,7 +195,6 @@ class LifeCycleManager(Node):
                     # Should use invariants here to check if we are in final mode and should finish the hybrid automaton.
                     self.get_logger().info(f"In final mode: {self.mode.data}")
             feedback = HybridAutomaton.Feedback()
-            self.get_logger().info('feedback....')
             feedback.feedback.automaton_uuid = self.ros_automaton_uuid
             feedback.feedback.mode = self.mode.data if self.mode is not None else ''
             feedback.feedback.status = self.status if self.status is not None else ''

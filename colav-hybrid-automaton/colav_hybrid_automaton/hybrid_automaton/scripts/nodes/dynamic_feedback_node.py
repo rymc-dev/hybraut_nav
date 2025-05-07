@@ -96,7 +96,7 @@ def load_module_attribute(module_path: str, attr_name: str):
     except (ImportError, AttributeError) as e:
         raise ImportError(f"Failed to import '{attr_name}' from '{module_path}': {e}")
 
-class DynamicsNode(Node):
+class DynamicFeedbackNode(Node):
     """
     DynamicsNode is an rclpy node that implemenst real-time dynamics evaluations
     for the COLAV Hybrid Automaton specific to the control mode we are in.
@@ -110,7 +110,7 @@ class DynamicsNode(Node):
     def __init__(
         self,
         namespace: str = "hybrid_automaton",
-        name: str = "dynamics_node"
+        name: str = "dynamic_feedback"
     ):
         """
         Initializes the dynamics_node
@@ -172,8 +172,6 @@ class DynamicsNode(Node):
         # Internal State
         self._current_mode = None
         self._agent_state = None
-
-        self.get_logger().info(f"{namespace}/{name} node initialised!")
 
     def _start_dynamics_evaluation_callback(
             self,
@@ -261,7 +259,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = None
     try:
-        node = DynamicsNode()
+        node = DynamicFeedbackNode()
         executor = MultiThreadedExecutor()  # Create a multi-threaded executor
         executor.add_node(node)  # Add your node to the executor
         executor.spin()  # Spin the executor instead of rclpy.spin

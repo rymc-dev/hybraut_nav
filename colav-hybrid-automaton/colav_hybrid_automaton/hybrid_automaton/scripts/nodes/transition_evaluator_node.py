@@ -107,7 +107,7 @@ class TransitionEvaluatorNode(Node):
     'guard_evaluations' topic.
     """
 
-    def __init__(self, namespace: str = "hybrid_automaton", name: str = "guards_node"):
+    def __init__(self, namespace: str = "hybrid_automaton", name: str = "transition_evaluator"):
         """
         Initializes the guards_node
         """
@@ -191,10 +191,6 @@ class TransitionEvaluatorNode(Node):
         self._current_mode = None
         self._guards_status = None
         self._resets_status = None
-
-        # Log initialization
-        self.get_logger().info(f"{namespace}/{name} node initialized.")
-        self.get_logger().debug("Publishers, subscribers, and services are ready.")
 
     """callbacks"""
     def _mode_callback(self, msg: String):

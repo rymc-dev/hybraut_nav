@@ -6,33 +6,33 @@ pkg_name = 'colav_hybrid_automaton'
 
 def generate_launch_description():
 
-    guards_node = Node(
+    dynamic_feedback_node = Node(
         package=pkg_name,
-        executable='guards_node',
+        executable='dynamic_feedback_node',
         output='screen',
     )
 
-    dynamics_node =  Node(
+    transition_evaluation_node =  Node(
         package=pkg_name,
-        executable='dynamics_node',
+        executable='transition_evaluation_node',
         output='screen',
     )
 
-    resets_node = Node(
+    transition_engine_node = Node(
         package=pkg_name,
-        executable='resets_node',
+        executable='transition_engine_node',
         output='screen'
     )
     
-    chart_node = Node(
+    lifecycle_manager_node = Node(
         package=pkg_name,
-        executable='chart_node',
+        executable='lifecycle_manager_node',
         output='screen'
     )
 
     return LaunchDescription([
-        guards_node,
-        dynamics_node,
-        resets_node,
-        chart_node
+        dynamic_feedback_node,
+        transition_evaluation_node,
+        transition_engine_node,
+        lifecycle_manager_node
     ])

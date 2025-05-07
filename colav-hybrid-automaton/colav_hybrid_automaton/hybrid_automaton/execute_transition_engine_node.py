@@ -1,26 +1,26 @@
 #!/usr/bin/python3
 """
-script for running the colav_hybrid_eval GuardsNode
+script for running the hybrid_automaton chart node
 
-Version: 0.0.1
+version 0.0.1
 Author: Ryan McKee
-Date: April 17, 2025
+Date: April 24, 2025
 """
 
 import rclpy
-from hybrid_automaton.scripts.nodes import GuardsNode
+from hybrid_automaton.scripts.nodes import TransitionEngineNode
 
 
 def main(args=None):
     rclpy.init()
-    node = GuardsNode()
+    node = TransitionEngineNode()
 
-    try:
-        rclpy.spin(node)
+    try: 
+        rclpy.spin(node=node)
     except KeyboardInterrupt:
         print("KeyboardInterrupt received. Shutting down node.")
     except Exception as e:
-        print(f"Exception occurred: {e}")
+        print (f"Exception occured: {e}")
     finally:
         node.destroy_node()
         rclpy.shutdown()

@@ -26,10 +26,10 @@ setup(
     tests_require=['pytest', 'launch_testing', 'parameterized'],
     entry_points={
         'console_scripts': [
-            "guards_node = hybrid_automaton.execute_guards_node:main",
-            "dynamics_node = hybrid_automaton.execute_dynamics_node:main",
-            "resets_node = hybrid_automaton.execute_resets_node:main",
-            "chart_node = hybrid_automaton.execute_chart_node:main"
+            "dynamic_feedback_node = hybrid_automaton.execute_dynamics_manager_node:main",
+            "lifecycle_manager_node = hybrid_automaton.execute_lifecycle_manager_node:main",
+            "transition_engine_node = hybrid_automaton.execute_transition_engine_node:main",
+            "transition_evaluation_node = hybrid_automaton.execute_transition_evaluation_node:main",
         ],
     },
 )

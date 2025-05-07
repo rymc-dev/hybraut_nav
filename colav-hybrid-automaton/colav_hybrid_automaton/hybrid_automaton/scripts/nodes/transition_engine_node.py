@@ -43,7 +43,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
 
-class TransitionEngine(Node):
+class TransitionEngineNode(Node):
     """
     transition engine manages the current mode, evaluating transitions in
     real time and performing transitions and resets on states based on 
@@ -53,7 +53,7 @@ class TransitionEngine(Node):
     def __init__(
         self,
         namespace: str = "hybrid_automaton",
-        name: str = "chart"
+        name: str = "transition_engine"
     ):
         """
         Initialize the COLAV Hybrid Automaton Chart node.
@@ -117,7 +117,6 @@ class TransitionEngine(Node):
             '/hybrid_automaton/stop_transition_engine',
             self._stop_hybrid_automaton_callback
         )
-        self.get_logger().info(f"{namespace}/{name} node initialised!")
 
     def _start_transition_engine(
             self,
@@ -147,20 +146,49 @@ class TransitionEngine(Node):
         Evaluates transitions between different modes based on guard conditions.
         """
         # Prepare request for evaluating transitions
-        if self.transition_pending is None:
+        if not isinstance(self.transition_pending, TransitionPending):
             return
         
-        if self.transition_pending.transition_pending:
-            self.get_logger().info('transition pending')
-            mode = self.mode
+        if self.transition_pending.transition_pending: # transition is pending
+            mode = self.mode.lower()
             transition_eval:Transition = self.transition_eval
+            if transition_eval.success == False: 
+                self.get_logger().error(f"Something went wrong with transition evaluation: {transition_eval.error_message}")
+                return
             pending_transitions = [
                 transition_name
                 for idx, transition_name in enumerate(transition_eval.transition_names)
                 if transition_eval.transition_values[idx] is True
             ]
-            [self.config['modes'][mode]['transitions'][pending_transition]['priority'] for pending_transition in pending_transitions]
+            transition = None
+            if len(pending_transitions) == 0:
+                # would need to set transition pending to False in this case via publisher
+                return
+            elif len(pending_transitions) == 1: # returns the first transition in the list as the only transition
+                transition = pending_transitions[0]
+            elif len(pending_transitions) > 1: # finds highest priority transition in case multiple evalute as true
+                highest_priority = -1
+                for transition_name in pending_transitions:
+                    curr_priority = self.config['modes'][mode]['transitions'][transition_name]['priority']
+                    if highest_priority == -1 or curr_priority < highest_priority:
+                        transition = transition_name
+                        highest_priority = curr_priority
 
+            
+            transition = "cruise_to_t2los_2"
+            _, _, transition_to_raw = transition.partition("to_")
+
+            # Split at the last underscore
+            base, _, maybe_num = transition_to_raw.rpartition('_')
+
+            if maybe_num.isdigit() and base in list(self.config['modes'].keys()):
+                transition_to = base
+            else:
+                transition_to = transition_to_raw
+            # check if reset if reset then make request to reset service to update internal states
+            self.mode_publisher.publish(String(data=transition_to))
+
+        
         
 
         # self._ha_pubs['mode'].publish(
@@ -303,7 +331,7 @@ from rclpy.executors import SingleThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
-    node = TransitionEngine()
+    node = TransitionEngineNode()
 
     try:
         rclpy.spin(node)
