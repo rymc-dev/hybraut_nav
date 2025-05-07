@@ -177,12 +177,12 @@ class TransitionEvaluatorNode(Node):
         # Services
         self.create_service(
             srv_type=Trigger,
-            srv_name="/hybrid_automaton/start_guards_eval",
+            srv_name="/hybrid_automaton/start_transition_eval",
             callback=self._start_guards_evaluation_callback
         )
         self.create_service(
             srv_type=Trigger,
-            srv_name="/hybrid_automaton/stop_guards_eval",
+            srv_name="/hybrid_automaton/stop_transition_eval",
             callback=self._stop_guards_evaluation_callback
         )
 
@@ -281,7 +281,7 @@ class TransitionEvaluatorNode(Node):
             response.message = 'Guards evaluation stopped successfully'
             self.get_logger().info(response.message)
         except Exception as e:
-            self.get_logger().exception('Error in stop callback')
+            self.get_logger().error('Error in stop callback')
             response.success = False
             response.message = str(e)
         return response

@@ -273,5 +273,5 @@ init:
 # Parameters
 # ============================================================================
 params:
-  transition_evaluation_hz: 1.0
+  transition_evaluation_hz: 10
   transition_evaluation_timeout: 1.0

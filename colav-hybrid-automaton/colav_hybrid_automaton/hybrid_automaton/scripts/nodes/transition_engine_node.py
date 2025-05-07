@@ -38,104 +38,23 @@ from colav_interfaces.srv import StartHybridAutomaton
 from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, DynamicsUpdate
 import rclpy
 from rclpy.node import Node
+from rcl_interfaces.msg import ParameterDescriptor
+from hybrid_automaton.utils import load_yml, process_automaton_config
+from hybrid_automaton_interfaces.msg import Transition, TransitionPending, TransitionTimer
+from ament_index_python.packages import get_package_share_directory
 
 # Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
 # allowing imports to work correctly without relying on the build process.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
 
-class InitializationError(Exception):
-    """Custom exception for initialization-related failures."""
-
-    def __init__(self, component: str, message: str):
-        super().__init__(f"[{component}] {message}")
-        self.component = component
-        self.message = message
-
-
-class ChartNode(Node):
+class TransitionEngine(Node):
     """
-    This class implements a hybrid automaton chart for the COLAV project.
-    It manages different modes of operation of the system, including transitions
-    between modes based on guard conditions. The hybrid automaton is defined as:
-        HA: (Q, X, F, Init, Inv, E, G, R)
-
-    Where:
-        Q: set of modes
-        X: set of continuous states
-        F: Dynamics (control policies for each mode)
-        Init: Initial discrete and continuous states
-        Inv: Invariants of the system
-        E: set of transitions
-        G: guard conditions
-        R: reset conditions
+    transition engine manages the current mode, evaluating transitions in
+    real time and performing transitions and resets on states based on 
+    real world evaluations.
     """
-
-    # Define control modes with unique keys
-    _MODES = {
-        1: "cruise",
-        2: "t2los",
-        3: "fb",
-        4: "waypoint_reached"
-    }
-
-    # Initial states of the automaton (discrete and continuous)
-    _INIT_STATES = {
-        "discrete": _MODES[1],
-        "continuous": {
-            "agent": AgentUpdate(),
-            "obstacles": ObstaclesUpdate(),
-            "waypoints": [],
-            "unsafe_set": UnsafeSet()
-        }
-    }
-
-    # Current states (continuous)
-    _STATES = {
-        "agent": AgentUpdate(),
-        "obstacles": ObstaclesUpdate(),
-        "waypoints": [],
-        "unsafe_set": UnsafeSet()
-    }
-
-    # Transitions for each mode along with their priorities
-    _TRANSITIONS = {
-        _MODES[1]: {  # CRUISE
-            f"{_MODES[1]}_to_{_MODES[2]}_1": 3,  # CRUISE to T2LOS (priority 3)
-            f"{_MODES[1]}_to_{_MODES[2]}_2": 4,  # CRUISE to T2LOS (priority 4)
-            # CRUISE to FALLBACK (priority 1)
-            f"{_MODES[1]}_to_{_MODES[3]}": 1,
-            # CRUISE to WAYPOINT_REACHED (priority 2)
-            f"{_MODES[1]}_to_{_MODES[4]}": 2,
-        },
-        _MODES[2]: {  # T2LOS
-            # T2LOS to FALLBACK (priority 1)
-            f"{_MODES[2]}_to_{_MODES[3]}": 1,
-            # T2LOS to CRUISE (priority 3)
-            f"{_MODES[2]}_to_{_MODES[1]}": 3,
-            # T2LOS to WAYPOINT_REACHED (priority 2)
-            f"{_MODES[2]}_to_{_MODES[4]}": 2,
-        },
-        _MODES[3]: [  # FALLBACK
-            # Define fallback transitions if required
-        ],
-        _MODES[4]: {  # WAYPOINT_REACHED
-            # WAYPOINT_REACHED to CRUISE (priority 1)
-            f"{_MODES[4]}_to_{_MODES[1]}": 1
-        }
-    }
-
-    # Define transitions with reset conditions
-    _RESETS = {
-        _MODES[1]: [  # CRUISE
-            f"{_MODES[1]}_to_{_MODES[2]}1"
-        ],
-        _MODES[4]: [  # WAYPOINT_REACHED
-            f"{_MODES[4]}_to_{_MODES[1]}"
-        ]
-    }
-
-    _INVARIANTS = {}
 
     def __init__(
         self,
@@ -146,32 +65,71 @@ class ChartNode(Node):
         Initialize the COLAV Hybrid Automaton Chart node.
         """
         super().__init__(name, namespace=namespace)
-        self._NODE_SUBS = self._init_node_subs()
-        self._current_dynamics = None
-        # Create services to start and stop the hybrid automaton.
+
+        self.declare_parameter(
+            'hybrid_automaton_config_path',
+            value=default_hybrid_automaton_config,
+            descriptor=ParameterDescriptor(description='Path to the Hybrid Automaton configuration file')
+        )
+
+        # Load automaton configuration
+        self.config = load_yml(
+            self.get_parameter('hybrid_automaton_config_path').get_parameter_value().string_value
+        )
+        self.config = process_automaton_config(self.config)
+
+        # declare parameter for transition evaluation hz
+        self.declare_parameter(
+            'transition_evaluation_hz',
+            value=self.config['params']['transition_evaluation_hz'],
+            descriptor=ParameterDescriptor(description='transition evaluation hz for guard evaluations')
+        )
+
+        self.create_subscription(
+            topic="/hybrid_automaton/mode",
+            msg_type=String,
+            callback=lambda msg: self.__setattr__('mode', msg.data),
+            qos_profile=QOS_PROFILE
+        )
+        self.create_subscription(
+            topic="/hybrid_automaton/transitions",
+            msg_type=Transition,
+            callback=lambda msg: self.__setattr__('transition_eval', msg),
+            qos_profile=QOS_PROFILE
+        )
+        self.create_subscription(
+            topic="/hybrid_automaton/transition_pending",
+            msg_type=TransitionPending,
+            callback=lambda msg: self.__setattr__('transition_pending', msg),
+            qos_profile=QOS_PROFILE
+        )
+
+        self.mode = None
+        self.transition_pending = None
+        self.transition_eval = None
+
         self.create_service(
-            StartHybridAutomaton,
-            '/hybrid_automaton/start',
-            self._start_hybrid_automaton_callback
+            Trigger,
+            '/hybrid_automaton/start_transition_engine',
+            self._start_transition_engine
         )
         self.create_service(
             Trigger,
-            '/hybrid_automaton/stop',
+            '/hybrid_automaton/stop_transition_engine',
             self._stop_hybrid_automaton_callback
         )
         self.get_logger().info(f"{namespace}/{name} node initialised!")
 
-    def _start_hybrid_automaton_callback(
+    def _start_transition_engine(
             self,
-            request: StartHybridAutomaton.Request,
-            response: StartHybridAutomaton.Response) -> StartHybridAutomaton.Response:
+            request: Trigger.Request,
+            response: Trigger.Response) -> Trigger.Response:
         """
         Callback to start the hybrid automaton.
         """
         try:
             # validate request, it should have waypoint and request should be within a valid timestamp range
-            self.get_logger().info(
-                f"/start_hybrid_automaton service called with request at time: secs: {request.stamp.sec}, nanosecs: {request.stamp.nanosec} with goal_waypoint of: {request.goal_waypoint}")
+
             self._ha_pubs = self._init_ha_pubs()  # Initialize controller feedback publisher
             self._init_ha(request)
 
@@ -436,54 +394,12 @@ class ChartNode(Node):
         response.message = "Stop function not implemented yet"
         return response
 
-    def _init_node_subs(self) -> dict:
-        """
-        Initializes subscriptions
-        - Initializes the subscriptions for the required for the hybrid automaton chart
-
-        :raises: (InitializationError) if exception occurs
-        """
-        try:
-            return {
-                "agent_update": self.create_subscription(
-                    msg_type=AgentUpdate,
-                    topic='/agent_update',
-                    callback=lambda msg: self._STATES.__setitem__(
-                        "agent",
-                        msg),
-                    qos_profile=QOS_PROFILE),
-                "obstacles_update": self.create_subscription(
-                    msg_type=ObstaclesUpdate,
-                    topic='/obstacles_update',
-                    callback=lambda msg: self._STATES.__setitem__(
-                        "obstacles",
-                        msg),
-                    qos_profile=QOS_PROFILE),
-                "unsafe_set_update": self.create_subscription(
-                    msg_type=UnsafeSet,
-                    topic='/unsafe_set',
-                    callback=lambda msg: self._STATES.__setitem__(
-                        "unsafe_set",
-                        msg),
-                    qos_profile=QOS_PROFILE),
-                "guards_status_update": self.create_subscription(
-                    msg_type=GuardsStatus,
-                    topic='/hybrid_automaton/guards',
-                    callback=lambda msg: setattr(
-                        self,
-                        '_guards_status',
-                        msg),
-                    qos_profile=QOS_PROFILE)}
-        except Exception as e:
-            raise InitializationError(
-                'Subscriptions',
-                f'error occured initializing subscriptions: {str(e)}')
 
 from rclpy.executors import SingleThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ChartNode()
+    node = TransitionEngine()
 
     try:
         executor = SingleThreadedExecutor()
