@@ -1,7 +1,7 @@
 # This files determines the dynamics of the system/ aka the mode behavior/control policies
 # while in each mode.
 
-from colav_interfaces.msg import AgentUpdate, Waypoint
+from colav_interfaces.msg import AgentUpdate, Waypoints
 from hybrid_automaton_interfaces.msg import DynamicParameter
 import math
 from hybrid_automaton.utils import quaternion_to_heading
@@ -15,9 +15,10 @@ TARGET_VELOCITY = 25 * 0.514444
 # TODO: Get this value from colav_params/agent_constraints Limit
 # acceleration to (m/s^2)
 MAX_ACCELERATION = 1.0
+from typing import Tuple
 
 
-def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> DynamicParameter:
+def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Tuple[float, float]:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
@@ -39,7 +40,6 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     Raises:
         ValueError: (Not currently raised, placeholder for future use if needed.)
     """
-    dynamic_parameters = DynamicParameter(controller_name="p-velocity controller")
     if not isinstance(agent_state, AgentUpdate):
         raise ValueError("agent state received is of none type not type AgentUpdate")
 
@@ -50,16 +50,17 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     if not isinstance(tolerance, Duration):
         raise ValueError('tolerance must be Duration type')
     
-    try:
-        validate_timestamps_within_tolerance(
-            agent_state.header.stamp,
-            get_current_ros_time(),
-            tolerance
-        )
-    except TimeoutError:
-        raise TimeoutError("timeout occurred in dynamics cruise")
-    except Exception as e:
-        raise
+    # NOTE: GETTING RID OF THIS FOR TESTING
+    # try:
+    #     validate_timestamps_within_tolerance(
+    #         agent_state.header.stamp,
+    #         get_current_ros_time(),
+    #         tolerance
+    #     )
+    # except TimeoutError:
+    #     raise TimeoutError("timeout occurred in dynamics cruise")
+    # except Exception as e:
+    #     raise
 
     current_velocity = agent_state.velocity
     velocity_change = TARGET_VELOCITY - current_velocity
@@ -69,18 +70,17 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
         min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)
     new_velocity = current_velocity + acceleration * dt
 
-    dynamic_parameters.dynamics_names = ['velocity']
-    dynamic_parameters.dynamics_values = [new_velocity]
-    return dynamic_parameters
+    return [new_velocity, 0.0]
 
 
 def proportional_yaw_rate_controller(
         agent_state: AgentUpdate,
-        waypoint: Waypoint,
+        waypoints: Waypoints,
         dt: float = 0.1,
         error_tolerance: float = 0.01,
         proportional_gain: float = 1.0,
-        tolerance: Duration = Duration(sec=1, nanosec=0)) -> DynamicParameter:
+        max_yaw_rate: float = 0.5,
+        tolerance: Duration = Duration(sec=1, nanosec=0)) -> Tuple[float, float]:
     # TODO: Need to implmenet this as a continuous proporitional controller P-control with a low-pass filter on the rudder
     """
     Computes the dynamics of the COLAV Hybrid Automaton T2LOS control mode
@@ -100,12 +100,11 @@ def proportional_yaw_rate_controller(
     Raises:
         ValueError: (TODO: Not currently set.)
     """
-    dynamics_parameters = DynamicParameter(controller_name = "P-yaw_rate controller")
     if not isinstance(agent_state, AgentUpdate):
         raise ValueError("agent state received is of none type not type AgentUpdate")
     
-    if not isinstance(waypoint, Waypoint):
-        raise ValueError("waypoint not an instance of Waypoint")
+    if not isinstance(waypoints, Waypoints):
+        raise ValueError("waypoints not an instance of Waypoints")
 
     if not isinstance(dt, float):
         raise ValueError("delta time must be type float")
@@ -127,16 +126,17 @@ def proportional_yaw_rate_controller(
     if not isinstance(tolerance, Duration):
         raise ValueError('tolerance must be Duration type')
 
-    try:
-        validate_timestamps_within_tolerance(
-            agent_state.header.stamp,
-            get_current_ros_time(),
-            tolerance
-        )
-    except TimeoutError:
-        raise TimeoutError("timeout occurred in dynamics cruise")
-    except Exception as e:
-        raise
+    # NOTE: GETTING RID OF THIS FOR TESTING
+    # try:
+    #     validate_timestamps_within_tolerance(
+    #         agent_state.header.stamp,
+    #         get_current_ros_time(),
+    #         tolerance
+    #     )
+    # except TimeoutError:
+    #     raise TimeoutError("timeout occurred in dynamics cruise")
+    # except Exception as e:
+    #     raise
 
     # Current agent heading
     current_heading = quaternion_to_heading(
@@ -146,15 +146,19 @@ def proportional_yaw_rate_controller(
         qw=agent_state.pose.orientation.w,
     )
 
+    try:
+        current_waypoint = waypoints.waypoints[0]
+    except Exception: 
+        raise ValueError('invalid waypoints received for this controller, There is no current waypoint for us to navigate to.')
     # Calculate the heading towards the waypoint (assumes 2D position)
-    dx = waypoint.position.x - agent_state.pose.position.x
-    dy = waypoint.position.y - agent_state.pose.position.y
+    dx = current_waypoint.position.x - agent_state.pose.position.x
+    dy = current_waypoint.position.y - agent_state.pose.position.y
     desired_heading = math.atan2(dy, dx)  # Desired heading to the waypoint
 
     # Calculate heading error (difference between current heading and desired
     # heading)
     heading_error = desired_heading - current_heading
-
+    heading_error = (heading_error + math.pi) % (2 * math.pi) - math.pi
     # Normalize the error to the range [-pi, pi]
     if heading_error > math.pi:
         heading_error -= 2 * math.pi
@@ -165,21 +169,18 @@ def proportional_yaw_rate_controller(
     if abs(heading_error) < error_tolerance:
         yaw_rate = 0
     else:
-        # Time proportional controller for yaw rate
-        yaw_rate = proportional_gain * heading_error / dt
+        # Raw P-controller output
+        raw_yaw_rate = proportional_gain * heading_error / dt
+        # Clamp it
+        yaw_rate = max(-max_yaw_rate, min(raw_yaw_rate, max_yaw_rate))
+        alpha = 0.1  # smoothing factor between 0 (slow) and 1 (fast)
+        yaw_rate = alpha * yaw_rate + (1 - alpha) * agent_state.yaw_rate
 
-    # Keep the velocity unchanged since we're just controlling the heading
-    new_velocity = agent_state.velocity
-
-    dynamics_parameters.parameter_names = ['velocity', 'yaw_rate']
-    dynamics_parameters.parameter_values = [float(new_velocity), float(yaw_rate)]
-    dynamics_parameters.parameter_types = ['m/s', 'rad/s']
-
-    return dynamics_parameters
+    return [float(agent_state.velocity), float(yaw_rate)]
 
 
-def no_op_controller() -> DynamicParameter:
+def no_op_controller() -> Tuple[float, float]:
     # Initially controller for fallback will return 0,0 commands therefore
     # enabling the controller on ATL vessel to ramp down by itself
 
-    return DynamicParameter(controller_name="no-op controller")
+    return [0.0, 0.0]

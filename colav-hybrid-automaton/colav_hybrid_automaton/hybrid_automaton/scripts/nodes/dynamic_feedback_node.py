@@ -63,6 +63,7 @@ from functools import partial
 import uuid
 from unique_identifier_msgs.msg import UUID
 import importlib
+from colav_interfaces.msg import AgentUpdate
 
 from hybrid_automaton_interfaces.msg import Dynamics
 
@@ -144,9 +145,16 @@ class DynamicsNode(Node):
             callback=lambda msg: self.__setattr__('_current_mode', msg.data),
             qos_profile=QOS_PROFILE
         )
+        # TODO: Need to get rid of this in the future and utilize yml for creating subscriptions for this file
+        # self._agent_state_sub = self.create_subscription(
+        #     msg_type=AgentUpdate,
+        #     topic='/state/agent',
+        #     callback=lambda msg: self.__setattr__('_agent_state', msg),
+        #     qos_profile=QOS_PROFILE
+        # )
 
         # subscribe to state updates
-        create_state_subscriptions(node=self)
+        create_state_subscriptions(node=self) # uncomment this in future
 
         # create the node services
         self.create_service(
@@ -163,6 +171,7 @@ class DynamicsNode(Node):
 
         # Internal State
         self._current_mode = None
+        self._agent_state = None
 
         self.get_logger().info(f"{namespace}/{name} node initialised!")
 
@@ -229,35 +238,15 @@ class DynamicsNode(Node):
             dynamics_update.dynamic_parameters.dynamic_units = list(self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]['output'].values())
 
             dynamic_function =  self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]['function']
-            dynamics_update.dynamic_parameters.dynamic_value = dynamic_function()
+            if 'state_inputs' in  self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]:
+                state_input_names = self.config['dynamics'][dynamics_update.dynamic_parameters.controller_name]['state_inputs']
+                state_inputs = [self.config['states'][state_name]['state'] for state_name in state_input_names]
+                dynamics_update.dynamic_parameters.dynamic_value = dynamic_function(*state_inputs)
+            else: 
+                dynamics_update.dynamic_parameters.dynamic_value = dynamic_function()
 
-            if self._control_mode == self._MODES[1]:
-                # CRUISE DYNAMICS
-                dynamics_update.control_mode = self._MODES[1]
-                dynamics: Dynamics = self._DYNAMICS[self._MODES[1]](
-                    agent_state=self._agent_state, dt=0.1)  # TODO: NEED DT TO BE CONFIGED BY COLAV_PARAMS
-
-            elif self._control_mode == self._MODES[2]:
-                # T2LOS DYNAMICS
-                dynamics_update.control_mode = self._MODES[2]
-                dynamics: Dynamics = self._DYNAMICS[self._MODES[2]](
-                    agent_state=self._agent_state, waypoint=self._waypoint)
-
-            elif self._control_mode == self._MODES[3]:
-                # FALLBACK DYNAMICS
-                dynamics_update.control_mode = self._MODES[3]
-                dynamics: Dynamics = self._DYNAMICS[self._MODES[3]]()
-
-            elif self._control_mode == self._MODES[4]:
-                # WAYPOINT_REACHE DYNAMICS
-                dynamics_update.control_mode = self._MODES[4]
-                dynamics: Dynamics = self._DYNAMICS[self._MODES[4]]()
-
-            else:  # EDGE CASE
-                raise RuntimeError('something went wrong here.')
-
-            dynamics_update.dynamics = dynamics
-            dynamics_update.error = False
+            # dynamics_update.dynamics = dynamics
+            dynamics_update.success = True
         except Exception as e:
             publish_error(mode='', message=str(f"Exception occured: {e}"))
             return

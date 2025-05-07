@@ -188,6 +188,8 @@ dynamics:
   proportional_velocity_controller:
     module: 'hybrid_automaton.scripts.dynamics'
     function: proportional_velocity_controller
+    state_inputs:
+      - 'agent_state'
     output: 
       velocity: 'm/s' 
       yaw_rate: 'rad/s'  
@@ -195,6 +197,9 @@ dynamics:
   proportional_yaw_rate_controller:
     module: 'hybrid_automaton.scripts.dynamics'
     function: proportional_yaw_rate_controller
+    state_inputs: 
+      - 'agent_state'
+      - 'waypoints_state'
     output: 
       velocity: 'm/s' 
       yaw_rate: 'rad/s'

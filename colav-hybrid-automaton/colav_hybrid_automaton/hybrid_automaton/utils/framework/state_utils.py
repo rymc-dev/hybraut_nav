@@ -14,7 +14,7 @@ def create_state_subscriptions(node: Node) -> dict:
         state_sub = node.create_subscription(
             topic=value['topic'],
             msg_type=value['type'],
-            callback = partial(state_callback, key=key),
+            callback = lambda msg, key=key: state_callback(node, msg, key),
             qos_profile=QOS_PROFILE
         )
         node.config['states'][key]['sub'] = state_sub
