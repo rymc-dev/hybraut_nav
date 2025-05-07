@@ -38,8 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pip dependencies for colav_gateway
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+# COPY requirements.txt /tmp/requirements.txt
+# RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
 # RUN pip install colav-bridge==0.0.2
 # RUN pip install colav-protobuf-utils==0.1.4
