@@ -79,22 +79,6 @@ from rclpy.action import ActionServer
 
 default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
 
-def load_module_attribute(module_path: str, attr_name: str):
-    """Dynamically import a module and retrieve an attribute (e.g., class or function)."""
-    try:
-        module = importlib.import_module(module_path)
-        return getattr(module, attr_name)
-    except (ImportError, AttributeError) as e:
-        raise ImportError(f"Failed to import '{attr_name}' from '{module_path}': {e}")
-
-class InitializationError(Exception):
-    """Custom exception for initialization-related failures."""
-
-    def __init__(self, component: str, message: str):
-        super().__init__(f"[{component}] {message}")
-        self.component = component
-        self.message = message
-
 
 class TransitionEvaluatorNode(Node):
     """
@@ -236,12 +220,6 @@ class TransitionEvaluatorNode(Node):
             response.success = True
             response.message = 'Guards evaluation started successfully'
             self.get_logger().info('Guard evaluation started successfully')
-
-        except InitializationError as init_err:
-            # Handle known initialization errors separately
-            response.success = False
-            response.message = f'Initialization failed: {init_err}'
-            self.get_logger().error(response.message)
 
         except Exception as e:
             # Catch-all for unexpected exceptions with full traceback

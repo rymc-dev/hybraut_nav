@@ -18,5 +18,14 @@ def create_state_subscriptions(node: Node) -> dict:
             qos_profile=QOS_PROFILE
         )
         node.config['states'][key]['sub'] = state_sub
-        del node.config['states'][key]['topic']
-        del node.config['states'][key]['type']
+
+def create_state_publishers(node: Node) -> dict: 
+    """create ros2 state subscriptions""" # TODO: FOR STATES NEED TO ADD TIMEOUT EXCEPTIONS BASED ON PARAMS
+    for key, value in node.config['states'].items():
+        node.config['states'][key]['state'] = None
+        state_pub = node.create_publisher(
+            topic=value['topic'],
+            msg_type=value['type'],
+            qos_profile=QOS_PROFILE
+        )
+        node.config['states'][key]['pub'] = state_pub

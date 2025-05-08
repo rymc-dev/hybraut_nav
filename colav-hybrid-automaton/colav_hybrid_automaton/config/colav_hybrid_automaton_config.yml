@@ -178,7 +178,7 @@ transitions:
 
   waypoint_reached_to_cruise:
     guard: 'is_virtual_waypoints'
-    reset_ref: 'remove_first_waypoint'
+    reset: 'remove_first_waypoint'
 
 # ============================================================================
 # Dynamics (F)

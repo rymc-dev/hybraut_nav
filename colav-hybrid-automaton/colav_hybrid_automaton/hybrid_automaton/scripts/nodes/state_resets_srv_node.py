@@ -20,181 +20,139 @@
 # """
 
 
-# from rclpy.node import Node
-# import os
-# import sys
-# sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-# from hybrid_automaton.scripts.resets import (
-#     reset_CRUISE_to_T2LOS,
-#     reset_WAYPOINT_REACHED_to_CRUISE
-# )
-# import rclpy
-# from colav_interfaces.srv import Reset
-# from colav_interfaces.msg import Waypoints, AgentUpdate, ObstaclesUpdate, UnsafeSet
-# from hybrid_automaton.config import QOS_PROFILE
+from rclpy.node import Node
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+from ament_index_python.packages import get_package_share_directory
+import rclpy
+from hybrid_automaton.config import QOS_PROFILE
+from hybrid_automaton_interfaces.srv import Reset
+from hybrid_automaton.utils import (
+    load_yml,
+    process_automaton_config,
+    create_state_subscriptions,
+    create_state_publishers
+)
+from rcl_interfaces.msg import ParameterDescriptor
+
+default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
+
+class InitializationError(Exception):
+    """Custom exception for initialization-related failures."""
+
+    def __init__(self, component: str, message: str):
+        super().__init__(f"[{component}] {message}")
+        self.component = component
+        self.message = message
+
+class StateResetSrvNode(Node):
+
+    def __init__(
+        self,
+        name: str = 'resets_node',
+        namespace: str = 'hybrid_automaton'
+    ):
+        """
+        initialise the node
+        """
+        super().__init__(name, namespace=namespace)
+
+        self.declare_parameter(
+            'hybrid_automaton_config_path',
+            value=default_hybrid_automaton_config,
+            descriptor=ParameterDescriptor(description='Path to the Hybrid Automaton configuration file')
+        )
+        self.config = load_yml(
+            self.get_parameter('hybrid_automaton_config_path').get_parameter_value().string_value
+        )
+        self.config = process_automaton_config(self.config)
+
+        create_state_subscriptions(node=self)
+        create_state_publishers(node=self)
+        # Create a subscription and publisher to /hybrid_automaton/waypoints
+        self.create_service(
+            srv_type=Reset,
+            srv_name='/hybrid_automaton/reset_states',
+            callback=self._reset_callback
+        )
+
+    def _reset_callback(
+            self,
+            request: Reset.Request,
+            response: Reset.Response):
+        """
+        callback for reset request
+        - performs reset function on state variables depending on transition name passed in
+        - throws exception if transition name does not have a reset associated
+        - throws exception if something unexpected goes wrong.
+        """
+        try:
+            transition_name = request.transition_name
+
+            if transition_name in list(self.config['transitions'].keys()):
+                if self.config['transitions'][transition_name]['reset'] is not None:
+                    if self.config['transitions'][transition_name]['reset'] in list(self.config['resets'].keys()):
+                        reset_name = self.config['transitions'][transition_name]['reset']
+                        reset_func = self.config['resets'][reset_name]['function']
+                        input_names = self.config['resets'][reset_name]['state_inputs']
+                        state_inputs = [self.config['states'][state_name]['state'] for state_name in input_names]
+                        reset_outputs = reset_func(*state_inputs)
+                        # TODO: IMPROVE THIS
+                        # state_outputs = 
+                    else:
+                        raise ValueError('Transition has reset but reset name not in resets configuration')
+                else: 
+                    raise ValueError('transition does not have reset function associated') # THIS IS NOT REALLY AN ERROR THIS IS A GOOD SIGN
+            else:
+                raise ValueError(f'transition name is node in modes: {transition_name}')
+
+            # if reset_name in list(self._RESETS.keys()):
+            #     if reset_name == 'waypoint_reached_to_cruise':
+            #         reset_func = self._RESETS[reset_name]
+            #         self._waypoints: Waypoints = reset_func(waypoints=self._waypoints)
+            #         # self.get_logger().info('waypoints: ')
+            #         # self.get_logger().info(self._waypoints)
+            #         self._node_pubs['waypoints'].publish(self._waypoints)
+            #     elif reset_name == 'cruise_to_t2los':
+            #         reset_func = self._RESETS[reset_name]
+            #         self._waypoints = reset_func(
+            #             agent_state = self._agent_state,
+            #             obstacles_state = self._obstacles_state,
+            #             unsafe_set = self._unsafe_set,
+            #             waypoints = self._waypoints
+            #         )
+            #         self._node_pubs['waypoints'].publish(self._waypoints)
+            #     else:
+            #         # something went wrong here
+            #         raise Exception('Invalid reset name')
+            #     response._success = True
+            #     response._message = "Reset successfully applied"
+            # else:
+            #     raise ValueError(
+            #         f"Reset transition name does not exist: {str(reset_name)}")
+        except Exception as e:
+            self.get_logger().error(
+                f'Error occured during reset_callback: {str(e)}')
+            response._success = False
+            response._message = f"{str(e)}"
+
+        return response
 
 
-# class InitializationError(Exception):
-#     """Custom exception for initialization-related failures."""
+def main(args=None):
+    rclpy.init(args=args)
+    node = None
+    try:
+        node = StateResetSrvNode()
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f'Exception occured: {str(e)}')
 
-#     def __init__(self, component: str, message: str):
-#         super().__init__(f"[{component}] {message}")
-#         self.component = component
-#         self.message = message
-
-
-# class ResetNode(Node):
-
-#     _RESETS = {
-#         'waypoint_reached_to_cruise': reset_WAYPOINT_REACHED_to_CRUISE,
-#         'cruise_to_t2los': reset_CRUISE_to_T2LOS
-#     }
-
-#     def __init__(
-#         self,
-#         name: str = 'resets_node',
-#         namespace: str = 'hybrid_automaton'
-#     ):
-#         """
-#         initialise the node
-#         """
-#         super().__init__(name, namespace=namespace)
-
-#         self._waypoints = Waypoints()
-#         self._agent_state = None
-#         self._obstacles_state = None
-#         self._unsafe_set = None
-
-#         # Create a subscription and publisher to /hybrid_automaton/waypoints
-#         self._node_subs = self._init_node_subs()
-#         self._node_pubs = self._init_node_pubs()
-#         self._node_srvs = self._init_node_srvs()
-
-#         self.get_logger().info(f'{namespace}/{name} node initialised!')
-
-#     def _init_node_pubs(self):
-#         try:
-#             return {
-#                 'waypoints': self.create_publisher(
-#                     msg_type=Waypoints,
-#                     topic='/hybrid_automaton/waypoints',
-#                     qos_profile=QOS_PROFILE),
-#             }
-#         except Exception as e:
-#             raise InitializationError(
-#                 "Publishers",
-#                 f'Attempted initialisation of reset_node publishers, but error occured: {str(e)}')
-
-#     def _init_node_subs(self):
-#         try:
-#             return {
-#                 'waypoints_sub': self.create_subscription(
-#                     msg_type=Waypoints,
-#                     topic='/hybrid_automaton/waypoints',
-#                     callback=lambda msg: self.__setattr__(
-#                         '_waypoints',
-#                         msg),
-#                     qos_profile=QOS_PROFILE),
-#                 "agent_state": self.create_subscription(
-#                     msg_type=AgentUpdate,
-#                     topic='/agent_update',
-#                     callback=lambda msg: self.__setattr__(
-#                         '_agent_state',
-#                         msg),
-#                     qos_profile=QOS_PROFILE),
-#                 "obstacles_state": self.create_subscription(
-#                     msg_type=ObstaclesUpdate,
-#                     topic='/obstacles_update',
-#                     callback=lambda msg: self.__setattr__(
-#                         'obstacles_update',
-#                         msg),
-#                     qos_profile=QOS_PROFILE),
-#                 "unsafe_set": self.create_subscription(
-#                     msg_type=UnsafeSet,
-#                     topic='/unsafe_set',
-#                     callback=lambda msg: self.__setattr__(
-#                         'unsafe_set',
-#                         msg),
-#                     qos_profile=QOS_PROFILE)}
-#         except Exception as e:
-#             raise InitializationError(
-#                 "subscribers",
-#                 f'Attempted initialisation of reset_node subscriptions, but error occured: {str(e)}')
-
-#     def _init_node_srvs(self):
-#         try:
-#             return {
-#                 "reset": self.create_service(
-#                     srv_type=Reset,
-#                     srv_name='reset',
-#                     callback=self._reset_callback
-#                 )
-#             }
-#         except Exception as e:
-#             raise InitializationError(
-#                 "services",
-#                 f'Attempted initialisation of reset_node services, but error occured: {str(e)}')
-
-#     def _reset_callback(
-#             self,
-#             request: Reset.Request,
-#             response: Reset.Response):
-#         """
-#         callback for reset request
-#         - performs reset function on state variables depending on transition name passed in
-#         - throws exception if transition name does not have a reset associated
-#         - throws exception if something unexpected goes wrong.
-#         """
-#         try:
-#             reset_name = request.transition_name
-#             self.get_logger().info(f'reset request received for {reset_name}')
-
-#             if reset_name in list(self._RESETS.keys()):
-#                 if reset_name == 'waypoint_reached_to_cruise':
-#                     reset_func = self._RESETS[reset_name]
-#                     self._waypoints: Waypoints = reset_func(waypoints=self._waypoints)
-#                     # self.get_logger().info('waypoints: ')
-#                     # self.get_logger().info(self._waypoints)
-#                     self._node_pubs['waypoints'].publish(self._waypoints)
-#                 elif reset_name == 'cruise_to_t2los':
-#                     reset_func = self._RESETS[reset_name]
-#                     self._waypoints = reset_func(
-#                         agent_state = self._agent_state,
-#                         obstacles_state = self._obstacles_state,
-#                         unsafe_set = self._unsafe_set,
-#                         waypoints = self._waypoints
-#                     )
-#                     self._node_pubs['waypoints'].publish(self._waypoints)
-#                 else:
-#                     # something went wrong here
-#                     raise Exception('Invalid reset name')
-#                 response._success = True
-#                 response._message = "Reset successfully applied"
-#             else:
-#                 raise ValueError(
-#                     f"Reset transition name does not exist: {str(reset_name)}")
-#         except Exception as e:
-#             self.get_logger().error(
-#                 f'Error occured during reset_callback: {str(e)}')
-#             response._success = False
-#             response._message = f"{str(e)}"
-
-#         return response
+    rclpy.shutdown()
 
 
-# def main(args=None):
-#     rclpy.init(args=args)
-#     node = None
-#     try:
-#         node = ResetNode()
-#         rclpy.spin(node)
-#     except KeyboardInterrupt:
-#         pass
-#     except Exception as e:
-#         print(f'Exception occured: {str(e)}')
-
-#     rclpy.shutdown()
-
-
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
