@@ -105,13 +105,13 @@ class LifeCycleManager(Node):
     def goal_callback(self, mission_request: HybridAutomaton.Goal, mission_request_tolerance: Duration = Duration(sec=1)):
         # validate the waypoint and such
         try: 
-            validate_timestamps_within_tolerance(mission_request.stamp, get_current_ros_time(), Duration(sec=1))
-            if mission_request.goal_waypoint is None: 
-                raise ValueError('no goal waypoint')
-            if mission_request.mission_uuid is None: 
-                raise ValueError('no mission_uuid received')
-            if mission_request.agent_uuid is None:
-                raise ValueError('no agent_uuid received')
+            validate_timestamps_within_tolerance(mission_request.stamp, get_current_ros_time(), Duration(sec=10))
+            # if mission_request.goal_waypoint is None: 
+            #     raise ValueError('no goal waypoint')
+            # if mission_request.mission_uuid is None: 
+            #     raise ValueError('no mission_uuid received')
+            # if mission_request.agent_uuid is None:
+            #     raise ValueError('no agent_uuid received')
         except Exception as e: 
             self.get_logger().error(f"Mission Request: \n\n'{mission_request}' \n\Rejected due to Exception: {str(e)}")
             return GoalResponse.REJECT

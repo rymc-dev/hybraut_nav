@@ -38,8 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pip dependencies for colav_gateway
-# COPY requirements.txt /tmp/requirements.txt
-# RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
 # RUN pip install colav-bridge==0.0.2
 # RUN pip install colav-protobuf-utils==0.1.4
@@ -75,11 +75,13 @@ RUN /bin/bash -c "source /root/.bashrc"
 
 # Set the entrypoint command
 ENTRYPOINT ["/bin/bash", "-c", "\
-if [ \"$MODE\" = \"container\" ]; then \
-  source /opt/ros/humble/setup.bash && \
-  colcon build /home/ros2_ws && \
-  source /root/.bashrc && \
-  ros2 launch colav_hybrid_automaton_bringup colav_hybrid_automaton.launch.py; \
-else \
-  while true; do sleep 30; done; \
-fi"]
+    if [ \"$MODE\" = \"container\" ]; then \
+    source /opt/ros/humble/setup.bash && \
+    cd /home/ros2_ws && \
+    colcon build && \
+    source /home/ros2_ws/install/setup.bash && \
+    ros2 launch colav_hybrid_automaton hybrid_automaton.launch.py; \
+    else \
+    while true; do sleep 30; done; \
+    fi"]
+
