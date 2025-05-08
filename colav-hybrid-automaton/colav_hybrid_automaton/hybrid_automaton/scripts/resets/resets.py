@@ -4,11 +4,12 @@ from geometry_msgs.msg import Point32
 from builtin_interfaces.msg import Duration
 from shapely import Polygon, LineString
 from hybrid_automaton.utils import validate_timestamps_within_tolerance, get_current_ros_time
+from typing import Tuple
 
 VW_ACCEPTANCE_RADIUS = 10
 
 
-def remove_first_waypoint(waypoints: Waypoints) -> Waypoints:
+def remove_first_waypoint(waypoints: Waypoints) -> Tuple[Waypoints]:
     """pops the first item in the queue of waypoints"""
     # validate arg
     if not isinstance(waypoints, Waypoints):
@@ -21,7 +22,7 @@ def remove_first_waypoint(waypoints: Waypoints) -> Waypoints:
             'waypoints list size less than 1, something has went wrong is guard condition')
     
     waypoints.waypoints = waypoints.waypoints[1:]
-    return waypoints
+    return [waypoints]
 
 
 def create_virtual_waypoint(
@@ -29,7 +30,7 @@ def create_virtual_waypoint(
         obstacles_update: ObstaclesUpdate,
         unsafe_set: UnsafeSet,
         waypoints: Waypoints,
-        tolerance: Duration = Duration(sec=1)) -> Waypoints:
+        tolerance: Duration = Duration(sec=1)) -> Tuple[Waypoints]:
     """
     Reset from CRUISE to T2LOS when the guard condition is triggered.
     This function finds the rightmost visible vertex on the unsafe set from the agent's perspective,
@@ -118,4 +119,4 @@ def create_virtual_waypoint(
 
     # 7. Insert the new waypoint at the beginning of the waypoint list
     waypoints.waypoints.insert(0, new_waypoint)
-    return waypoints
+    return [waypoints]

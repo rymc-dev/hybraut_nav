@@ -88,49 +88,21 @@ class StateResetSrvNode(Node):
         - throws exception if something unexpected goes wrong.
         """
         try:
-            transition_name = request.transition_name
+            reset_name = request.reset_name
 
-            if transition_name in list(self.config['transitions'].keys()):
-                if self.config['transitions'][transition_name]['reset'] is not None:
-                    if self.config['transitions'][transition_name]['reset'] in list(self.config['resets'].keys()):
-                        reset_name = self.config['transitions'][transition_name]['reset']
-                        reset_func = self.config['resets'][reset_name]['function']
-                        input_names = self.config['resets'][reset_name]['state_inputs']
-                        state_inputs = [self.config['states'][state_name]['state'] for state_name in input_names]
-                        reset_outputs = reset_func(*state_inputs)
-                        # TODO: IMPROVE THIS
-                        # state_outputs = 
-                    else:
-                        raise ValueError('Transition has reset but reset name not in resets configuration')
-                else: 
-                    raise ValueError('transition does not have reset function associated') # THIS IS NOT REALLY AN ERROR THIS IS A GOOD SIGN
-            else:
-                raise ValueError(f'transition name is node in modes: {transition_name}')
-
-            # if reset_name in list(self._RESETS.keys()):
-            #     if reset_name == 'waypoint_reached_to_cruise':
-            #         reset_func = self._RESETS[reset_name]
-            #         self._waypoints: Waypoints = reset_func(waypoints=self._waypoints)
-            #         # self.get_logger().info('waypoints: ')
-            #         # self.get_logger().info(self._waypoints)
-            #         self._node_pubs['waypoints'].publish(self._waypoints)
-            #     elif reset_name == 'cruise_to_t2los':
-            #         reset_func = self._RESETS[reset_name]
-            #         self._waypoints = reset_func(
-            #             agent_state = self._agent_state,
-            #             obstacles_state = self._obstacles_state,
-            #             unsafe_set = self._unsafe_set,
-            #             waypoints = self._waypoints
-            #         )
-            #         self._node_pubs['waypoints'].publish(self._waypoints)
-            #     else:
-            #         # something went wrong here
-            #         raise Exception('Invalid reset name')
-            #     response._success = True
-            #     response._message = "Reset successfully applied"
-            # else:
-            #     raise ValueError(
-            #         f"Reset transition name does not exist: {str(reset_name)}")
+            if reset_name in list(self.config['resets'].keys()):
+                reset_func = self.config['resets'][reset_name]['function']
+                input_names = self.config['resets'][reset_name]['state_inputs']
+                state_inputs = [self.config['states'][state_name]['state'] for state_name in input_names]
+                reset_outputs = reset_func(*state_inputs)
+                state_outputs = self.config['resets']['remove_first_waypoint']['state_outputs']
+                for idx, state_output in enumerate(state_outputs):
+                    self.config['states'][state_output]['pub'].publish(reset_outputs[idx])
+                
+                response._success = True
+                response._message = f"Reset '{reset_name}' successfully applied to state variables: '{state_outputs}'"
+            else: 
+                raise ValueError('invalid reset request sent')
         except Exception as e:
             self.get_logger().error(
                 f'Error occured during reset_callback: {str(e)}')

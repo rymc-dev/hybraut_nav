@@ -175,7 +175,6 @@ class TransitionEngineNode(Node):
                         highest_priority = curr_priority
 
             
-            transition = "cruise_to_t2los_2"
             _, _, transition_to_raw = transition.partition("to_")
 
             # Split at the last underscore
@@ -185,6 +184,7 @@ class TransitionEngineNode(Node):
                 transition_to = base
             else:
                 transition_to = transition_to_raw
+
             # check if reset if reset then make request to reset service to update internal states
             self.mode_publisher.publish(String(data=transition_to))
 

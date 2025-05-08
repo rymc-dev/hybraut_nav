@@ -12,9 +12,6 @@
 # UUID of the transition to apply the reset to
 unique_identifier_msgs/UUID transition_uuid
 
-# Name of the transition (for reference and logging)
-string transition_name
-
 # Name of the reset function to invoke
 string reset_name
 
@@ -25,7 +22,7 @@ string reset_name
 unique_identifier_msgs/UUID transition_uuid
 
 # Name of the transition that was evaluated
-string transition_name
+string reset_name
 
 # Indicates whether the reset was applied successfully
 bool success
