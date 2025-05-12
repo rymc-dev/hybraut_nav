@@ -75,13 +75,14 @@ RUN /bin/bash -c "source /root/.bashrc"
 
 # Set the entrypoint command
 ENTRYPOINT ["/bin/bash", "-c", "\
-    if [ \"$MODE\" = \"container\" ]; then \
+if [ \"$MODE\" = \"container\" ]; then \
     source /opt/ros/humble/setup.bash && \
     cd /home/ros2_ws && \
     colcon build && \
     source /home/ros2_ws/install/setup.bash && \
     ros2 launch colav_hybrid_automaton hybrid_automaton.launch.py; \
-    else \
+else \
     while true; do sleep 30; done; \
-    fi"]
+fi"]
+
 

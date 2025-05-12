@@ -39,21 +39,13 @@ sys.path.append(
 
 from collections import deque
 from hybrid_automaton.config import QOS_PROFILE
-# from hybrid_automaton.scripts.guards import (
-#     is_los_clear_to_waypoint,
-#     is_heading_within_tolerance,
-#     is_unsafe_conditions,
-#     is_waypoint_reached,
-#     is_heading_not_within_tolerance,
-#     is_virtual_waypoints
-# )
 from hybrid_automaton.utils import (
     get_current_ros_time, 
     load_yml,
     process_automaton_config,
     create_state_subscriptions
 )
-
+import threading
 from hybrid_automaton_interfaces.msg import (
     Transition,
     TransitionPending,
@@ -111,8 +103,6 @@ class TransitionEvaluatorNode(Node):
         self.config = process_automaton_config(self.config)
 
         # Declare the parameter correctly
-
-        from rcl_interfaces.msg import Parameter
         # declare parameter for transition evaluation hz
         self.declare_parameter(
             'transition_evaluation_hz',
@@ -140,11 +130,11 @@ class TransitionEvaluatorNode(Node):
             callback=self._mode_callback,
             qos_profile=QOS_PROFILE
         )
-
+        
         self.create_subscription(
             topic="/hybrid_automaton/transition_pending",
             msg_type=TransitionPending,
-            callback=lambda msg: self.__setattr__('transition_pending', msg),
+            callback=self._transition_pending_callback,
             qos_profile=QOS_PROFILE
         )
 
@@ -171,10 +161,11 @@ class TransitionEvaluatorNode(Node):
         )
 
         # Internal state
-        self.transition_pending = False
+        self.transition_event = threading.Event()
         self._current_mode = None
         self._guards_status = None
         self._resets_status = None
+        self._current_transition_uuid = None
 
     """callbacks"""
     def _mode_callback(self, msg: String):
@@ -182,8 +173,12 @@ class TransitionEvaluatorNode(Node):
         self.get_logger().debug(f"Received control mode: {self._current_mode}")
 
     def _transition_pending_callback(self, msg: TransitionPending):
-        self.transition_pending = msg
         self.get_logger().debug("Transition pending status received.")
+
+        if msg.transition_pending:
+            self.transition_event.set()   # Signal that a transition is pending
+        else:
+            self.transition_event.clear()  # Signal that the transition is complete
 
     # def _buffer_callback(self, msg, key: str):
     #     """a generased buffer callback"""
@@ -275,82 +270,83 @@ class TransitionEvaluatorNode(Node):
         else:
             self._current_waypoint = None
 
-    def _validate_state_updates(self, mode: str) -> bool:
-        """Ensure all necessary state variables are available for the given mode."""
-        required_states = [
-            
-            self.agent_state_buffer,
-            self.obstacles_state_buffer,
-            self.unsafe_set_state_buffer,
-            self._current_waypoints,
-            self._current_waypoint,
-        ]
-        if any(state is None for state in required_states):
-            return False
-        return True
-
     def _eval_transitions(self):
-        """Evaluate transitions based on the control mode.""" 
-        # 1. Get metadata for transition
+        """Evaluate transitions based on the current control mode in the Hybrid Automaton."""
         
-        ros_stamp = get_current_ros_time()
-        generated_uuid = uuid.uuid4()
+        if self.transition_event.is_set():
+            self.get_logger().info('transition event in progress, skipping evaluation')
+            ros_stamp = get_current_ros_time()
+            transition_pending = TransitionPending(transition_pending = True, stamp=ros_stamp, transition_uuid=self._current_transition_uuid)
+            self.transition_pending_pub.publish(transition_pending)
+        else:
+            ros_stamp = get_current_ros_time()
+            transition_id = uuid.uuid4()
+            ros_uuid = UUID()
+            ros_uuid.uuid = list(transition_id.bytes)
+            self._current_transition_uuid = ros_uuid
+            transition_eval = Transition(stamp=ros_stamp, transition_uuid=ros_uuid)
+            transition_pending = TransitionPending(stamp=ros_stamp, transition_uuid=ros_uuid)
 
-        ros_uuid = UUID()
-        ros_uuid.uuid = list(generated_uuid.bytes)
+            def publish_error(message: str):
+                transition_eval.success = False
+                transition_eval.error_message = message
+                transition_eval.stamp = ros_stamp
+                self.transition_eval_pub.publish(transition_eval)
 
-        transition_eval = Transition(stamp=ros_stamp, transition_uuid=ros_uuid)
-        transition_pending = TransitionPending(stamp=ros_stamp, transition_uuid=ros_uuid)
-        
-        def publish_error(mode:str, message: str):
-            transition_eval.success = False
-            transition_eval.error_message = message
-            transition_eval.stamp = ros_stamp
-            self.transition_eval_pub.publish(transition_eval)
+            try:
+                try:
+                    current_mode = self._current_mode.lower()
+                    transition_eval.mode = current_mode
+                except Exception:
+                    raise RuntimeError("Hybrid Automaton Control Mode not received on /hybrid_automaton/mode")
 
-        try:
-            try: 
-                current_mode = self._current_mode.lower()
-            except Exception as e: 
-                raise ValueError('Hybrid Automaton Control Mode not received /hybrid_automaton/mode')
+                available_modes = self.config['modes']
+                if current_mode not in available_modes:
+                    raise ValueError(
+                        current_mode,
+                        f"Published mode '{current_mode}' is not configured. Available modes: {list(available_modes)}"
+                    )
 
-            # validate state data for this transition evaluation
-            if current_mode is None:
-                publish_error("NULL", "Hybrid Automaton Mode has not been published to /hybrid_automaton/mode.")
-                return
+                transitions = available_modes[current_mode].get('transitions', {})
+                transition_names = list(transitions.keys())
 
-            if current_mode not in [mode for mode in self.config['modes']]:
-                publish_error(current_mode, f"Current Hybrid Automaton Mode published to /hybrid_automaton/mode: '{current_mode}' is not among Hybrid Automaton Mode configuration: '{[mode for mode in self.config['modes']]}'")
+                transition_eval.success = True
+                transition_eval.transition_names = []
+                transition_eval.transition_values = []
+                transition_eval.transition_priority = []
+                error_messages = []
+
+                for name in transition_names:
+                    try:
+                        transition_config = self.config['transitions'][name]
+                        guard_key = transition_config['guard']
+                        guard_config = self.config['guards'][guard_key]
+                        guard_func = guard_config['function']
+                        state_inputs = [self.config['states'][s]['state'] for s in guard_config['state_inputs']]
+
+                        result = bool(guard_func(*state_inputs))
+                        transition_eval.transition_names.append(name)
+                        transition_eval.transition_values.append(result)
+                        transition_eval.transition_priority.append(transitions[name]['priority'])
+
+                    except Exception as e:
+                        self.get_logger().error(f"Transition '{name}' guard evaluation failed: {e}")
+                        error_messages.append(f"{name}: {e}")
+                        transition_eval.success = False
+
+                if error_messages:
+                    transition_eval.error_message = "Errors during evaluation: " + "; ".join(error_messages)
+
+                if any(transition_eval.transition_values):
+                    transition_pending.transition_pending = True
+                    self.transition_event.set()
+
+            except Exception as e:
+                publish_error(str(e))
                 return
             
-            # Make transition evaluations 
-            transition_eval.mode = current_mode
-
-            transitions = self.config['modes'][transition_eval.mode]['transitions']
-            transition_names = list(transitions.keys()) if len(transitions) > 0 else []
-
-
-            transition_eval.transition_names = transition_names    
-            values = []
-            for transition in transition_names:
-                guard_func = self.config['guards'][(self.config['transitions'][transition]['guard'])]['function']
-                state_inputs = [self.config['states'][state]['state'] for state in (self.config['guards'][(self.config['transitions'][transition]['guard'])]['state_inputs'])]
-                value:bool = guard_func(*state_inputs)
-                values.append(value)
-
-            transition_eval.transition_values = values
-            transition_eval.success = True
-
-            # if any transitions for current mode evlauted as true
-            if True in values: 
-                transition_pending.transition_pending = True
-
-        except Exception as e:
-            publish_error(mode=self._current_mode, message=str(e))
-            return
-        
-        self.transition_eval_pub.publish(transition_eval)
-        self.transition_pending_pub.publish(transition_pending)
+            self.transition_eval_pub.publish(transition_eval)
+            self.transition_pending_pub.publish(transition_pending)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -365,7 +361,6 @@ def main(args=None):
         if node is not None:
             node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

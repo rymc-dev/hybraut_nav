@@ -30,6 +30,7 @@ setup(
             "lifecycle_manager_node = hybrid_automaton.execute_lifecycle_manager_node:main",
             "transition_engine_node = hybrid_automaton.execute_transition_engine_node:main",
             "transition_evaluation_node = hybrid_automaton.execute_transition_evaluation_node:main",
+            "state_resets_srv_node = hybrid_automaton.execute_state_resets_srv_node:main"
         ],
     },
 )

@@ -82,6 +82,12 @@ class LifeCycleManager(Node):
             callback=lambda msg: self.__setattr__('dynamics', msg),
             qos_profile=QOS_PROFILE
         )
+        self.create_subscription(
+            topic='/hybrid_automaton/state/waypoints',
+            msg_type=Waypoints,
+            callback=lambda msg: self.__setattr__('waypoints', msg),
+            qos_profile=QOS_PROFILE
+        )
 
         self.mission_start_time = None
         self.automaton_uuid = None
@@ -197,7 +203,7 @@ class LifeCycleManager(Node):
             feedback = HybridAutomaton.Feedback()
             feedback.feedback.automaton_uuid = self.ros_automaton_uuid
             feedback.feedback.mode = self.mode.data if self.mode is not None else ''
-            feedback.feedback.status = self.status if self.status is not None else ''
+            feedback.feedback.status = self.status if self.status is not None else 'ACTIVE'
             feedback.feedback.dynamics = self.dynamics.dynamic_parameters if self.dynamics is not None else DynamicParameter()
             feedback.feedback.time_since_last_transition = self.time_since_last_transition if self.time_since_last_transition is not None else Duration()
             feedback.feedback.transition_pending = self.transition_pending if self.transition_pending is not None else TransitionPending()

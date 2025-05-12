@@ -45,13 +45,13 @@ def create_virtual_waypoint(
             'exception occured: input args to function have incorrect types')
 
     # TODO: validate timestamps
-    try:
-        sys_stamp = get_current_ros_time()
-        validate_timestamps_within_tolerance(agent_state.header.stamp, sys_stamp, tolerance)
-        validate_timestamps_within_tolerance(obstacles_update.header.stamp, sys_stamp, tolerance)
-        validate_timestamps_within_tolerance(unsafe_set.header.stamp, sys_stamp, tolerance)
-    except TimeoutError as e:
-        raise TimeoutError(f'Timeour error at reset_CRUISE_to_T2LOS during timestamp validation: {e}')
+    # try:
+    #     sys_stamp = get_current_ros_time()
+    #     validate_timestamps_within_tolerance(agent_state.header.stamp, sys_stamp, tolerance)
+    #     validate_timestamps_within_tolerance(obstacles_update.header.stamp, sys_stamp, tolerance)
+    #     validate_timestamps_within_tolerance(unsafe_set.header.stamp, sys_stamp, tolerance)
+    # except TimeoutError as e:
+    #     raise TimeoutError(f'Timeour error at reset_CRUISE_to_T2LOS during timestamp validation: {e}')
     
     # TODO: check if unsafe set is valid polyshape
 

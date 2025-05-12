@@ -111,7 +111,7 @@ guards:
 
   is_heading_not_within_tolerance:
     module: hybrid_automaton.scripts.guards
-    function: is_heading_within_tolerance  
+    function: is_heading_not_within_tolerance  
     state_inputs:
       - 'agent_state'
       - 'waypoints_state'
@@ -273,5 +273,5 @@ init:
 # Parameters
 # ============================================================================
 params:
-  transition_evaluation_hz: 10
+  transition_evaluation_hz: 1.0
   transition_evaluation_timeout: 1.0

@@ -12,6 +12,12 @@ def generate_launch_description():
         output='screen',
     )
 
+    state_resets_srv_node = Node(
+        package=pkg_name,
+        executable='state_resets_srv_node',
+        output='screen',
+    )
+
     transition_evaluation_node =  Node(
         package=pkg_name,
         executable='transition_evaluation_node',
@@ -34,5 +40,6 @@ def generate_launch_description():
         dynamic_feedback_node,
         transition_evaluation_node,
         transition_engine_node,
-        lifecycle_manager_node
+        lifecycle_manager_node,
+        state_resets_srv_node
     ])

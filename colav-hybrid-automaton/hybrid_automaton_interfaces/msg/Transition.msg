@@ -20,6 +20,7 @@ string mode
 # Names of transitions evaluated in this update cycle.
 string[] transition_names # key
 bool[] transition_values # value
+int32[] transition_priority # priorite for transitions 
 
 # Timestamp when this transition update was published.
 builtin_interfaces/Time stamp

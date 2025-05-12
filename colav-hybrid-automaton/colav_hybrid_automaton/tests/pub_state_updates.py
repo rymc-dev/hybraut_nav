@@ -52,19 +52,20 @@ while True:
         ros_time = Time()
         ros_time.sec = sec
         ros_time.nanosec = nanosec
-
+        from geometry_msgs.msg import Pose
+        from geometry_msgs.msg import Point
+        from geometry_msgs.msg import Quaternion
         agent_update = AgentUpdate(header=Header(stamp=ros_time), velocity=2.0)
         obstacles_update = ObstaclesUpdate(header=Header(stamp=ros_time))
         unsafe_set_update = UnsafeSet(header=Header(stamp=ros_time))
-        waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=10.0, y=2.0)), Waypoint()])
+        waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=100.0, y=100.0), acceptance_radius = 20.0) , Waypoint(position=Point32(x=100.0, y=100.0))])
 
         agent_pub.publish(agent_update)
         obstacles_pub.publish(obstacles_update)
         unsafe_set_pub.publish(unsafe_set_update)
         waypoints_pub.publish(waypoints_update)
         time.sleep(0.1)
-
     except KeyboardInterrupt:
-        break
+        pass
 
 rclpy.shutdown()

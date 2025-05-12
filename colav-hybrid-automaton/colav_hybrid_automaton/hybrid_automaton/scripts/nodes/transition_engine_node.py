@@ -23,6 +23,7 @@ from hybrid_automaton_interfaces.msg import (
     Waypoints,
     # output
 )
+from unique_identifier_msgs.msg import UUID
 from colav_interfaces.msg import GuardsStatus, Waypoints, ControllerFeedback
 # from hybrid_automaton.utils import get_current_ros_time  
 # from colav_hybrid_automaton.hybrid_automaton.utils.hybrid_automaton.node_utils import create_cli
@@ -36,10 +37,12 @@ from rcl_interfaces.msg import ParameterDescriptor
 from hybrid_automaton.utils import load_yml, process_automaton_config
 from hybrid_automaton_interfaces.msg import Transition, TransitionPending, TransitionTimer
 from ament_index_python.packages import get_package_share_directory
-
+from hybrid_automaton_interfaces.srv import Reset
 # Add two directories back to sys.path: necessary for local debugging when the package isn't built with colcon,
 # allowing imports to work correctly without relying on the build process.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from builtin_interfaces.msg import Duration
+from rclpy.time import Time
 
 default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
 
@@ -106,6 +109,13 @@ class TransitionEngineNode(Node):
         self.mode = None
         self.transition_pending = None
         self.transition_eval = None
+        self._waiting_after_reset = False
+        self._reset_complete_time = None
+
+        self.reset_srv_cli = self.create_client(
+            srv_type=Reset,
+            srv_name='/hybrid_automaton/reset_states'
+        )
 
         self.create_service(
             Trigger,
@@ -141,17 +151,40 @@ class TransitionEngineNode(Node):
         return response
 
 
+    def make_zero_uuid(self) -> UUID:
+        u = UUID()
+        u.uuid = [0]*16
+        return u
+
     def transition_check_callback(self):
         """
         Evaluates transitions between different modes based on guard conditions.
         """
         # Prepare request for evaluating transitions
+        if self._waiting_after_reset:
+            now = self.get_clock().now()
+        if now - self._reset_complete_time < Duration(seconds=1.0):
+            return  # Still waiting
+        else:
+            self._waiting_after_reset = False  # Done waiting
+
+
         if not isinstance(self.transition_pending, TransitionPending):
             return
         
-        if self.transition_pending.transition_pending: # transition is pending
+        try:
             mode = self.mode.lower()
+        except Exception as e: 
+            self.get_logger().error('self.mode has not been received by this node')
+            return
+        
+        if self.transition_pending.transition_pending: # transition is pending
+
             transition_eval:Transition = self.transition_eval
+            # Need to first check if transition eval is instece 
+            if not isinstance(transition_eval, Transition):
+                self.get_logger().error('transition evaluation not received')
+                return
             if transition_eval.success == False: 
                 self.get_logger().error(f"Something went wrong with transition evaluation: {transition_eval.error_message}")
                 return
@@ -175,6 +208,22 @@ class TransitionEngineNode(Node):
                         highest_priority = curr_priority
 
             
+            if transition is not None:
+                if self.config['transitions'][transition]['reset'] is not None: 
+                    if self.config['transitions'][transition]['reset'] in list(self.config['resets'].keys()):
+                        reset_name = self.config['transitions'][transition]['reset']
+                        client = self.create_client(Reset, '/hybrid_automaton/reset_states')
+
+                        if not client.wait_for_service(timeout_sec=5.0):
+                            self.get_logger().error('Service /hybrid_automaton/reset_states not available')
+                            return
+
+                        req = Reset.Request()
+                        req.transition_uuid = self.make_zero_uuid()
+                        req.reset_name = reset_name
+                        future = client.call_async(req)
+                        future.add_done_callback(self._handle_reset_response)
+     
             _, _, transition_to_raw = transition.partition("to_")
 
             # Split at the last underscore
@@ -185,134 +234,11 @@ class TransitionEngineNode(Node):
             else:
                 transition_to = transition_to_raw
 
-            # check if reset if reset then make request to reset service to update internal states
             self.mode_publisher.publish(String(data=transition_to))
-
-        
-        
-
-        # self._ha_pubs['mode'].publish(
-        #     String(data=str(self._CURRENT_MODE).upper()))
-        # self._ha_pubs['waypoints'].publish(
-        #     Waypoints(waypoints=self._STATES['waypoints']))
-
-        # try:
-        #     if self._guards_status is not None:
-        #         guards_to_check = self._guards_status.guard_names
-        #         guard_results = {}
-        #         for guard_name in guards_to_check:
-        #             if hasattr(self._guards_status, guard_name):
-        #                 value = getattr(self._guards_status, guard_name)
-        #                 guard_results[guard_name] = value
-        #             else:
-        #                 self.get_logger().warn(
-        #                     f'Guard name: "{guard_name}" not found in guard_status fields ')
-        #         active_guard = None
-        #         priority = -1
-        #         for guard, status in guard_results.items():
-        #             if self._TRANSITIONS[self._CURRENT_MODE][guard] < priority or priority == -1:
-        #                 if status:  # Means that the guard is active
-        #                     priority = self._TRANSITIONS[self._CURRENT_MODE][guard]
-        #                     active_guard = guard
-
-        #         # make transition based on active guard
-        #         if active_guard is not None:
-        #             # TODO: first check if there is a reset for this guar
-        #             # Get transition to item from guard name
-        #             new_control_mode = active_guard.split('_')[2]
-        #             self._CURRENT_MODE = new_control_mode
-        #             # If no reset condition for this guard then change control
-        #             # mode based on the transition
-        #         from std_msgs.msg import Header
-        #         from colav_interfaces.msg import CmdVelYaw, ControlMode, ControlStatus
-        #         # need to now publish the latest dynamic updates!!!!!!
-        #         controller_feedback = ControllerFeedback(
-        #             header=Header(stamp=get_current_ros_time()),
-        #             mission_tag="mission",  # TODO: Need to retrieve this from colav_params
-        #             agent_tag='agent',  # TODO: Need to retrive this from colav_params
-        #             cmd=CmdVelYaw(
-        #                 velocity=self._current_dynamics.dynamics.velocity,
-        #                 yaw_rate=self._current_dynamics.dynamics.yaw_rate),
-        #             mode=ControlMode(
-        #                 type=next(
-        #                     (k for k, v in self._MODES.items() if v == self._CURRENT_MODE), None)),
-        #             status=ControlStatus(type=1)
-        #         )
-        #         self._ha_pubs['controller_feedback'].publish(
-        #             controller_feedback)
-
-        # except Exception as e:
-        #     self.get_logger().error(f'Error occured: {str(e)}')
-
-        # request = EvaluateTransitions.Request()
-        # request.transition_names = [transition[0] for transition in self._TRANSITIONS[self._CURRENT_MODE]]
-        # cli = self._NODE_CLIS['evaluate_transitions']
-        # future = cli.call_async(request)
-        # future.add_done_callback(self._transition_evaluation_callback)
-
-    # def _transition_evaluation_callback(self, future):
-    #     """
-    #     Callback function for evaluating mode transitions based on guard conditions.
-
-    #     This function is triggered when the asynchronous transition evaluation completes.
-    #     It processes the `future` response containing the result of guard evaluations for
-    #     possible transitions from the current control mode.
-
-    #     If the evaluation is successful:
-    #     - It filters out the transitions with successful guard conditions.
-    #     - Among the valid transitions, it selects the one with the highest priority (lowest numeric value).
-    #     - Logs the name of the active transition.
-    #     - (TODO) Executes any necessary reset or update actions and updates the `_CURRENT_MODE`.
-
-    #     If the evaluation fails (`overall_success` is False), it raises a `RuntimeError`.
-
-    #     Args:
-    #         future (concurrent.futures.Future): A future object containing the result of the transition evaluation,
-    #                                             which is expected to have an `overall_success` flag,
-    #                                             a `results` list of evaluated transitions,
-    #                                             and a `message` describing any failure.
-
-    #     Raises:
-    #         RuntimeError: If the evaluation response indicates failure.
-    #         Exception: For any unexpected error encountered during processing.
-    #     """
-
-    #     try:
-    #         response = future.result()
-    #         if response.overall_success:
-    #             # Filter active transitions (those with a successful guard
-    #             # evaluation)
-    #             active_transitions = [t for t in response.results if t.success]
-    #             if active_transitions:
-    #                 # Determine the transition with the highest priority
-    #                 # (lowest numerical value)
-    #                 def get_priority(transition_name):
-    #                     for trans, priority in self._TRANSITIONS[self._CURRENT_MODE]:
-    #                         if trans == transition_name:
-    #                             return priority
-    #                     return float('inf')
-
-    #                 active_transition = min(
-    #                     active_transitions,
-    #                     key=lambda t: get_priority(
-    #                         t.transition_name))
-    #                 self.get_logger().info(
-    #                     f"Active transition: {active_transition.transition_name}")
-
-    #                 # TODO: Execute any reset/update actions,
-    #                 # and update the _CURRENT_MODE based on the chosen
-    #                 # transition.
-    #                 pass
-    #             else:
-    #                 # No transition was activated: execute dynamics for the
-    #                 # current mode.
-    #                 pass
-    #         else:
-    #             raise RuntimeError(
-    #                 f"Transition evaluation failed: {response.message}")
-    #     except Exception as e:
-    #         self.get_logger().error(str(e))
-    #         raise e
+            self.mode = transition_to
+        else: 
+            self.mode_publisher.publish(String(data=mode))
+            self.mode = mode
 
     def _stop_hybrid_automaton_callback(
             self,
@@ -327,26 +253,38 @@ class TransitionEngineNode(Node):
         return response
 
 
-from rclpy.executors import SingleThreadedExecutor
+    def _handle_reset_response(self, future):
+        try:
+            resp = future.result()
+            if resp.success:
+                self._waiting_after_reset = True
+                self._reset_complete_time = self.get_clock().now()
+            self.get_logger().info(f"Reset service response: success={resp.success}, message=\"{resp.message}\"")
+        except Exception as e:
+            self.get_logger().error(f"Reset service call failed: {str(e)}")
+
+from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
     rclpy.init(args=args)
     node = TransitionEngineNode()
+    executor = MultiThreadedExecutor()
+
+    # Add your node to the multithreaded executor
+    executor.add_node(node)
 
     try:
-        rclpy.spin(node)
-        # executor = SingleThreadedExecutor()
-        # executor.add_node(node)
-        # executor.spin()
+        # This will spin callbacks in parallel threads
+        executor.spin()
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f"Exception occurred: {e}")
+        node.get_logger().error(f"Exception in executor: {e}")
     finally:
-        if node is not None:
-            node.destroy_node()
+        # Cleanly shut down
+        executor.shutdown()       # stop the executor
+        node.destroy_node()       # tear down the node
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

@@ -11,7 +11,7 @@ from hybrid_automaton.utils import (
     quaternion_to_heading,
     get_current_ros_time
 )
-
+import math
 
 # Constant distance threshold (DSF) for now.
 DSF = 80  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
@@ -105,7 +105,7 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
 
 
 def is_heading_within_tolerance(agent_state: AgentUpdate,
-                            waypoints: Waypoints,
+                            waypoints_state: Waypoints,
                             heading_error_tolerance: float = 0.1,
                             tolerance: Duration = Duration(sec=1)) -> bool:
     """
@@ -129,16 +129,17 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     """
     # Calculate the heading error between the agent's current heading and the
     # direction to the waypoint.
-    if agent_state is None or \
-        waypoints is None: 
-        return False
+    if not isinstance(agent_state, AgentUpdate):
+        raise ValueError("is_heading_within_tolerance input state 'agent_state' not received.")
+    if not isinstance(waypoints_state, Waypoints): 
+        raise ValueError("is_heading_within_tolerance input state 'waypoints_state' not received.")
     
-    if len(waypoints.waypoints) > 0: 
-        current_waypoint = waypoints.waypoints[0]
+    if len(waypoints_state.waypoints) > 0: 
+        current_waypoint = waypoints_state.waypoints[0]
     else:
-        return False
+        raise ValueError("is_heading_within_tolerance input state 'waypoints_state' does not have waypoints.")
     
-    waypoint_heading_error = delta_heading(
+    error = delta_heading(
         x_a=agent_state.pose.position.x,
         y_a=agent_state.pose.position.y,
         theta_a=quaternion_to_heading(
@@ -152,8 +153,8 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     )
 
     # If the heading error is within the allowed tolerance, return True.
-    return bool(waypoint_heading_error > heading_error_tolerance)
-
+    return (error <= heading_error_tolerance) or \
+        math.isclose(error, heading_error_tolerance, abs_tol=1e-6) # this means error between 1e-6 is still within tolerance
 
 def is_unsafe_conditions(agent_state: AgentUpdate,
                        obstacles_state: ObstaclesUpdate,
@@ -239,14 +240,14 @@ def is_waypoint_reached(
             current_waypoint.position.y]
         if euclidean_distance(
                 agent_coords,
-                waypoint_coords) < current_waypoint.acceptance_radius:
+                waypoint_coords) <= current_waypoint.acceptance_radius:
             return True
 
     return False
 
 def is_heading_not_within_tolerance(agent_state: AgentUpdate,
-                          current_waypoint: Waypoint,
-                          heading_error_tolerance: float,
+                          waypoints: Waypoints,
+                          heading_error_tolerance: float = 0.1,
                           tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from T2LOS back to CRUISE
@@ -264,11 +265,13 @@ def is_heading_not_within_tolerance(agent_state: AgentUpdate,
         bool: True if the agent should transition back to CRUISE, otherwise False.
     """
     # Transition back to CRUISE if the heading alignment is not met.
-    return not is_heading_within_tolerance(
+    is_heading_not_within_tolerance = not is_heading_within_tolerance(
         agent_state,
-        current_waypoint,
+        waypoints,
         heading_error_tolerance,
-        tolerance)
+        tolerance
+    )
+    return is_heading_not_within_tolerance
 
 def is_virtual_waypoints(
     waypoints: Waypoints) -> bool:
