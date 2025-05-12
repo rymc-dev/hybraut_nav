@@ -49,9 +49,9 @@ import threading
 from hybrid_automaton_interfaces.msg import (
     Transition,
     TransitionPending,
-    TransitionTimer,
-    Waypoints
+    TransitionTimer
 )
+from colav_interfaces.msg import Waypoints
 from functools import partial
 from ament_index_python.packages import get_package_share_directory
 from std_srvs.srv import Trigger

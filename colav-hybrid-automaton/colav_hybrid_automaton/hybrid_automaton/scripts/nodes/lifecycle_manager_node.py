@@ -11,7 +11,8 @@ from std_msgs.msg import String
 from hybrid_automaton.config import QOS_PROFILE
 import uuid
 from unique_identifier_msgs.msg import UUID
-from hybrid_automaton_interfaces.msg import Dynamics, TransitionPending, Waypoints, TransitionTimer, DynamicParameter
+from hybrid_automaton_interfaces.msg import Dynamics, TransitionPending, TransitionTimer, DynamicParameter
+from colav_interfaces.msg import Waypoints
 from hybrid_automaton.utils import subtract_time
 from builtin_interfaces.msg import Time
 from ament_index_python.packages import get_package_share_directory

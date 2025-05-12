@@ -1,4 +1,4 @@
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet
+from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, Waypoints
 from rclpy.node import Node
 
 import sys
@@ -8,7 +8,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from hybrid_automaton.config.qos_config import QOS_PROFILE
 import rclpy
-from colav_interfaces.msg import Waypoints, Waypoint
 from std_msgs.msg import Header
 from builtin_interfaces.msg import Time
 
@@ -43,6 +42,10 @@ waypoints_pub = pub_node.create_publisher(
 
 from geometry_msgs.msg import Point32
 
+waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius = 20.0)])
+# waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius = 20.0) , Waypoint(position=Point32(x=100.0, y=100.0))])
+waypoints_pub.publish(waypoints_update)
+
 while True:
     try:
         now = time.time()  # seconds since epoch as float
@@ -58,12 +61,12 @@ while True:
         agent_update = AgentUpdate(header=Header(stamp=ros_time), velocity=2.0)
         obstacles_update = ObstaclesUpdate(header=Header(stamp=ros_time))
         unsafe_set_update = UnsafeSet(header=Header(stamp=ros_time))
-        waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=100.0, y=100.0), acceptance_radius = 20.0) , Waypoint(position=Point32(x=100.0, y=100.0))])
+    
 
         agent_pub.publish(agent_update)
         obstacles_pub.publish(obstacles_update)
         unsafe_set_pub.publish(unsafe_set_update)
-        waypoints_pub.publish(waypoints_update)
+
         time.sleep(0.1)
     except KeyboardInterrupt:
         pass

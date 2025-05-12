@@ -141,7 +141,24 @@ guards:
 # Invariants (Inv)
 # Leave empty if no mode constraints exist.
 # ============================================================================
-invariants: []
+invariants:
+  is_goal_waypoint:
+    module: hybrid_automaton.scripts.invariants
+    function: is_goal_waypoints 
+    state_inputs:
+      - 'waypoints_state'
+
+  trivial_invariant:
+    module: hybrid_automaton.scripts.invariants
+    function: trivial_invariant
+    state_inputs: 
+      - 'waypoints_state'
+
+  failing_invariant:
+    module: hybrid_automaton.scripts.invariants
+    function: failing_invariant
+    state_inputs: 
+      - 'waypoints_state'
 
 # ============================================================================
 # Transitions (E)
@@ -219,7 +236,8 @@ modes:
   cruise:
     index: 0
     dynamics: 'proportional_velocity_controller'
-    invariants: []
+    invariants:
+      trivial_invariant
     transitions:
       cruise_to_fallback:
         priority: 0
@@ -233,7 +251,8 @@ modes:
   t2los:
     index: 1
     dynamics: 'proportional_yaw_rate_controller'
-    invariants: []
+    invariants: 
+      trivial_invariant
     transitions:
       t2los_to_fallback:
         priority: 0
@@ -245,7 +264,8 @@ modes:
   waypoint_reached:
     index: 2
     dynamics: 'no_op_controller'
-    invariants: []
+    invariants: 
+      is_goal_waypoints
     transitions:
       waypoint_reached_to_cruise:
         priority: 0
@@ -253,7 +273,15 @@ modes:
   fallback:
     index: 3
     dynamics: 'no_op_controller'
-    invariants: []
+    invariants:
+      failing_invariant
+    transitions: []
+  
+  error: 
+    index: 4
+    dynamics: 'no_op_controller'
+    invariants:
+      failing_invariant
     transitions: []
 
 # ============================================================================
@@ -262,6 +290,7 @@ modes:
 modes_goal:
   - waypoint_reached
   - fallback
+  - error
 
 # ============================================================================
 # Initial Mode (Init)

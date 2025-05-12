@@ -15,12 +15,11 @@ find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(unique_identifier_msgs)
 find_package(builtin_interfaces REQUIRED)
+find_package(colav_interfaces REQUIRED)
 
 
 # ADDED dependencies END --------------------------
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/Waypoint.msg"
-  "msg/Waypoints.msg"
   "msg/DynamicParameter.msg"
   "msg/Dynamics.msg"
   "msg/DynamicsTimer.msg"
@@ -37,7 +36,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
   "action/HybridAutomaton.action"
 
-  DEPENDENCIES geometry_msgs nav_msgs std_msgs builtin_interfaces unique_identifier_msgs
+  DEPENDENCIES geometry_msgs nav_msgs std_msgs builtin_interfaces unique_identifier_msgs colav_interfaces
 )
 
 

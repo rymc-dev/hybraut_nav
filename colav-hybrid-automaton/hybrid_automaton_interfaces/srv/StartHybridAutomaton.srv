@@ -17,7 +17,7 @@ string mission_profile  # Define the type of mission (e.g., "fastest_path", "saf
 unique_identifier_msgs/UUID agent_uuid   # Unique identifier for the agent (e.g., vessel, drone)
 
 # --- Control Inputs Start ---
-hybrid_automaton_interfaces/Waypoint goal_waypoint  # Target waypoint for the agent to reach
+colav_interfaces/Waypoint goal_waypoint  # Target waypoint for the agent to reach
 # --- Control Inputs End ---
 
 ---
