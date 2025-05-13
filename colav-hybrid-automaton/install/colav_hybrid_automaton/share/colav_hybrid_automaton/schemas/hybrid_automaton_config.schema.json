@@ -1,0 +1,206 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Hybrid Automaton Framework Schema",
+    "description": "This schema defines the structure for validating JSON data related to the Hybrid Automaton Configuration",
+    "version": "1.0.0",
+    "type": "object",
+    "properties": {
+        "states": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+              "type": "object",
+              "required": ["topic", "type"],
+              "properties": {
+                "topic": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "object",
+                  "required": ["pkg", "msg"],
+                  "properties": {
+                    "pkg": { "type": "string" },
+                    "msg": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                },
+                "params": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "maxProperties": 1,
+                    "patternProperties": {
+                      "^(update_hz|timeout_sec)$": { "type": "number" }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "resets": {
+            "type": "object",
+            "patternProperties": {
+              "^[a-zA-Z0-9_]+$": {
+                "type": "object",
+                "required": ["module", "function", "state_inputs", "state_outputs"],
+                "properties": {
+                    "module": {"type": "string"},
+                    "function": {"type": "string"},
+                    "state_inputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "state_outputs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+      },
+      "guards": {
+        "type": "object",
+        "patternProperties": {
+        "^[a-zA-Z0-9_]+$": {
+            "type": "object",
+            "required": ["module", "function", "state_inputs"],
+            "properties": {
+                "module": {"type": "string"},
+                "function": {"type": "string"},
+                "state_inputs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": false
+        }
+        },
+        "additionalProperties": false
+    },
+    "invariants": {
+        "type": "object",
+        "patternProperties": {
+        "^[a-zA-Z0-9_]+$": {
+            "type": "object",
+            "required": ["module", "function", "state_inputs"],
+            "properties": {
+                "module": {"type": "string"},
+                "function": {"type": "string"},
+                "state_inputs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": false
+        }
+        },
+        "additionalProperties": false
+    },
+    "transitions": {
+        "type": "object",
+        "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+                "type": "object",
+                "properties": {
+                    "guard": {"type": "string"},
+                    "reset": {"type": "string"}
+                },
+            "additionalProperties": false
+            }
+        },
+        "additionalProperties": false
+    },
+    "dynamics": {
+        "type": "object",
+        "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+                "type": "object",
+                "properties": {
+                    "module": {"type": "string"},
+                    "function": {"type": "string"}
+                },
+                "additionalProperties": false
+            }
+        },
+        "additionalProperties": false
+    },
+    "modes": {
+        "type": "object",
+        "patternProperties": {
+            "^[a-zA-Z0-9_]+$": {
+                "type": "object",
+                "properties": {
+                    "index": {"type": "string"},
+                    "function": {"type": "string"},
+                    "transitions": {
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-zA-Z0-9_]+$": {
+                            "type": "object",
+                            "required": ["priority"],
+                            "properties": {
+                              "priority": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                },
+                "additionalProperties": false
+            }
+        },
+        "additionalProperties": false
+    },
+    "modes_goal": {
+        "type": "array",
+        "items": {
+            "type": "string"
+        }
+    },
+    "init": {
+        "type": "object",
+        "required": ["mode"],
+        "properties": {
+          "mode": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+    },
+    "params": {
+        "type": "object",
+        "required": ["transition_evaluation_hz", "transition_evaluation_timeout"],
+        "properties": {
+          "transition_evaluation_hz": {
+            "type": "number",
+            "minimum": 0
+          },
+          "transition_evaluation_timeout": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+    },
+    "required": ["states", "resets", "guards", "invariants", "transitions", "dynamics", "modes", "init", "params"]
+}

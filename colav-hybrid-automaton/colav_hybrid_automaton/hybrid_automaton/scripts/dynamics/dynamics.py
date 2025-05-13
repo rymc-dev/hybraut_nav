@@ -11,7 +11,7 @@ from builtin_interfaces.msg import Duration
 # constant target velocity for now but in the future would like to change
 # this t obe based on agent static dynamic params Convert knots to meters
 # per second (1 knot = 0.514444 m/s)
-TARGET_VELOCITY = 25 * 0.514444
+TARGET_VELOCITY = 30 * 0.514444
 # TODO: Get this value from colav_params/agent_constraints Limit
 # acceleration to (m/s^2)
 MAX_ACCELERATION = 1.0

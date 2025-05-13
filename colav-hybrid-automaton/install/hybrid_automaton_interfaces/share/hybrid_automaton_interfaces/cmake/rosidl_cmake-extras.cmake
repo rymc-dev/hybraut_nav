@@ -1,0 +1,4 @@
+# generated from rosidl_cmake/cmake/rosidl_cmake-extras.cmake.in
+
+set(hybrid_automaton_interfaces_IDL_FILES "msg/DynamicParameter.idl;msg/Dynamics.idl;msg/DynamicsTimer.idl;msg/Mode.idl;msg/Transition.idl;msg/TransitionPending.idl;msg/TransitionTimer.idl;msg/Output.idl;msg/Guards.idl;srv/Reset.idl;srv/StartHybridAutomaton.idl;srv/StopHybridAutomaton.idl;action/HybridAutomaton.idl")
+set(hybrid_automaton_interfaces_INTERFACE_FILES "msg/DynamicParameter.msg;msg/Dynamics.msg;msg/DynamicsTimer.msg;msg/Mode.msg;msg/Transition.msg;msg/TransitionPending.msg;msg/TransitionTimer.msg;msg/Output.msg;msg/Guards.msg;srv/Reset.srv;srv/Reset_Request.msg;srv/Reset_Response.msg;srv/StartHybridAutomaton.srv;srv/StartHybridAutomaton_Request.msg;srv/StartHybridAutomaton_Response.msg;srv/StopHybridAutomaton.srv;srv/StopHybridAutomaton_Request.msg;srv/StopHybridAutomaton_Response.msg;action/HybridAutomaton.action")

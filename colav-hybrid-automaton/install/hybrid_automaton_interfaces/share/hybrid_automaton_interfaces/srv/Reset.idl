@@ -1,0 +1,46 @@
+// generated from rosidl_adapter/resource/srv.idl.em
+// with input from hybrid_automaton_interfaces/srv/Reset.srv
+// generated code does not contain a copyright notice
+
+#include "unique_identifier_msgs/msg/UUID.idl"
+
+module hybrid_automaton_interfaces {
+  module srv {
+    @verbatim (language="comment", text=
+      "Reset.srv" "\n"
+      "ROS 2 service definition for issuing reset requests to the Hybrid Automaton framework." "\n"
+      "" "\n"
+      "This service allows external systems to request a reset of the automaton's state," "\n"
+      "based on a specified reset name. The reset is applied to the state associated with" "\n"
+      "the given transition UUID and transition name.")
+    struct Reset_Request {
+      @verbatim (language="comment", text=
+        "NOTE: Do not modify this file." "\n"
+        "--- Request ---" "\n"
+        "UUID of the transition to apply the reset to")
+      unique_identifier_msgs::msg::UUID transition_uuid;
+
+      @verbatim (language="comment", text=
+        "Name of the reset function to invoke")
+      string reset_name;
+    };
+    struct Reset_Response {
+      @verbatim (language="comment", text=
+        "--- Response ---" "\n"
+        "UUID of the transition that was evaluated")
+      unique_identifier_msgs::msg::UUID transition_uuid;
+
+      @verbatim (language="comment", text=
+        "Name of the transition that was evaluated")
+      string reset_name;
+
+      @verbatim (language="comment", text=
+        "Indicates whether the reset was applied successfully")
+      boolean success;
+
+      @verbatim (language="comment", text=
+        "Summary message describing the result or error, if any")
+      string message;
+    };
+  };
+};

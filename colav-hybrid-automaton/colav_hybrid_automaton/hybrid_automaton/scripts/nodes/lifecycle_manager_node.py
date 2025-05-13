@@ -177,7 +177,7 @@ class LifeCycleManager(Node):
             rclpy.spin_once(self)
 
         # Cleanup timer and goal handle
-        self._feedback_timer.cancel()
+        self.destroy_timer(self._feedback_timer)
         self._current_goal_handle = None
 
         # Return final result (sends to client)

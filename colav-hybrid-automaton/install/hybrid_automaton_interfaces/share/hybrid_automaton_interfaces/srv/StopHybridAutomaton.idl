@@ -1,0 +1,48 @@
+// generated from rosidl_adapter/resource/srv.idl.em
+// with input from hybrid_automaton_interfaces/srv/StopHybridAutomaton.srv
+// generated code does not contain a copyright notice
+
+#include "builtin_interfaces/msg/Time.idl"
+#include "unique_identifier_msgs/msg/UUID.idl"
+
+module hybrid_automaton_interfaces {
+  module srv {
+    @verbatim (language="comment", text=
+      "StopHybridAutomaton" "\n"
+      "ROS 2 service for terminating the Hybrid Automaton Framework." "\n"
+      "" "\n"
+      "This service stops or terminates the currently operating Hybrid Automaton instance." "\n"
+      "The automaton specified by the `automaton_uuid` will be stopped, and the system will cease its current operations." "\n"
+      "" "\n"
+      "NOTE: Do not modify anything outside the boundaries marked")
+    struct StopHybridAutomaton_Request {
+      @verbatim (language="comment", text=
+        "--- Request ---" "\n"
+        "Timestamp for synchronization of the request")
+      builtin_interfaces::msg::Time stamp;
+
+      @verbatim (language="comment", text=
+        "Unique identifier for the Hybrid Automaton instance to be stopped")
+      unique_identifier_msgs::msg::UUID automaton_uuid;
+
+      @verbatim (language="comment", text=
+        "Optional: A reason for stopping the automaton (e.g., \"mission_complete\", \"manual_stop\", \"error\")")
+      string stop_reason;
+    };
+    @verbatim (language="comment", text=
+      "--- Response ---")
+    struct StopHybridAutomaton_Response {
+      @verbatim (language="comment", text=
+        "Echo the automaton_uuid to confirm which automaton was stopped")
+      unique_identifier_msgs::msg::UUID automaton_uuid;
+
+      @verbatim (language="comment", text=
+        "Indicates whether the Hybrid Automaton was successfully terminated")
+      boolean success;
+
+      @verbatim (language="comment", text=
+        "Optional: Detailed message providing additional information (e.g., \"Successfully stopped\", \"Error: automaton not found\")")
+      string message;
+    };
+  };
+};

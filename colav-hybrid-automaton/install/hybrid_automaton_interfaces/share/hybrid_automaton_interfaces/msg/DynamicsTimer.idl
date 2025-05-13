@@ -1,0 +1,41 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from hybrid_automaton_interfaces/msg/DynamicsTimer.msg
+// generated code does not contain a copyright notice
+
+#include "builtin_interfaces/msg/Duration.idl"
+#include "unique_identifier_msgs/msg/UUID.idl"
+
+module hybrid_automaton_interfaces {
+  module msg {
+    @verbatim (language="comment", text=
+      "DynamicsTimer.msg" "\n"
+      "ROS 2 interface for the Hybrid Automaton framework." "\n"
+      "Publishes timing information related to dynamic updates." "\n"
+      "Used to monitor synchronization and detect delays or missed updates " "\n"
+      "in the hybrid automaton's control modes.")
+    struct DynamicsTimer {
+      @verbatim (language="comment", text=
+        "PURPOSE: This message tracks the elapsed time since the last dynamics update." "\n"
+        "It supports runtime evaluation of system responsiveness and timeout detection." "\n"
+        "NOTE: Do not modify this file." "\n"
+        "UUID of the most recent dynamic update")
+      unique_identifier_msgs::msg::UUID previous_dynamic_uuid;
+
+      @verbatim (language="comment", text=
+        "Duration since the last dynamics update was received")
+      builtin_interfaces::msg::Duration elapsed;
+
+      @verbatim (language="comment", text=
+        "Configured timeout duration for dynamics updates")
+      builtin_interfaces::msg::Duration timeout;
+
+      @verbatim (language="comment", text=
+        "Timeout value in seconds (for convenience or compatibility)")
+      double timeout_sec;
+
+      @verbatim (language="comment", text=
+        "True if the elapsed time has exceeded the timeout threshold")
+      boolean expired;
+    };
+  };
+};
