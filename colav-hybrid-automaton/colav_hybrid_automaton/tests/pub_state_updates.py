@@ -42,9 +42,10 @@ waypoints_pub = pub_node.create_publisher(
 
 from geometry_msgs.msg import Point32
 
-waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius = 20.0)])
+# waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius = 20.0), Waypoint(position=Point32(x=100.0, y=100.9), acceptance_radius=10.0)])
+waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=100.9), acceptance_radius=0.0)])
 # waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius = 20.0) , Waypoint(position=Point32(x=100.0, y=100.0))])
-waypoints_pub.publish(waypoints_update)
+
 
 while True:
     try:
@@ -62,7 +63,7 @@ while True:
         obstacles_update = ObstaclesUpdate(header=Header(stamp=ros_time))
         unsafe_set_update = UnsafeSet(header=Header(stamp=ros_time))
     
-
+        waypoints_pub.publish(waypoints_update)
         agent_pub.publish(agent_update)
         obstacles_pub.publish(obstacles_update)
         unsafe_set_pub.publish(unsafe_set_update)

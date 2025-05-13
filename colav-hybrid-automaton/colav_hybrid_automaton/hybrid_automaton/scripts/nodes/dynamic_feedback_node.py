@@ -153,6 +153,8 @@ class DynamicFeedbackNode(Node):
         #     qos_profile=QOS_PROFILE
         # )
 
+        self._dynamics_timer = None
+
         # subscribe to state updates
         create_state_subscriptions(node=self) # uncomment this in future
 
@@ -167,7 +169,6 @@ class DynamicFeedbackNode(Node):
             srv_name=f'/hybrid_automaton/stop_dynamics_eval',
             callback=self._stop_dynamics_evaluation_callback
         )
-
 
         # Internal State
         self._current_mode = None
@@ -198,8 +199,21 @@ class DynamicFeedbackNode(Node):
             self,
             request: Trigger.Request,
             response: Trigger.Response):
-        # TODO
-        pass
+        try:
+            if self._dynamics_timer is not None:
+                self.destroy_timer(self._dynamics_timer)
+                self._dynamics_timer = None
+            
+            self._current_mode = None
+            self._agent_state = None
+            response.success = True
+            response.message = "dynamics evaluation stopped successfully."
+        except Exception as e:
+            self.get_logger().error(f"Error occured: {str(e)}")
+            response.success = False
+            response.message = f"Error occured: {str(e)}"
+        
+        return response
 
     def _update_dynamics_callback(self):
         """updating dynamics"""

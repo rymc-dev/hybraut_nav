@@ -1,13 +1,13 @@
 from colav_interfaces.msg import Waypoints
 
-def is_goal_waypoints(waypoints: Waypoints) -> bool:
-    if isinstance(waypoints, Waypoints):
-        raise ValueError("invalid input to invariant 'is_goal_waypoints'")
+def is_at_final_waypoint(waypoints: Waypoints) -> bool:
+    if not isinstance(waypoints, Waypoints):
+        raise ValueError("invalid input to invariant 'is_at_final_waypoint'")
 
     if len(waypoints.waypoints) == 1:
-        return True
+        return False
     
-    return False
+    return True
 
 def trivial_invariant() -> bool:
     return True

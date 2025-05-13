@@ -42,6 +42,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from builtin_interfaces.msg import Duration
 from rclpy.time import Time
 import threading
+from hybrid_automaton.utils import create_state_subscriptions
+from hybrid_automaton.config import HybridAutomatonStatus
 
 default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
 
@@ -86,6 +88,11 @@ class TransitionEngineNode(Node):
             '/hybrid_automaton/mode',
             qos_profile=QOS_PROFILE
         )
+        self.status_publisher = self.create_publisher(
+            String,
+            '/hybrid_automaton/status',
+            qos_profile=QOS_PROFILE
+        )
         self.transition_pending_pub = self.create_publisher(
             TransitionPending,
             '/hybrid_automaton/transition_pending',
@@ -94,7 +101,7 @@ class TransitionEngineNode(Node):
         self.create_subscription(
             topic="/hybrid_automaton/mode",
             msg_type=String,
-            callback=lambda msg: self.__setattr__('mode', msg.data),
+            callback=lambda msg: self.__setattr__('mode', msg.data.lower()),
             qos_profile=QOS_PROFILE
         )
         self.create_subscription(
@@ -109,8 +116,16 @@ class TransitionEngineNode(Node):
             callback=lambda msg: self.__setattr__('transition_pending', msg),
             qos_profile=QOS_PROFILE
         )
+        self.create_subscription(
+            topic='/hybrid_automaton/status',
+            msg_type=String,
+            callback=lambda msg: self.__setattr__('status', msg.data),
+            qos_profile=QOS_PROFILE
+        )
+        create_state_subscriptions(node=self)
 
         self.mode = None
+        self.status = None
         self.transition_pending = None
         self.transition_eval = None
         self._waiting_after_reset = False
@@ -166,114 +181,139 @@ class TransitionEngineNode(Node):
 
         # If a reset is in progress, skip all transition logic
         if self.reset_event.is_set():
+            self.status_publisher.publish(String(data=HybridAutomatonStatus.TRANSITIONING.name))
             self.get_logger().info(f'Transition reset in progress for transition: {self.current_transition_uuid}')
             return
 
-        # Ensure we have pending info
-        if not isinstance(self.transition_pending, TransitionPending):
-            return
-
-        try:
-            mode = self.mode.lower()
-        except Exception:
+        if self.mode is None:
+            self.status_publisher.publish(String(data=HybridAutomatonStatus.AWAITING_MODE.name))
             self.get_logger().error('self.mode has not been received by this node')
             return
-        # Only proceed if a transition is actually pending
-        if not self.transition_pending.transition_pending:
-            # No transition pending: just re-publish current mode
-            self.mode_publisher.publish(String(data=mode))
-            self.mode = mode
-            return
 
-        # We have a pending transition; evaluate which one
-        transition_eval: Transition = self.transition_eval
-        if not isinstance(transition_eval, Transition):
-            self.get_logger().error('transition evaluation not received')
-            return
-        if not transition_eval.success:
-            self.get_logger().error(f"Transition evaluation failed: {transition_eval.error_message}")
-            return
+        # Get invariant
+        invariant = self.config['modes'][self.mode].get('invariants')
+        if not invariant:
+            return  # No invariant found
 
-        self.current_transition_uuid = transition_eval.transition_uuid
-        pending = [
-            name for idx, name in enumerate(transition_eval.transition_names)
-            if transition_eval.transition_values[idx]
+        inv_func = self.config['invariants'][invariant]['function']
+        state_inputs_raw = self.config['invariants'][invariant].get('state_inputs', [])
+        state_inputs = [
+            self.config['states'][state_input]['state']
+            for state_input in state_inputs_raw if state_input in self.config['states']
         ]
-        if not pending:
+        try:
+            invariant_output = inv_func(*state_inputs)
+        except Exception as e:
+            self.get_logger().error(str(e))
+            self.status_publisher.publish(String(data=HybridAutomatonStatus.FAILED.name))
+            return
+
+        # If no transition is pending, re-publish current mode
+        if isinstance(self.transition_pending, TransitionPending) and self.transition_pending.transition_pending and isinstance(self.transition_eval, Transition):
+            # Transition evaluation
+            if not self.transition_eval.success:
+                self.get_logger().error(f"Transition evaluation failed: {self.transition_eval.error_message}")
+                self.status_publisher.publish(String(data=HybridAutomatonStatus.FAILED.name))
+                return
+
+            self.current_transition_uuid = self.transition_eval.transition_uuid
+            pending = [
+                name for idx, name in enumerate(self.transition_eval.transition_names)
+                if self.transition_eval.transition_values[idx]
+            ]
+        else:
+            # No transitions pending: finalize or return based on invariant output
+            if invariant_output is False:
+                self.status_publisher.publish(String(data=HybridAutomatonStatus.COMPLETED.name))
+                return
+            
+            self.status_publisher.publish(String(data=HybridAutomatonStatus.ACTIVE.name))
             return
 
         # Select the highest-priority transition
-        transition = None
-        if len(pending) == 1:
-            transition = pending[0]
-        else:
-            highest = float('inf')
-            for name in pending:
-                prio = self.config['modes'][mode]['transitions'][name]['priority']
-                if prio < highest:
-                    highest = prio
-                    transition = name
-
-        # If this transition requires a reset, call the service and defer publishing
-        reset_name = self.config['transitions'][transition].get('reset')
-        if reset_name and reset_name in self.config['resets']:
-            self.reset_event.set()
-            client = self.create_client(Reset, '/hybrid_automaton/reset_states')
-            if not client.wait_for_service(timeout_sec=5.0):
-                self.get_logger().error('Reset service not available')
-                self.reset_event.clear()
-                return
-
-            req = Reset.Request()
-            req.transition_uuid = self.current_transition_uuid
-            req.reset_name = reset_name
-            future = client.call_async(req)
-
-            # Timeout watchdog
-            def _on_reset_timeout():
-                if not future.done():
-                    self.get_logger().warn("Reset service call timed out.")
-                    self.reset_event.clear()
-
-            timeout_timer = threading.Timer(30.0, _on_reset_timeout)
-            timeout_timer.start()
-
-            # Proper done-callback
-            def _on_reset_response(fut):
-                timeout_timer.cancel()
-                try:
-                    resp = fut.result()
-                    if resp.success:
-                        self.get_logger().info(f"Reset succeeded: {resp.message}")
-                        # Publish the mode transition now that reset is done
-                        self.parse_and_publish_transition(transition)
-                        # Clear the pending flag
-                        tp = TransitionPending(
-                            stamp=transition_eval.stamp,
-                            transition_uuid=transition_eval.transition_uuid,
-                            transition_pending=False
-                        )
-                        self.transition_pending_pub.publish(tp)
-                    else:
-                        self.get_logger().error(f"Reset failed: {resp.message}")
-                except Exception as e:
-                    self.get_logger().error(f"Reset service exception: {e}")
-                finally:
-                    # Always clear the event so future evaluations resume
-                    self.reset_event.clear()
-
-            future.add_done_callback(_on_reset_response)
+        transition = self._select_highest_priority_transition(pending)
+        # no transitions and invariants is still true therefore we still active
+        if transition is None:
+            self.status_publisher.publish(String(data=HybridAutomatonStatus.ACTIVE.name))
             return
 
-        # No reset needed: publish transition immediately
+        # Handle reset if required
+        reset_name = self.config['transitions'][transition].get('reset')
+        if reset_name and reset_name in self.config['resets']:
+            self._handle_reset(transition)
+        else:
+            self._publish_transition(transition)
+
+    def _select_highest_priority_transition(self, pending):
+        """
+        Helper function to select the highest-priority transition from a list of pending transitions.
+        """
+        if len(pending) == 1:
+            return pending[0]
+        
+        highest_priority = float('inf')
+        transition = None
+        for name in pending:
+            prio = self.config['modes'][self.mode]['transitions'][name]['priority']
+            if prio < highest_priority:
+                highest_priority = prio
+                transition = name
+        return transition
+
+    def _handle_reset(self, transition):
+        """
+        Handles the reset logic for a transition that requires it.
+        """
+        self.reset_event.set()
+        client = self.create_client(Reset, '/hybrid_automaton/reset_states')
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('Reset service not available')
+            self.reset_event.clear()
+            return
+
+        req = Reset.Request()
+        req.transition_uuid = self.current_transition_uuid
+        req.reset_name = self.config['transitions'][transition].get('reset')
+        future = client.call_async(req)
+
+        # Timeout watchdog
+        def _on_reset_timeout():
+            if not future.done():
+                self.get_logger().warn("Reset service call timed out.")
+                self.reset_event.clear()
+
+        timeout_timer = threading.Timer(30.0, _on_reset_timeout)
+        timeout_timer.start()
+
+        # Reset response callback
+        def _on_reset_response(fut):
+            timeout_timer.cancel()
+            try:
+                resp = fut.result()
+                if resp.success:
+                    self.get_logger().info(f"Reset succeeded: {resp.message}")
+                    self._publish_transition(transition)
+                else:
+                    self.get_logger().error(f"Reset failed: {resp.message}")
+            except Exception as e:
+                self.get_logger().error(f"Reset service exception: {e}")
+            finally:
+                self.reset_event.clear()
+
+        future.add_done_callback(_on_reset_response)
+
+    def _publish_transition(self, transition):
+        """
+        Publishes the transition when no reset is needed.
+        """
         self.parse_and_publish_transition(transition)
         tp = TransitionPending(
-            stamp=transition_eval.stamp,
-            transition_uuid=transition_eval.transition_uuid,
+            stamp=self.transition_eval.stamp,
+            transition_uuid=self.transition_eval.transition_uuid,
             transition_pending=False
         )
+        self.status_publisher.publish(String(data=HybridAutomatonStatus.TRANSITIONING.name))
         self.transition_pending_pub.publish(tp)
-
 
     def parse_and_publish_transition(self, transition):
         _, _, transition_to_raw = transition.partition("to_")

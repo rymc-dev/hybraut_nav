@@ -142,23 +142,19 @@ guards:
 # Leave empty if no mode constraints exist.
 # ============================================================================
 invariants:
-  is_goal_waypoint:
+  is_at_final_waypoint:
     module: hybrid_automaton.scripts.invariants
-    function: is_goal_waypoints 
+    function: is_at_final_waypoint
     state_inputs:
       - 'waypoints_state'
 
   trivial_invariant:
     module: hybrid_automaton.scripts.invariants
     function: trivial_invariant
-    state_inputs: 
-      - 'waypoints_state'
 
   failing_invariant:
     module: hybrid_automaton.scripts.invariants
     function: failing_invariant
-    state_inputs: 
-      - 'waypoints_state'
 
 # ============================================================================
 # Transitions (E)
@@ -265,7 +261,7 @@ modes:
     index: 2
     dynamics: 'no_op_controller'
     invariants: 
-      is_goal_waypoints
+      is_at_final_waypoint
     transitions:
       waypoint_reached_to_cruise:
         priority: 0
