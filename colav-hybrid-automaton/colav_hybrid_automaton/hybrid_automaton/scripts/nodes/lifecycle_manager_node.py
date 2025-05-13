@@ -82,6 +82,11 @@ class LifeCycleManager(Node):
             '/hybrid_automaton/status',
             QOS_PROFILE
         )
+        self.waypoint_publisher = self.create_publisher(
+            Waypoints,
+            '/hybrid_automaton/state/waypoints',
+            QOS_PROFILE
+        )
         self.create_subscription(
             String,
             '/hybrid_automaton/mode',
@@ -145,6 +150,8 @@ class LifeCycleManager(Node):
         self.automaton_uuid = uuid.uuid4()
         self.ros_automaton_uuid = UUID(uuid=list(self.automaton_uuid.bytes))
         self.mission_active = True
+        init_waypoints = Waypoints(waypoints=[goal.goal_waypoint])
+        self.waypoint_publisher.publish(init_waypoints)
         self.get_logger().info('Accepted, Starting Hybrid Automaton...')
         return GoalResponse.ACCEPT
 
