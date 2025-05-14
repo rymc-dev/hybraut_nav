@@ -11,6 +11,7 @@ from std_srvs.srv import Trigger
 from ament_index_python.packages import get_package_share_directory
 import os
 import uuid
+from rclpy.executors import MultiThreadedExecutor
 
 from hybrid_automaton.utils import (
     validate_timestamps_within_tolerance,
@@ -21,6 +22,10 @@ from hybrid_automaton.utils import (
 )
 from hybrid_automaton.config import QOS_PROFILE, HybridAutomatonStatus
 from hybrid_automaton_interfaces.msg import Dynamics, TransitionPending, TransitionTimer, DynamicParameter
+import threading
+import time
+import asyncio
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Default path to the hybrid automaton config
 default_hybrid_automaton_config = os.path.join(
@@ -28,6 +33,15 @@ default_hybrid_automaton_config = os.path.join(
     'config',
     'colav_hybrid_automaton_config.yml'
 )
+
+automaton_srv_names = [
+    '/hybrid_automaton/start_dynamics_eval',
+    '/hybrid_automaton/start_transition_eval',
+    '/hybrid_automaton/start_transition_engine'
+]
+automaton_clis = [
+
+]
 
 class LifeCycleManager(Node):
     def __init__(self,
@@ -57,10 +71,17 @@ class LifeCycleManager(Node):
             )
         )
 
+
+        for srv_name in automaton_srv_names:
+            cli = self.create_client(Trigger, srv_name)
+            if not cli.wait_for_service(timeout_sec=2.0):
+                raise TimeoutError(f"Timeout waiting for {srv_name}")
+            automaton_clis.append(cli)
+
         # Internal state variables
         self.initial_mode = self.config['init']['mode']
         self.final_modes = self.config['modes_goal']
-        self.mission_active = False
+        self.automaton_active_event = threading.Event()
         self.mission_start_time = None
         self.automaton_uuid = None
         self.ros_automaton_uuid = None
@@ -131,67 +152,90 @@ class LifeCycleManager(Node):
             'hybrid_automaton_action_server',
             execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
-            cancel_callback=self._cancel_callback
+            cancel_callback=self._cancel_callback,
+            callback_group=ReentrantCallbackGroup()
         )
 
-    def goal_callback(self, goal: HybridAutomaton.Goal, 
-                      mission_request_tolerance: Duration = Duration(sec=1)):
+    async def goal_callback(
+        self, 
+        goal: HybridAutomaton.Goal, 
+        mission_request_tolerance: Duration = Duration(sec=1)
+    ) -> GoalResponse:
+        """Callback function triggered upon receiving a new mission goal for the Hybrid Automaton."""
+
         try:
+            # Validate that the mission timestamp is within an acceptable range of the current ROS time
             validate_timestamps_within_tolerance(
                 goal.stamp,
                 get_current_ros_time(),
-                Duration(sec=10)
+                Duration(sec=10)  # Hard-coded for now, consider using mission_request_tolerance instead
             )
+
+            # TODO: Add validation logic for the received waypoint, e.g., bounds or format checking
+
+            await self.start_services_async()
+
+            # Store mission context
+            self.mission_start_time = goal.stamp
+            self.automaton_uuid = uuid.uuid4()
+            self.ros_automaton_uuid = UUID(uuid=list(self.automaton_uuid.bytes))
+
+            # Publish initial waypoint
+            initial_waypoints = Waypoints(waypoints=[goal.goal_waypoint])
+            self.waypoint_publisher.publish(initial_waypoints)
+
         except Exception as e:
             self.get_logger().error(f"Mission Request Rejected: {e}")
             return GoalResponse.REJECT
 
-        self.mission_start_time = goal.stamp
-        self.automaton_uuid = uuid.uuid4()
-        self.ros_automaton_uuid = UUID(uuid=list(self.automaton_uuid.bytes))
-        self.mission_active = True
-        init_waypoints = Waypoints(waypoints=[goal.goal_waypoint])
-        self.waypoint_publisher.publish(init_waypoints)
-        self.get_logger().info('Accepted, Starting Hybrid Automaton...')
+        self.automaton_active_event.set()
+        self.get_logger().info("Mission request accepted. Hybrid Automaton starting mission.")
         return GoalResponse.ACCEPT
+ 
+    async def start_services_async(self, timeout_sec: float = 2.0):
+        """
+        Starts all dependent services asynchronously through the action server executor.
+        Raises RuntimeError if any service fails to start within the timeout or returns a failed response.
+        """
+        for idx, client in enumerate(automaton_clis):
+            service_name = automaton_srv_names[idx]
+            request = Trigger.Request()
 
-    def execute_callback(self, goal_handle):
+            future = client.call_async(request)
+            rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
+
+            if not future.done():
+                raise RuntimeError(f"Service '{service_name}' did not respond within {timeout_sec} seconds.")
+
+            result = future.result()
+            if result is None or not result.success:
+                raise RuntimeError(f"Service '{service_name}' failed to start: {getattr(result, 'message', 'Unknown error')}")
+
+            self.get_logger().info(f"Service '{service_name}' started successfully.")
+
+    async def execute_callback(self, goal_handle):
+        """This is the callback function when the hybrid automaton mission request has been received"""
+
+        self.get_logger().info("Hybrid Automaton mission goal received.")
         self._current_goal_handle = goal_handle
 
         # Publish initial mode
         self.mode_publisher.publish(String(data=self.initial_mode))
-
-        # Start underlying services
-        for srv_name in [
-            '/hybrid_automaton/start_dynamics_eval',
-            '/hybrid_automaton/start_transition_eval',
-            '/hybrid_automaton/start_transition_engine'
-        ]:
-            cli = self.create_client(Trigger, srv_name)
-            if not cli.wait_for_service(timeout_sec=2.0):
-                raise TimeoutError(f"Timeout waiting for {srv_name}")
-            future = cli.call_async(Trigger.Request())
-            rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
-            if not future.done() or not future.result().success:
-                raise RuntimeError(f"Service {srv_name} failed to start")
-
-        # Start feedback timer
-        hz = self.get_parameter('transition_evaluation_hz').value
-        self._feedback_timer = self.create_timer(1.0/hz, self._feedback_timer_callback)
-
-        # Spin until mission_active is cleared
-        while self.mission_active:
-            rclpy.spin_once(self)
-
-        # Cleanup timer and goal handle
-        self.destroy_timer(self._feedback_timer)
-        self._current_goal_handle = None
-
-        # Return final result (sends to client)
-        result = HybridAutomaton.Result()
-        result.success = True
-        result.message = 'Mission Completed!'
+        
+        await self.feedback_executor()
+        
+        result = HybridAutomaton.Result(success=True, message='Mission Complete')
+        self.automaton_active_event.clear()
         return result
+    
+    async def feedback_executor(self):
+        self.automaton_active_event.set()
+        hz = self.get_parameter('transition_evaluation_hz').value
+        self._feedback_timer = self.create_timer(1.0 / hz, self._feedback_timer_callback)
+        while self.automaton_active_event.is_set():
+            rclpy.spin_once(self, timeout_sec=0.1)
+        self.destroy_timer(self._feedback_timer)
+        return
 
     def _feedback_timer_callback(self):
         try:
@@ -221,7 +265,7 @@ class LifeCycleManager(Node):
 
                 self._current_goal_handle.publish_feedback(fb)
                 self._current_goal_handle.succeed()
-                self.mission_active = False
+                self.automaton_active_event.clear()
                 return
 
             # Normal feedback loop
@@ -254,18 +298,27 @@ class LifeCycleManager(Node):
             self._current_goal_handle.publish_feedback(fb)
         except Exception as e:
             self.get_logger().error(f"Error in feedback callback: {e}")
+            self.automaton_active_event.clear()
 
     def _cancel_callback(self, goal_handle):
         self.get_logger().info('Received request to cancel goal')
         self.mission_active = False
         return CancelResponse.ACCEPT
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = LifeCycleManager()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except Exception as e: 
+        print (str(e))
+    except KeyboardInterrupt:
+        pass
+
+    if node is not None:
+        node.destroy_node()
+    if rclpy.ok():
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

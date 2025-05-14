@@ -276,8 +276,10 @@ class TransitionEvaluatorNode(Node):
         if self.transition_event.is_set():
             self.get_logger().info('transition event in progress, skipping evaluation')
             ros_stamp = get_current_ros_time()
+            transition_eval = Transition(success=True, error_message='No error, currently transitioning.')
             transition_pending = TransitionPending(transition_pending = True, stamp=ros_stamp, transition_uuid=self._current_transition_uuid)
             self.transition_pending_pub.publish(transition_pending)
+            return
         else:
             ros_stamp = get_current_ros_time()
             transition_id = uuid.uuid4()

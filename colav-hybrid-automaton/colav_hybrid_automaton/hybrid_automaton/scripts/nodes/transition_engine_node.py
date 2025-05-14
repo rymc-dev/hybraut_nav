@@ -211,15 +211,16 @@ class TransitionEngineNode(Node):
         # If no transition is pending, re-publish current mode
         if isinstance(self.transition_pending, TransitionPending) and self.transition_pending.transition_pending and isinstance(self.transition_eval, Transition):
             # Transition evaluation
-            if not self.transition_eval.success:
-                self.get_logger().error(f"Transition evaluation failed: {self.transition_eval.error_message}")
+            curr_transition_eval = self.transition_eval
+            if not curr_transition_eval.success:
+                self.get_logger().error(f"Transition evaluation failed: {curr_transition_eval.error_message}")
                 self.status_publisher.publish(String(data=HybridAutomatonStatus.FAILED.name))
                 return
 
-            self.current_transition_uuid = self.transition_eval.transition_uuid
+            self.current_transition_uuid = curr_transition_eval.transition_uuid
             pending = [
-                name for idx, name in enumerate(self.transition_eval.transition_names)
-                if self.transition_eval.transition_values[idx]
+                name for idx, name in enumerate(curr_transition_eval.transition_names)
+                if curr_transition_eval.transition_values[idx]
             ]
         else:
             # No transitions pending: finalize or return based on invariant output
