@@ -153,8 +153,8 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     )
 
     # If the heading error is within the allowed tolerance, return True.
-    return (error <= heading_error_tolerance) or \
-        math.isclose(error, heading_error_tolerance, abs_tol=1e-6) # this means error between 1e-6 is still within tolerance
+    return (abs(error) <= heading_error_tolerance) or \
+       math.isclose(abs(error), heading_error_tolerance, abs_tol=1e-6)
 
 def is_unsafe_conditions(agent_state: AgentUpdate,
                        obstacles_state: ObstaclesUpdate,
