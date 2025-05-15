@@ -1,0 +1,302 @@
+# ============================================================================
+# ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
+# ============================================================================
+# This defines the configuration for the Hybrid Automaton used in ROS2.
+# It includes mode declarations, transitions, guards, resets, invariants,
+# initial states, and parameter settings in a structured and interpretable format.
+#
+# IMPORTANT:
+# - Python function links (guards/resets) must point to valid, importable symbols.
+# - Functions must be exposed via __init__.py with __all__ to enable automatic access.
+# - Module paths must be within the Python build path (not direct file paths).
+#
+# Hybrid Automaton formalism:
+#   HA = (Q, Q_goal, X, F, Init, Inv, E, G, R)
+#
+#   Q      = modes
+#   Q_goal = modes_goal # Optional
+#   X      = states
+#   F      = dynamics
+#   Init   = init
+#   Inv    = invariants
+#   E      = transitions
+#   G      = guards
+#   R      = resets
+#
+# additional param: 
+# params: This provides metatdata related to the hybrid automaton
+
+# ============================================================================
+# Continuous States (X)
+# These are received via ROS2 topics. Metadata is included per state.
+# ============================================================================
+states:
+  agent_state:
+    topic: '/state/agent'
+    type:
+      pkg: 'colav_interfaces.msg'
+      msg: 'AgentUpdate'
+    params:
+      - update_hz: 10.0
+      - timeout_sec: 0.5
+
+  obstacles_state:
+    topic: '/state/obstacles'
+    type:
+      pkg: 'colav_interfaces.msg'
+      msg: 'ObstaclesUpdate'
+    params:
+      - update_hz: 4.0
+      - timeout_sec: 1.0
+
+  unsafe_set_state:
+    topic: '/state/unsafe_set'
+    type:
+      pkg: 'colav_interfaces.msg'
+      msg: 'UnsafeSet'
+    params:
+      - update_hz: 2.0
+      - timeout_sec: 1.5
+
+  waypoints_state:
+    topic: '/hybrid_automaton/state/waypoints'
+    type:
+      pkg: 'colav_interfaces.msg'
+      msg: 'Waypoints'
+
+# ============================================================================
+# Reset Functions (R)
+# Executed during transitions to modify continuous state.
+# ============================================================================
+resets:
+  remove_first_waypoint:
+    module: hybrid_automaton.scripts.resets
+    function: remove_first_waypoint
+    state_inputs:
+      - 'waypoints_state'
+    state_outputs:
+      - 'waypoints_state'
+
+  create_virtual_waypoint:
+    module: hybrid_automaton.scripts.resets
+    function: create_virtual_waypoint
+    state_inputs:
+      - 'agent_state'
+      - 'obstacles_state'
+      - 'unsafe_set_state'
+      - 'waypoints_state'
+    state_outputs:
+      - 'waypoints_state'
+
+# ============================================================================
+# Guard Conditions (G)
+# Boolean functions checked during transition evaluation.
+# ============================================================================
+guards:
+  is_los_clear_to_waypoint:
+    module: hybrid_automaton.scripts.guards
+    function: is_los_clear_to_waypoint
+    state_inputs:
+      - 'agent_state'
+      - 'obstacles_state'
+      - 'unsafe_set_state'
+      - 'waypoints_state'
+
+  is_heading_within_tolerance:
+    module: hybrid_automaton.scripts.guards
+    function: is_heading_within_tolerance
+    state_inputs:
+      - 'agent_state'
+      - 'waypoints_state'
+
+  is_heading_not_within_tolerance:
+    module: hybrid_automaton.scripts.guards
+    function: is_heading_not_within_tolerance  
+    state_inputs:
+      - 'agent_state'
+      - 'waypoints_state'
+
+  is_virtual_waypoints:
+    module: hybrid_automaton.scripts.guards
+    function: is_virtual_waypoints
+    state_inputs:
+      - 'waypoints_state'
+
+  is_unsafe_conditions:
+    module: hybrid_automaton.scripts.guards
+    function: is_unsafe_conditions
+    state_inputs:
+      - 'agent_state'
+      - 'obstacles_state'
+      - 'unsafe_set_state'
+
+  is_waypoint_reached:
+    module: hybrid_automaton.scripts.guards
+    function: is_waypoint_reached
+    state_inputs:
+      - 'agent_state'
+      - 'waypoints_state'
+
+# ============================================================================
+# Invariants (Inv)
+# Leave empty if no mode constraints exist.
+# ============================================================================
+invariants:
+  is_at_final_waypoint:
+    module: hybrid_automaton.scripts.invariants
+    function: is_at_final_waypoint
+    state_inputs:
+      - 'waypoints_state'
+
+  trivial_invariant:
+    module: hybrid_automaton.scripts.invariants
+    function: trivial_invariant
+
+  failing_invariant:
+    module: hybrid_automaton.scripts.invariants
+    function: failing_invariant
+
+# ============================================================================
+# Transitions (E)
+# Mapping of transition names to guard and reset functions.
+# ============================================================================
+transitions:
+  cruise_to_t2los_1:
+    guard: 'is_los_clear_to_waypoint'
+    reset: 'create_virtual_waypoint'
+
+  cruise_to_t2los_2:
+    guard: 'is_heading_not_within_tolerance'
+    reset: null
+
+  cruise_to_fallback:
+    guard: 'is_unsafe_conditions'
+    reset: null
+
+  cruise_to_waypoint_reached:
+    guard: 'is_waypoint_reached'
+    reset: null
+
+  t2los_to_cruise:
+    guard: 'is_heading_within_tolerance'
+    reset: null
+
+  t2los_to_fallback:
+    guard: 'is_unsafe_conditions'
+    reset: null
+
+  t2los_to_waypoint_reached:
+    guard: 'is_waypoint_reached'
+    reset: null
+
+  waypoint_reached_to_cruise:
+    guard: 'is_virtual_waypoints'
+    reset: 'remove_first_waypoint'
+
+# ============================================================================
+# Dynamics (F)
+# Controllers used for continuous evolution within each mode.
+# ============================================================================
+dynamics:
+  proportional_velocity_controller:
+    module: 'hybrid_automaton.scripts.dynamics'
+    function: proportional_velocity_controller
+    state_inputs:
+      - 'agent_state'
+    output: 
+      velocity: 'm/s' 
+      yaw_rate: 'rad/s'  
+
+  proportional_yaw_rate_controller:
+    module: 'hybrid_automaton.scripts.dynamics'
+    function: proportional_yaw_rate_controller
+    state_inputs: 
+      - 'agent_state'
+      - 'waypoints_state'
+    output: 
+      velocity: 'm/s' 
+      yaw_rate: 'rad/s'
+
+  no_op_controller:
+    module: 'hybrid_automaton.scripts.dynamics'
+    function: no_op_controller
+    output:
+      velocity: 'm/s' 
+      yaw_rate: 'rad/s'
+
+# ============================================================================
+# Modes (Q)
+# Discrete states, each associated with dynamics, invariants, and transitions.
+# ============================================================================
+modes:
+  cruise:
+    index: 0
+    dynamics: 'proportional_velocity_controller'
+    invariants:
+      trivial_invariant
+    transitions:
+      cruise_to_fallback:
+        priority: 0
+      cruise_to_waypoint_reached:
+        priority: 1
+      cruise_to_t2los_1:
+        priority: 2
+      cruise_to_t2los_2:
+        priority: 3
+
+  t2los:
+    index: 1
+    dynamics: 'proportional_yaw_rate_controller'
+    invariants: 
+      trivial_invariant
+    transitions:
+      t2los_to_fallback:
+        priority: 0
+      t2los_to_cruise:
+        priority: 1
+      t2los_to_waypoint_reached:
+        priority: 2
+
+  waypoint_reached:
+    index: 2
+    dynamics: 'no_op_controller'
+    invariants: 
+      is_at_final_waypoint
+    transitions:
+      waypoint_reached_to_cruise:
+        priority: 0
+
+  fallback:
+    index: 3
+    dynamics: 'no_op_controller'
+    invariants:
+      failing_invariant
+    transitions: []
+  
+  error: 
+    index: 4
+    dynamics: 'no_op_controller'
+    invariants:
+      failing_invariant
+    transitions: []
+
+# ============================================================================
+# Goal Modes (Q_goal)
+# ============================================================================
+modes_goal:
+  - waypoint_reached
+  - fallback
+  - error
+
+# ============================================================================
+# Initial Mode (Init)
+# ============================================================================
+init:
+  mode: 'cruise'
+
+# ============================================================================
+# Parameters
+# ============================================================================
+params:
+  transition_evaluation_hz: 1.0
+  transition_evaluation_timeout: 1.0

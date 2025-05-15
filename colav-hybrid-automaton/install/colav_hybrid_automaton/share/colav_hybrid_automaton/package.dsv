@@ -1,0 +1,6 @@
+source;share/colav_hybrid_automaton/hook/pythonpath.ps1
+source;share/colav_hybrid_automaton/hook/pythonpath.dsv
+source;share/colav_hybrid_automaton/hook/pythonpath.sh
+source;share/colav_hybrid_automaton/hook/ament_prefix_path.ps1
+source;share/colav_hybrid_automaton/hook/ament_prefix_path.dsv
+source;share/colav_hybrid_automaton/hook/ament_prefix_path.sh

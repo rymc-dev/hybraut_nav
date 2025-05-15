@@ -20,8 +20,8 @@ publisher = pub_node.create_publisher(
 waypoints = Waypoints(
     waypoints = [
         Waypoint(
-            position=Point32(x=1019.995, y=1015.666, z=0.0),
-            acceptance_radius=20.0
+            position=Point32(x=977.491, y=1798.949, z=0.0),
+            acceptance_radius=5.0
         )    
     ]
 )

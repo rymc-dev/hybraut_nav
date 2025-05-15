@@ -1,0 +1,22 @@
+# StartHybridAutomaton.srv
+# ROS 2 service for initiating the Hybrid Automaton Framework.
+#
+# This service starts the Hybrid Automaton, with the goal of enabling automated behavior
+# for agents based on their assigned mission and control inputs.
+#
+# NOTE: Do not modify anything outside boundaries marked
+# 'Control Inputs Start' and 'Control Inputs End'
+# Only edit within that section to define or update your custom hybrid automaton Control Inputs
+# for example you could have (goal_waypoint, initial_states, ...etc)
+
+
+# --- Request ---
+builtin_interfaces/Time stamp         # Timestamp for synchronization
+unique_identifier_msgs/UUID mission_uuid  # Unique identifier for the mission
+string mission_profile  # Define the type of mission (e.g., "fastest_path", "safe_navigation")
+unique_identifier_msgs/UUID agent_uuid   # Unique identifier for the agent (e.g., vessel, drone)
+
+# --- Control Inputs Start ---
+colav_interfaces/Waypoint goal_waypoint  # Target waypoint for the agent to reach
+# --- Control Inputs End ---
+
