@@ -106,7 +106,7 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
 
 def is_heading_within_tolerance(agent_state: AgentUpdate,
                             waypoints_state: Waypoints,
-                            heading_error_tolerance: float = 0.1,
+                            heading_error_tolerance: float = 0.5,
                             tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for the second transition condition to T2LOS
@@ -182,17 +182,18 @@ def is_unsafe_conditions(agent_state: AgentUpdate,
     
 
     # Check if unsafe set data exists and apply collision conditions.
-    if unsafe_set is not None:
-        if unsafe_set.vertices.data:
-            if is_inside_unsafe_set(
-                    agent_state=agent_state,
-                    unsafe_set=unsafe_set):
-                return True
+    # if unsafe_set is not None:
+    #     if unsafe_set.vertices.data:
+    #         if is_inside_unsafe_set(
+    #                 agent_state=agent_state,
+    #                 unsafe_set=unsafe_set):
+    #             return True
 
-            if is_imminent_collision(
-                    agent_state=agent_state,
-                    unsafe_set=unsafe_set):
-                return True
+    #         if is_imminent_collision(
+    #                 agent_state=agent_state,
+    #                   agent_state=agent_state,
+    #                 unsafe_set=unsafe_set):
+    #             return True
 
     return False
 

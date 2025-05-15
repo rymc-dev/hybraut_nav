@@ -13,20 +13,16 @@ rclpy.init()
 pub_node = Node('pub_node')
 publisher = pub_node.create_publisher(
     Waypoints,
-    '/hybrid_automaton/waypoints',
+    '/hybrid_automaton/state/waypoints',
     qos_profile=QOS_PROFILE
 )
 
 waypoints = Waypoints(
     waypoints = [
         Waypoint(
-            position=Point32(x=float(10), y=float(10), z=float(0.2)),
-            acceptance_radius=float(20)
-        ),  
-        Waypoint(
-            position=Point32(x=float(20), y=float(50), z=float(0.2)),
-            acceptance_radius=float(20)
-        ),          
+            position=Point32(x=1019.995, y=1015.666, z=0.0),
+            acceptance_radius=20.0
+        )    
     ]
 )
 
