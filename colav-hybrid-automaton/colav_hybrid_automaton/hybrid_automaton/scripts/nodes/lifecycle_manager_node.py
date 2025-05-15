@@ -145,6 +145,16 @@ class LifeCycleManager(Node):
             QOS_PROFILE
         )
 
+        self.health_check_pub = self.create_publisher(
+            Time,
+            '/health_check',
+            qos_profile=QOS_PROFILE
+        )
+        self.create_timer(
+            1.0,
+            self.health_check_callback
+        )
+
         # Action server
         self._hybrid_automaton_action_server = ActionServer(
             self,
@@ -154,6 +164,11 @@ class LifeCycleManager(Node):
             goal_callback=self.goal_callback,
             cancel_callback=self._cancel_callback,
             callback_group=ReentrantCallbackGroup()
+        )
+
+    def health_check_callback(self):
+        self.health_check_pub.publish(
+            self.get_clock().now().to_msg()
         )
 
     async def goal_callback(
