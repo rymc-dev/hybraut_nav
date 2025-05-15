@@ -47,7 +47,6 @@ from geometry_msgs.msg import Point32
 waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius=100.0)])
 # waypoints_update = Waypoints(waypoints=[Waypoint(position=Point32(x=0.0, y=0.0), acceptance_radius = 20.0) , Waypoint(position=Point32(x=100.0, y=100.0))])
 
-
 while True:
     try:
         now = time.time()  # seconds since epoch as float
