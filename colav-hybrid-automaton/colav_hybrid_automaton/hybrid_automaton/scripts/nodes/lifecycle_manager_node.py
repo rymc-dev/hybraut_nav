@@ -22,7 +22,7 @@ from hybrid_automaton.utils import (
 )
 from hybrid_automaton.config import QOS_PROFILE, HybridAutomatonStatus
 from hybrid_automaton_interfaces.msg import Dynamics, TransitionPending, TransitionTimer, DynamicParameter
-import threading
+from threading import Event, Lock, Thread
 import time
 import asyncio
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -73,7 +73,7 @@ class LifeCycleManager(Node):
 
 
         for srv_name in automaton_srv_names:
-            cli = self.create_client(Trigger, srv_name)
+            cli = self.create_client(Trigger, srv_name, callback_group=ReentrantCallbackGroup())
             if not cli.wait_for_service(timeout_sec=2.0):
                 raise TimeoutError(f"Timeout waiting for {srv_name}")
             automaton_clis.append(cli)
@@ -81,7 +81,7 @@ class LifeCycleManager(Node):
         # Internal state variables
         self.initial_mode = self.config['init']['mode']
         self.final_modes = self.config['modes_goal']
-        self.automaton_active_event = threading.Event()
+        self.automaton_active_event = Event()
         self.mission_start_time = None
         self.automaton_uuid = None
         self.ros_automaton_uuid = None
@@ -155,6 +155,15 @@ class LifeCycleManager(Node):
             self.health_check_callback
         )
 
+        self._start_srv_evt = Event()
+        self._stop_srv_evt = Event()
+        self._srv_lock = Lock()
+
+        Thread(target=self._service_worker, daemon=True).start()
+        # self.create_timer(
+        #     0.1, self._trigger_services
+        # )
+
         # Action server
         self._hybrid_automaton_action_server = ActionServer(
             self,
@@ -166,12 +175,50 @@ class LifeCycleManager(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
+    # def _trigger_services(self):
+    #     if not self._start_srv_evt.is_set():
+    #         self.get_logger().info('-> scheduling service calls')
+    #         self._start_srv_evt.set()
+
+    def _service_worker(self):
+        # this runs once, forever, in its own thread
+        while rclpy.ok():
+            # wait until someone says “start”:
+            self._start_srv_evt.wait()
+            self.get_logger().info("⚙️  worker waking up to do service calls")
+
+            # clear start so that retriggers have to come later
+            self._start_srv_evt.clear()
+
+            # do each service in turn, but bail out if stop is requested
+            for idx, client in enumerate(automaton_clis):
+                if self._stop_srv_evt.is_set():
+                    self.get_logger().warn("🛑 stop requested, aborting remaining calls")
+                    break
+
+                with self._srv_lock:
+                    service_name = automaton_srv_names[idx]
+                    req = Trigger.Request()
+                    fut = client.call_async(req)
+
+                # we can spin here or just wait on the future
+                rclpy.spin_until_future_complete(self, fut, timeout_sec=1.0)
+                if not fut.done():
+                    self.get_logger().error(f"timeout on {service_name}")
+                    continue
+
+                resp = fut.result()
+                if not resp.success:
+                    self.get_logger().error(f"{service_name} failed: {resp.message}")
+                else:
+                    self.get_logger().info(f"{service_name} succeeded")
+
     def health_check_callback(self):
         self.health_check_pub.publish(
             self.get_clock().now().to_msg()
         )
 
-    async def goal_callback(
+    def goal_callback(
         self, 
         goal: HybridAutomaton.Goal, 
         mission_request_tolerance: Duration = Duration(sec=1)
@@ -188,7 +235,10 @@ class LifeCycleManager(Node):
 
             # TODO: Add validation logic for the received waypoint, e.g., bounds or format checking
 
-            await self.start_services_async()
+            self._start_srv_evt.set()
+
+            while self._start_srv_evt.is_set():
+                time.sleep(0.1)
 
             # Store mission context
             self.mission_start_time = goal.stamp
@@ -207,26 +257,12 @@ class LifeCycleManager(Node):
         self.get_logger().info("Mission request accepted. Hybrid Automaton starting mission.")
         return GoalResponse.ACCEPT
  
-    async def start_services_async(self, timeout_sec: float = 2.0):
-        """
-        Starts all dependent services asynchronously through the action server executor.
-        Raises RuntimeError if any service fails to start within the timeout or returns a failed response.
-        """
-        for idx, client in enumerate(automaton_clis):
-            service_name = automaton_srv_names[idx]
-            request = Trigger.Request()
-
-            future = client.call_async(request)
-            rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_sec)
-
-            if not future.done():
-                raise RuntimeError(f"Service '{service_name}' did not respond within {timeout_sec} seconds.")
-
-            result = future.result()
-            if result is None or not result.success:
-                raise RuntimeError(f"Service '{service_name}' failed to start: {getattr(result, 'message', 'Unknown error')}")
-
-            self.get_logger().info(f"Service '{service_name}' started successfully.")
+    # def start_services_async(self, timeout_sec: float = 2.0):
+    #     """
+    #     Starts all dependent services asynchronously through the action server executor.
+    #     Raises RuntimeError if any service fails to start within the timeout or returns a failed response.
+    #     """
+ 
 
     async def execute_callback(self, goal_handle):
         """This is the callback function when the hybrid automaton mission request has been received"""
@@ -237,7 +273,7 @@ class LifeCycleManager(Node):
         # Publish initial mode
         self.mode_publisher.publish(String(data=self.initial_mode))
         
-        await self.feedback_executor()
+        # await self.feedback_executor()
         
         result = HybridAutomaton.Result(success=True, message='Mission Complete')
         self.automaton_active_event.clear()
@@ -320,11 +356,15 @@ class LifeCycleManager(Node):
         self.mission_active = False
         return CancelResponse.ACCEPT
 
+from rclpy.executors import MultiThreadedExecutor
+
 def main(args=None):
     rclpy.init(args=args)
     node = LifeCycleManager()
     try:
-        rclpy.spin(node)
+        executor = MultiThreadedExecutor(num_threads=10)
+        executor.add_node(node)
+        executor.spin()
     except Exception as e: 
         print (str(e))
     except KeyboardInterrupt:
