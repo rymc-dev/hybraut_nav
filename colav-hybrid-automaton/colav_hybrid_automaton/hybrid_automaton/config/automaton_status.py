@@ -8,5 +8,6 @@ class HybridAutomatonStatus(Enum):
     FAILED = auto()       # Invariant violation with no valid transition
     ABORTED = auto()      # Stopped externally
     TRANSITIONING = auto()
+    TRANSITION_ERROR = auto()
     AWAITING_MODE = auto()
     AWAITING_STATE = auto()

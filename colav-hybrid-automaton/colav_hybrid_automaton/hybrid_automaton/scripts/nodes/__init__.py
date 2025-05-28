@@ -1,14 +1,15 @@
-from .dynamic_feedback_node import DynamicFeedbackNode
-from .transition_evaluator_node import TransitionEvaluatorNode
+from .dynamics_managed_node import DynamicFeedbackLifecycleNode
+from .transition_evaluator_managed_node import TransitionEvaluatorLifecycleNode
 from .state_resets_srv_node import StateResetSrvNode
-from .transition_engine_node import TransitionEngineNode
-from .lifecycle_manager_node import LifeCycleManager
+from .transition_engine_node import TransitionEngineManagedNode
+# from .lifecycle_manager_node import LifeCycleManager
+from .lifecycle_node import LifecycleNodeHybridAutomaton
 
 
 __all__ = [
-    'DynamicFeedbackNode',
-    'TransitionEvaluatorNode',
-    'TransitionEngineNode',
-    'LifeCycleManager',
-    "StateResetSrvNode"
+    'DynamicFeedbackLifecycleNode',
+    'TransitionEvaluatorLifecycleNode',
+    'StateResetSrvNode',
+    'TransitionEngineManagedNode',
+    "LifecycleNodeHybridAutomaton"
 ]

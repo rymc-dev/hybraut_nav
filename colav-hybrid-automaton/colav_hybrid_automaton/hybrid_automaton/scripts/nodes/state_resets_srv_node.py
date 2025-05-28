@@ -34,19 +34,11 @@ from hybrid_automaton.utils import (
     create_state_subscriptions,
     create_state_publishers
 )
+from rclpy.lifecycle import TransitionCallbackReturn, State
 from rcl_interfaces.msg import ParameterDescriptor
+from hybrid_automaton.scripts.nodes.managed_node import AutomatonManagedNode
 
-default_hybrid_automaton_config = os.path.join(get_package_share_directory('colav_hybrid_automaton'), 'config', 'colav_hybrid_automaton_config.yml')
-
-class InitializationError(Exception):
-    """Custom exception for initialization-related failures."""
-
-    def __init__(self, component: str, message: str):
-        super().__init__(f"[{component}] {message}")
-        self.component = component
-        self.message = message
-
-class StateResetSrvNode(Node):
+class StateResetSrvNode(AutomatonManagedNode):
 
     def __init__(
         self,
@@ -58,24 +50,31 @@ class StateResetSrvNode(Node):
         """
         super().__init__(name, namespace=namespace)
 
-        self.declare_parameter(
-            'hybrid_automaton_config_path',
-            value=default_hybrid_automaton_config,
-            descriptor=ParameterDescriptor(description='Path to the Hybrid Automaton configuration file')
-        )
-        self.config = load_yml(
-            self.get_parameter('hybrid_automaton_config_path').get_parameter_value().string_value
-        )
-        self.config = process_automaton_config(self.config)
-
-        create_state_subscriptions(node=self)
-        create_state_publishers(node=self)
-        # Create a subscription and publisher to /hybrid_automaton/waypoints
-        self.create_service(
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        super().on_configure(state)
+        try:
+            create_state_publishers(node=self)
+        except Exception as e: 
+            return TransitionCallbackReturn.FAILURE
+        return TransitionCallbackReturn.SUCCESS
+    
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.srv = self.create_service(
             srv_type=Reset,
             srv_name='/hybrid_automaton/reset_states',
             callback=self._reset_callback
         )
+        return TransitionCallbackReturn.SUCCESS
+    
+    def on_deactivate(self, state) -> TransitionCallbackReturn:
+        self.destroy_service(self.srv)
+        return TransitionCallbackReturn.SUCCESS
+    
+    def on_shutdown(self, state):
+        return super().on_shutdown(state)
+    
+    def on_cleanup(self, state):
+        return super().on_cleanup(state)
 
     def _reset_callback(
             self,
@@ -110,7 +109,6 @@ class StateResetSrvNode(Node):
             response._message = f"{str(e)}"
 
         return response
-
 
 def main(args=None):
     rclpy.init(args=args)

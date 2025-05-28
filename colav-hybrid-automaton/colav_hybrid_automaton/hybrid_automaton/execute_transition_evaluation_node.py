@@ -8,20 +8,23 @@ Date: April 17, 2025
 """
 
 import rclpy
-from hybrid_automaton.scripts.nodes import TransitionEvaluatorNode
-
+from hybrid_automaton.scripts.nodes import TransitionEvaluatorLifecycleNode
+from rclpy.executors import MultiThreadedExecutor
 
 def main(args=None):
     rclpy.init()
-    node = TransitionEvaluatorNode()
+    node = TransitionEvaluatorLifecycleNode('transition_evaluator', 'hybrid_automaton')
+    executors = MultiThreadedExecutor(num_threads=4)
 
     try:
-        rclpy.spin(node)
+        executors.add_node(node)
+        executors.spin()
     except KeyboardInterrupt:
         print("KeyboardInterrupt received. Shutting down node.")
     except Exception as e:
         print(f"Exception occurred: {e}")
     finally:
+        executors.shutdown()
         node.destroy_node()
         rclpy.shutdown()
 

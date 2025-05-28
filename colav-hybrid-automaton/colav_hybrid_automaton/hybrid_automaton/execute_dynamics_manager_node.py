@@ -8,7 +8,7 @@ Date: April 17, 2025
 """
 
 import rclpy
-from hybrid_automaton.scripts.nodes import DynamicFeedbackNode
+from hybrid_automaton.scripts.nodes import DynamicFeedbackLifecycleNode
 from rclpy.executors import MultiThreadedExecutor
 
 
@@ -16,8 +16,8 @@ def main(args=None):
     rclpy.init(args=args)
     node = None
     try:
-        node = DynamicFeedbackNode()
-        executor = MultiThreadedExecutor()  # Create a multi-threaded executor
+        node = DynamicFeedbackLifecycleNode('dynamics_node', 'hybrid_automaton')
+        executor = MultiThreadedExecutor(num_threads=4)  # Create a multi-threaded executor
         executor.add_node(node)  # Add your node to the executor
         executor.spin()  # Spin the executor instead of rclpy.spin
     except KeyboardInterrupt:

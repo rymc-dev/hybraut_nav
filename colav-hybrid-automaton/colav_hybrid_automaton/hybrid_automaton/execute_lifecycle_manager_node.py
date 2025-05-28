@@ -1,11 +1,11 @@
 import rclpy
 from rclpy.node import Node
-from hybrid_automaton.scripts.nodes import LifeCycleManager
+from hybrid_automaton.scripts.nodes.lifecycle_node import LifecycleNodeHybridAutomaton
 
 def main(arg=None):
     """"""
     rclpy.init()
-    node = LifeCycleManager()
+    node = LifecycleNodeHybridAutomaton('lifecycle_manager', 'hybrid_automaton')
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
