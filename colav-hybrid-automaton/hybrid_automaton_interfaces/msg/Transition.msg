@@ -28,4 +28,4 @@ builtin_interfaces/Time stamp
 # Metadata indicating success of the update.
 # If unsuccessful, the error message will describe the issue.
 bool success
-string error_message
+string message

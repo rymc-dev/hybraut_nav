@@ -8,10 +8,6 @@
 # 'Custom Dynamics Parameters Start' and 'Custom Dynamics Parameters End'.
 # Only edit within that section to define or update your custom dynamics.
 
-
-# UUID uniquely identifying this dynamic update instance
-unique_identifier_msgs/UUID dynamic_uuid
-
 # The name of the current control mode. Must match one of the configured mode names.
 string mode
 
@@ -23,4 +19,4 @@ builtin_interfaces/Time stamp
 # Metadata for update status.
 # Indicates whether the update was successfully applied, and provides error details if not.
 bool success
-string error_message
+string message

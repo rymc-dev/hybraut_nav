@@ -248,7 +248,7 @@ def is_waypoint_reached(
 
 def is_heading_not_within_tolerance(agent_state: AgentUpdate,
                           waypoints: Waypoints,
-                          heading_error_tolerance: float = 0.1,
+                          heading_error_tolerance: float = 0.5,
                           tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from T2LOS back to CRUISE

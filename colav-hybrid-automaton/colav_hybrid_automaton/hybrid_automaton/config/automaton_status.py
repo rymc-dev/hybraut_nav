@@ -1,13 +1,21 @@
-# status.py
+# automaton_status
 
 from enum import Enum, auto
 
 class HybridAutomatonStatus(Enum):
-    ACTIVE = auto()       # Actively evaluating modes, invariants, and transitions
-    COMPLETED = auto()    # Reached a final mode or goal condition
-    FAILED = auto()       # Invariant violation with no valid transition
-    ABORTED = auto()      # Stopped externally
+    """Enumeration of internal states for a hybrid automaton lifecycle."""
+
+    EXECUTING_MODE = auto()
+    """Currently executing within an active mode (continuous evolution)."""
+
     TRANSITIONING = auto()
-    TRANSITION_ERROR = auto()
-    AWAITING_MODE = auto()
-    AWAITING_STATE = auto()
+    """A transition is occurring between modes (guard condition triggered, reset in progress)."""
+
+    COMPLETED = auto()
+    """Final goal or terminal condition has been reached; automaton is shutting down cleanly."""
+
+    DEACTIVATING = auto()
+    """Automaton is being externally stopped or deactivated."""
+
+    ERROR = auto()
+    """An unrecoverable error occurred during execution, transition, or mode evaluation."""

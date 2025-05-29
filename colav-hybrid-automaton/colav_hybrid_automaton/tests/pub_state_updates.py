@@ -19,7 +19,7 @@ rclpy.init()
 pub_node = Node('pub_node')
 agent_pub = pub_node.create_publisher(
     AgentUpdate,
-    '/state/agent/raw',
+    '/state/agent',
     10
 )
 
