@@ -23,7 +23,6 @@ setup(
         'Hybrid automaton forms part of the COLAV project.'
     ),
     license='MIT',
-    tests_require=['pytest', 'launch_testing', 'parameterized'],
     entry_points={
         'console_scripts': [
             "dynamic_feedback_node = hybrid_automaton.execute_dynamics_manager_node:main",

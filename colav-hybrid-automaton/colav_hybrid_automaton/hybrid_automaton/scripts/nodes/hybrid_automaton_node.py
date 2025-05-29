@@ -755,7 +755,7 @@ import rclpy
 
 def main():
     rclpy.init()
-    node = HybridAutomatonNode(name='hybrid_automaton_node', namespace='hybrid_automaton')
+    node = HybridAutomatonNode(name='hybrid_automaton', namespace='colav')
     executor = MultiThreadedExecutor(num_threads=16)
 
     try:
