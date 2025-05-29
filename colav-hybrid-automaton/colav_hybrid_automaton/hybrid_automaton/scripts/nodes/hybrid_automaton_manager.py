@@ -64,7 +64,7 @@ class HybridAutomatonManager(Node):
             ]))
         rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
         if future.done():
-            if not future.result().success: 
+            if not all(result.successful for result in future.result().results):
                 self.get_logger().error('setting params failed for configuration')
 
         # Transition to inactive state
@@ -76,16 +76,23 @@ class HybridAutomatonManager(Node):
             if not future.result().success:
                 self.get_logger().error('transition request to configure for hybrid automaton lifecycle failed')
 
+    #     self._hybrid_automaton_action_server = ActionServer(
+    #         self,
+    #         HybridAutomaton,
+    #         'hybrid_automaton_action_server',
+    #         execute_callback=self.execute_callback,
+    #         goal_callback=self.goal_callback,
+    #         handle_accepted_callback=self.handle_accepted_callback,
+    #         cancel_callback=self.cancel_callback,
+    #         callback_group=ReentrantCallbackGroup()
+    #     )
 
-        self._hybrid_automaton_action_server = ActionServer(
-            self,
-            HybridAutomaton,
-            'hybrid_automaton_action_server',
-            execute_callback=self.execute_callback,
-            goal_callback=self.goal_callback,
-            callback_group=ReentrantCallbackGroup
-        )
 
+    # async def _goal_callback(self, goal_handle):
+    #     goal_handle.pass
+
+    # async def _execute_callback(self, goal_handle):
+    #     pass
 
 
 def main():

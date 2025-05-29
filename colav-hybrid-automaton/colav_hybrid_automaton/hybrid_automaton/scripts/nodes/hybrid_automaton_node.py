@@ -129,47 +129,6 @@ class HybridAutomatonNode(LifecycleNode):
             ))
             create_state_subscriptions(node=self)
             self._automaton_modes = list(self._configuration['modes'].keys())
-            
-            # need to create the callback groups
-            self._transition_engine_callback_group = ReentrantCallbackGroup()
-            self._transition_evaluation_timer_callback_group = ReentrantCallbackGroup()
-            self._dynamics_timer_callback_group = ReentrantCallbackGroup()
-            self._topic_io_callback_group = ReentrantCallbackGroup()
-
-            # initialize hybrid automaton topic publishers
-
-            self._status_publisher = self.create_publisher(
-                String,
-                '/hybrid_automaton/status',
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
-            self._transition_evaluation_publisher = self.create_publisher(
-                topic="/hybrid_automaton/transition_evaluations",
-                msg_type=Transition,
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
-            self._dynamics_publisher = self.create_publisher(
-                msg_type=Dynamics,
-                topic='/hybrid_automaton/dynamics',
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
-            self._waypoints_publisher = self.create_publisher(
-                msg_type=Waypoints,
-                topic='/hybrid_automaton/state/waypoints',
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
-            # initialize hybrid automaton topic subscriptions
-            self._transition_evaluation_subscriber = self.create_subscription(
-                topic="/hybrid_automaton/transition_evaluations",
-                msg_type=Transition,
-                callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
 
             self.declare_parameter(
                 'waypoint_x',
@@ -221,23 +180,51 @@ class HybridAutomatonNode(LifecycleNode):
         self.get_logger().info(f"Node '{self.get_name()}' is in state '{state.label}'. Transitioning to 'activate'")
 
         try:
-            
-            # create trigger transition service
-            # self._trigger_transition_srv = self.create_service(
-            #     srv_type=Trigger,
-            #     srv_name='/hybrid_automaton/trigger_transition',
-            #     callback=self._transition_engine_callback,
-            #     callback_group = ReentrantCallbackGroup()
-            # )
-            # self._trigger_transition_cli = self.create_client(
-            #     srv_type=Trigger,
-            #     srv_name='/hybrid_automaton/trigger_transition',
-            #     callback_group=ReentrantCallbackGroup()
-            # )
-            # if not self._trigger_transition_cli.wait_for_service(timeout_sec=5.0):
-            #     self.get_logger().warning('trigger_transition srv not starting during activation')
-            #     return TransitionCallbackReturn.FAILURE
-            
+            # need to create the callback groups
+            self._transition_engine_callback_group = ReentrantCallbackGroup()
+            self._transition_evaluation_timer_callback_group = ReentrantCallbackGroup()
+            self._dynamics_timer_callback_group = ReentrantCallbackGroup()
+            self._topic_io_callback_group = ReentrantCallbackGroup()
+
+            # initialize hybrid automaton topic publishers
+            self._mode_publisher = self.create_publisher(
+                String,
+                '/hybrid_automaton/mode',
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
+            self._status_publisher = self.create_publisher(
+                String,
+                '/hybrid_automaton/status',
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
+            self._transition_evaluation_publisher = self.create_publisher(
+                topic="/hybrid_automaton/transition_evaluations",
+                msg_type=Transition,
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
+            self._dynamics_publisher = self.create_publisher(
+                msg_type=Dynamics,
+                topic='/hybrid_automaton/dynamics',
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
+            self._waypoints_publisher = self.create_publisher(
+                msg_type=Waypoints,
+                topic='/hybrid_automaton/state/waypoints',
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
+            # initialize hybrid automaton topic subscriptions
+            self._transition_evaluation_subscriber = self.create_subscription(
+                topic="/hybrid_automaton/transition_evaluations",
+                msg_type=Transition,
+                callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
             self._status_subscription = self.create_subscription( # TODO: CLOSE THIS IN DEACTIVATE
                 msg_type=String,
                 topic='/hybrid_automaton/status',
@@ -245,6 +232,14 @@ class HybridAutomatonNode(LifecycleNode):
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
+            self._mode_subscription = self.create_subscription(
+                String,
+                '/hybrid_automaton/mode',
+                callback=lambda msg: self.__setattr__('_mode', msg.data.lower()),
+                qos_profile=QOS_PROFILE,
+                callback_group=self._topic_io_callback_group
+            )
+
             
             goal_waypoint_params = {
                 'waypoint_x': None,
@@ -260,20 +255,6 @@ class HybridAutomatonNode(LifecycleNode):
             for param_key in goal_waypoint_params.keys():
                 goal_waypoint_params[param_key] = get_param(param_key).value
             
-            self._mode_publisher = self.create_publisher(
-                String,
-                '/hybrid_automaton/mode',
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
-
-            self._mode_subscription = self.create_subscription(
-                String,
-                '/hybrid_automaton/mode',
-                callback=lambda msg: self.__setattr__('_mode', msg.data.lower()),
-                qos_profile=QOS_PROFILE,
-                callback_group=self._topic_io_callback_group
-            )
 
             # validate values are not None for goal waypoint if they are return errror
             self._goal_waypoint = Waypoint(
@@ -283,7 +264,8 @@ class HybridAutomatonNode(LifecycleNode):
             waypoints = Waypoints(
                 waypoints=[self._goal_waypoint]
             )
-            self._mode_publisher.publish(String(data="cruise")) # TODO: Need to get initial mode from config but for now this will do donkey
+            self._mode_publisher.publish(String(data="cruise")) 
+            self._waypoints_publisher.publish(waypoints)
 
             # start timers
             self._transition_evaluation_timer.reset()
@@ -309,10 +291,6 @@ class HybridAutomatonNode(LifecycleNode):
             self._transition_evaluation_timer.cancel()
             self._dynamics_timer.cancel()
 
-            # stop the transition engine service
-            # self.destroy_client(self._trigger_transition_cli)
-            # self.destroy_service(self._trigger_transition_srv)
-
             self.destroy_subscription(self._mode_publisher)
             self._mode_publisher: Publisher = None
             self.destroy_subscription(self._mode_subscription)
@@ -322,6 +300,27 @@ class HybridAutomatonNode(LifecycleNode):
             
             self._trigger_transition_cli = None
             self._trigger_transition_srv = None
+            # Destroy publishers
+            for pub_attr in [
+                'mode_publisher',
+                'status_publisher',
+                'transition_pending_pub',
+                'transition_eval_pub',
+                'dynamics_pub'
+            ]:
+                if hasattr(self, pub_attr):
+                    self.destroy_publisher(getattr(self, pub_attr))
+                    self.__setattr__(pub_attr, None)
+
+            # Destroy subscriptions
+            for sub_attr in [
+                'transition_sub',
+                'transition_pending_sub',
+                'status_sub'
+            ]:
+                if hasattr(self, sub_attr):
+                    self.destroy_subscription(getattr(self, sub_attr))
+                    self.__setattr__(sub_attr, None)
 
             # Clear goal waypoint state parameter
             if hasattr(self, 'goal_waypoint'):
@@ -370,28 +369,6 @@ class HybridAutomatonNode(LifecycleNode):
                 self.destroy_timer(self._dynamics_timer)
                 self._dynamics_timer:Timer = None
 
-            # Destroy publishers
-            for pub_attr in [
-                'mode_publisher',
-                'status_publisher',
-                'transition_pending_pub',
-                'transition_eval_pub',
-                'dynamics_pub'
-            ]:
-                if hasattr(self, pub_attr):
-                    self.destroy_publisher(getattr(self, pub_attr))
-                    self.__setattr__(pub_attr, None)
-
-            # Destroy subscriptions
-            for sub_attr in [
-                'transition_sub',
-                'transition_pending_sub',
-                'status_sub'
-            ]:
-                if hasattr(self, sub_attr):
-                    self.destroy_subscription(getattr(self, sub_attr))
-                    self.__setattr__(sub_attr, None)
-
             # Remove other attributes
             for attr in [
                 'automaton_active',
@@ -409,10 +386,6 @@ class HybridAutomatonNode(LifecycleNode):
             self.get_logger().error(f"Cleanup failed: {e}")
             return TransitionCallbackReturn.FAILURE
         
-        self.undeclare_parameter('waypoint_acceptance_radius')
-        self.undeclare_parameter('waypoint_x')
-        self.undeclare_parameter('waypoint_y')
-        
         self.declare_parameter(
             'configuration_path',
             value=self._configuration_path,
@@ -429,7 +402,7 @@ class HybridAutomatonNode(LifecycleNode):
         )
         self.declare_parameter(
             'control_frequency',
-            value=self._evaluation_frequency,
+            value=self._control_frequency,
             descriptor=ParameterDescriptor(
                 description="Frequency (in Hz) at which controller feedback is returned."
             )
@@ -686,7 +659,7 @@ class HybridAutomatonNode(LifecycleNode):
                     raise ValueError("Errors during evaluation: " + "; ".join(error_messages))
 
                 if any(eval.transition_values):
-                    self._status = HybridAutomatonStatus.TRANSITIONING
+                    self._status = HybridAutomatonStatus.TRANSITIONINGself._status_publisher.publish(String(data=str(self._status.name)))
                     self._transition_evaluation_publisher.publish(eval)
                     # rate = self.create_rate(frequency=1.0, clock=SYSTEM_CLOCK)
                     # self._current_transition_evaluation = eval
@@ -697,7 +670,7 @@ class HybridAutomatonNode(LifecycleNode):
                 self._status_publisher.publish(String(data=str(self._status.name)))
         except Exception as e:
             self._status = HybridAutomatonStatus.ERROR
-            self._status_publisher.publish(String(str(self._status.name)))
+            self._status_publisher.publish(String(data=str(self._status.name)))
             eval.success = False
             eval.message = str(e)
 
