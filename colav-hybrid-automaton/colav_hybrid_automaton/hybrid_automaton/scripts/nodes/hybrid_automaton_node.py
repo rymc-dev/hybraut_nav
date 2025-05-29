@@ -579,7 +579,7 @@ class HybridAutomatonNode(LifecycleNode):
         highest_priority = float('inf')
         transition = None
         for name in pending:
-            prio = self.config['modes'][self.mode]['transitions'][name]['priority']
+            prio = self._configuration['modes'][self._mode]['transitions'][name]['priority']
             if prio < highest_priority:
                 highest_priority = prio
                 transition = name
@@ -623,7 +623,7 @@ class HybridAutomatonNode(LifecycleNode):
     def check_invariant(self, mode:str):
         """checks the invariant function for mode"""
         try:
-            invariant = self.config['modes'][mode].get('invariants')
+            invariant = self._configuration['modes'][mode].get('invariants')
             if not invariant:
                 return  # No invariant found
 
@@ -755,7 +755,7 @@ import rclpy
 
 def main():
     rclpy.init()
-    node = HybridAutomatonNode(name='hybrid_automaton', namespace='colav')
+    node = HybridAutomatonNode(name='hybrid_automaton_lifecycle', namespace='colav')
     executor = MultiThreadedExecutor(num_threads=16)
 
     try:
