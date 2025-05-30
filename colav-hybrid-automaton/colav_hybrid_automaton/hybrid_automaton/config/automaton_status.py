@@ -5,6 +5,9 @@ from enum import Enum, auto
 class HybridAutomatonStatus(Enum):
     """Enumeration of internal states for a hybrid automaton lifecycle."""
 
+    INITIALIZING = auto()
+    """Used when moving from configured state to active"""
+
     EXECUTING_MODE = auto()
     """Currently executing within an active mode (continuous evolution)."""
 

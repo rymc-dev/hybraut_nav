@@ -3,7 +3,7 @@ from colav_interfaces.msg import Waypoints, Waypoint, AgentUpdate, ObstaclesUpda
 from geometry_msgs.msg import Point32
 from builtin_interfaces.msg import Duration
 from shapely import Polygon, LineString
-from hybrid_automaton.utils import validate_timestamps_within_tolerance, get_current_ros_time
+from hybrid_automaton.utils import is_timestamps_within_tolerance, get_current_ros_time
 from typing import Tuple
 
 VW_ACCEPTANCE_RADIUS = 10

@@ -5,7 +5,7 @@ import numpy as np
 
 from hybrid_automaton.utils import is_inside_unsafe_set, is_imminent_collision
 from hybrid_automaton.utils import (
-    validate_timestamps_within_tolerance,
+    is_timestamps_within_tolerance,
     delta_heading,
     euclidean_distance,
     quaternion_to_heading,

@@ -5,7 +5,7 @@ from colav_interfaces.msg import AgentUpdate, Waypoints
 from hybrid_automaton_interfaces.msg import DynamicParameter
 import math
 from hybrid_automaton.utils import quaternion_to_heading
-from hybrid_automaton.utils import get_current_ros_time, validate_timestamps_within_tolerance
+from hybrid_automaton.utils import get_current_ros_time, is_timestamps_within_tolerance
 from builtin_interfaces.msg import Duration
 
 # constant target velocity for now but in the future would like to change

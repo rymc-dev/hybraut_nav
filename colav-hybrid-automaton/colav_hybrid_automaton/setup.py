@@ -25,11 +25,8 @@ setup(
     license='MIT',
     entry_points={
         'console_scripts': [
-            "dynamic_feedback_node = hybrid_automaton.execute_dynamics_manager_node:main",
-            "lifecycle_manager_node = hybrid_automaton.execute_lifecycle_manager_node:main",
-            "transition_engine_node = hybrid_automaton.execute_transition_engine_node:main",
-            "transition_evaluation_node = hybrid_automaton.execute_transition_evaluation_node:main",
-            "state_resets_srv_node = hybrid_automaton.execute_state_resets_srv_node:main"
+            "mission_control_node = hybrid_automaton.execute_hybrid_automaton_mission_control_node:main",
+            "lifecycle_node = hybrid_automaton.execute_hybrid_automaton_node:main"
         ],
     },
 )

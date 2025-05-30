@@ -26,9 +26,10 @@ from std_srvs.srv import Trigger
 from rclpy.service import Service
 from rclpy.client import Client
 from hybrid_automaton.utils import create_state_subscriptions
+
 SYSTEM_CLOCK = None
 
-class HybridAutomatonNode(LifecycleNode):
+class HybridAutomatonLifecycleNode(LifecycleNode):
     """
     A Hybrid Automaton Node Managed Node which performs 
     executes dynamics, invariants transitions and so on
@@ -132,7 +133,7 @@ class HybridAutomatonNode(LifecycleNode):
 
             self.declare_parameter(
                 'waypoint_x',
-                value=ParameterType.PARAMETER_DOUBLE,
+                value=0.0,
                 descriptor=ParameterDescriptor(
                     description="COLAV Hybrid Automaton State for goal waypoints 'x' position (m)."
                 )
@@ -140,14 +141,14 @@ class HybridAutomatonNode(LifecycleNode):
             # TODO: IN CLEANUP REMOVE PARAM WAYPOINTS
             self.declare_parameter(
                 'waypoint_y',
-                value=ParameterType.PARAMETER_DOUBLE,
+                value=0.0,
                 descriptor=ParameterDescriptor(
                     description="COLAV Hybrid Automaton State for goal waypoints 'y' Position (m)."
                 )
             )
             self.declare_parameter(
                 'waypoint_acceptance_radius',
-                value=ParameterType.PARAMETER_DOUBLE,
+                value=0.0,
                 descriptor=ParameterDescriptor(
                     description="COLAV Hybrid Automaton State for goal waypoints 'acceptance radius' (m)."
                 )
@@ -659,7 +660,8 @@ class HybridAutomatonNode(LifecycleNode):
                     raise ValueError("Errors during evaluation: " + "; ".join(error_messages))
 
                 if any(eval.transition_values):
-                    self._status = HybridAutomatonStatus.TRANSITIONINGself._status_publisher.publish(String(data=str(self._status.name)))
+                    self._status = HybridAutomatonStatus.TRANSITIONING
+                    self._status_publisher.publish(String(data=str(self._status.name)))
                     self._transition_evaluation_publisher.publish(eval)
                     # rate = self.create_rate(frequency=1.0, clock=SYSTEM_CLOCK)
                     # self._current_transition_evaluation = eval
@@ -728,7 +730,7 @@ import rclpy
 
 def main():
     rclpy.init()
-    node = HybridAutomatonNode(name='hybrid_automaton_lifecycle', namespace='colav')
+    node = HybridAutomatonLifecycleNode(name='hybrid_automaton_lifecycle', namespace='colav')
     executor = MultiThreadedExecutor(num_threads=16)
 
     try:
