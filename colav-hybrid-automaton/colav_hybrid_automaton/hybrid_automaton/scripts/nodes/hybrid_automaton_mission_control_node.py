@@ -21,6 +21,13 @@ from rclpy.guard_condition import GuardCondition
 from rclpy.timer import Timer
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from lifecycle_msgs.msg import State
+from hybrid_automaton.config import HybridAutomatonStatus
+from hybrid_automaton_interfaces.msg import Output
+from std_msgs.msg import String
+from hybrid_automaton_interfaces.msg import Dynamics
+from hybrid_automaton.config import QOS_PROFILE
+from hybrid_automaton_interfaces.msg import DynamicParameter
+from colav_interfaces.msg import Waypoints
 
 SYSTEM_CLOCK = None
 
@@ -32,6 +39,40 @@ class HybridAutomatonMissionControlNode(Node):
         namespace: str
     ):
         super().__init__(name, namespace=namespace)
+
+        self._current_mode = "IDLE"
+        self._current_status = "INITIALIZING"
+        self._current_dynamics = None
+        self._current_waypoints = None
+
+        self.create_subscription(
+            msg_type=String,
+            topic='/hybrid_automaton/mode',
+            callback=lambda msg: self.__setattr__('_current_mode', msg.data.lower()),
+            callback_group=ReentrantCallbackGroup(),
+            qos_profile=QOS_PROFILE
+        )
+        self.create_subscription(
+            msg_type=String,
+            topic='/hybrid_automaton/status',
+            callback=lambda msg: self.__setattr__('_current_status', msg.data.lower()),
+            callback_group=ReentrantCallbackGroup(),
+            qos_profile=QOS_PROFILE
+        )
+        self.create_subscription(
+            msg_type=Dynamics,
+            topic='/hybrid_automaton/dynamics',
+            callback=lambda msg: self.__setattr__('_current_dynamics', msg),
+            callback_group=ReentrantCallbackGroup(),
+            qos_profile=QOS_PROFILE
+        )
+        self.create_subscription(
+            msg_type=Waypoints,
+            topic='/hybrid_automaton/state/waypoints',
+            callback=lambda msg: self.__setattr__('_current_waypoints', msg),
+            callback_group=ReentrantCallbackGroup(),
+            qos_profile=QOS_PROFILE
+        )
 
         self._state_cli = self.create_client(
             srv_type=GetState,
@@ -64,17 +105,13 @@ class HybridAutomatonMissionControlNode(Node):
             callback_group=MutuallyExclusiveCallbackGroup()
         )
         self._activating_automaton_lock:threading.Lock = threading.Lock()
-        # self._automaton_monitor_timer = self.create_timer(
 
-        # )
-
-
-        # self._deactivate_automaton:GuardCondition = self.create_guard_condition(
-        #     self._deactivate_automaton_callback,
-
-        # )
-
-        # set default params for automaton
+        self._action_server_feedback_timer = self.create_timer(
+            0.1,
+            self._action_server_feedback_timer_callback,
+            callback_group=ReentrantCallbackGroup(),
+            autostart=False
+        )
 
         future = self._automaton_params_setter_cli.call_async(
             SetParameters.Request(
@@ -119,6 +156,7 @@ class HybridAutomatonMissionControlNode(Node):
             cancel_callback=self.cancel_callback,
             callback_group=ReentrantCallbackGroup()
         )
+        self.get_logger().info(f"{namespace}/{name}: initialized")
 
     def _activate_automaton_callback(self):
         self._activating_automaton_lock.acquire()
@@ -162,11 +200,11 @@ class HybridAutomatonMissionControlNode(Node):
                     self.get_logger().error('setting params failed for configuration')
 
             # set param for goal waypoint x,y and acceptance radius based on the self_goal_waypoint
-            self._change_state_cli.call_async(request=ChangeState.Request(
+            future = self._change_state_cli.call_async(request=ChangeState.Request(
                 transition=Transition(id=Transition.TRANSITION_ACTIVATE)
             ))
 
-            future = rclpy.spin_until_future_complete(self,future, timeout_sec=5.0)
+            rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
             if future.done():
                 if not future.result().success:
                     self.get_logger().error('transition request to configure for hybrid automaton lifecycle failed')
@@ -185,9 +223,8 @@ class HybridAutomatonMissionControlNode(Node):
             if not future_response.current_state.id == State.PRIMARY_STATE_ACTIVE:
                 self.get_logger().warning("error occured during callback to state automaton, need to be in lifecycle state inactive to transition to activate")
             # release lock and trigger the timer which monitors the automatons lifecycle state to ensure it is still in active.
-
-        finally:
-            self._activating_automaton_lock.release()
+        except Exception as e:
+            self.get_logger().error(f"Exception occured while starting hybrid automaton: {str(e)}")
 
         self.get_logger().info('Hybrid automaton activated')
 
@@ -257,29 +294,41 @@ class HybridAutomatonMissionControlNode(Node):
         self.get_logger().info('Received cancel request')
         return CancelResponse.ACCEPT
 
-    def _action_server_feedback_timer(self):
+    def _action_server_feedback_timer_callback(self):
         # This timer is going to execute simultaneously to execute callback parsing the hybrid automaton data
         # into a format that can that can be returned to the server cli.
-        pass
+        feedback_msg = HybridAutomaton.Feedback()
+        feedback_msg.feedback = Output(
+            mode=self._current_mode,
+            status=self._current_status,
+            dynamics=DynamicParameter() if self._current_dynamics is None else self._current_dynamics.dynamic_parameters,
+            waypoints=Waypoints() if self._current_waypoints is None else self._current_waypoints,
+            stamp=self.get_clock().now().to_msg()
+        )
+        self._goal_handle.publish_feedback(feedback_msg) 
+
     
     def execute_callback(self, goal_handle: ServerGoalHandle):
         """Execute the goal."""
         self.get_logger().info(f"Executing goal. Mission is to sequentially navigate to each of the goal waypoints: '{goal_handle._goal_request.goal_waypoints.waypoints}'")
 
         # Append the seeds for the Fibonacci sequence
-        feedback_msg = HybridAutomaton.Feedback()
+        self._current_status = HybridAutomatonStatus.INITIALIZING.name
+        rate = self.create_rate(1.0, SYSTEM_CLOCK)
+        rate.sleep()
+        self._action_server_feedback_timer.reset()
 
         for idx, goal_waypoint in enumerate(goal_handle._goal_request.goal_waypoints.waypoints):
             self._waypoint_idx = idx
             self._current_goal_waypoint = goal_waypoint
             self._activate_automaton.trigger()
+            
             self._mission_active = True
             
             rate = self.create_rate(frequency=10.0, clock=SYSTEM_CLOCK)
             
             while self._mission_active:
-                while self._activating_automaton_lock.locked():
-                    rate.sleep() 
+                rclpy.spin_once(self, timeout_sec=1.0)
 
         # # Start executing the action
         # for i in range(1, goal_handle.request.order):
@@ -332,8 +381,8 @@ class HybridAutomatonMissionControlNode(Node):
 
 def main():
     rclpy.init()
-    node = HybridAutomatonMissionControlNode(name='hybrid_automaton_manager', namespace='colav')
-    executor = MultiThreadedExecutor(num_threads=6)
+    node = HybridAutomatonMissionControlNode(name='manager', namespace='colav/hybrid_automaton')
+    executor = MultiThreadedExecutor(num_threads=8)
 
     try:
         executor.add_node(node)

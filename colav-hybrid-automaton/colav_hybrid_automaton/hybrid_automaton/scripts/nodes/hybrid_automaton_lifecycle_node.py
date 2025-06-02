@@ -730,7 +730,7 @@ import rclpy
 
 def main():
     rclpy.init()
-    node = HybridAutomatonLifecycleNode(name='hybrid_automaton_lifecycle', namespace='colav')
+    node = HybridAutomatonLifecycleNode(name='lifecycle', namespace='colav/hybrid_automaton')
     executor = MultiThreadedExecutor(num_threads=16)
 
     try:
