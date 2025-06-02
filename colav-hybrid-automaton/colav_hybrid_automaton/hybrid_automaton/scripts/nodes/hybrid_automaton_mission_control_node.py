@@ -182,15 +182,15 @@ class HybridAutomatonMissionControlNode(Node):
                 SetParameters.Request(
                     parameters=[
                         Parameter(
-                            name='waypoint_acceptance_radius', 
+                            name='waypoint_x', 
                             value=ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=self._current_goal_waypoint.position.x)
                         ),
                         Parameter(
-                            name='waypoint_x',
+                            name='waypoint_y',
                             value=ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=self._current_goal_waypoint.position.y)
                         ),
                         Parameter(
-                            name='waypoint_y',
+                            name='waypoint_acceptance_radius',
                             value=ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=self._current_goal_waypoint.acceptance_radius)
                         )
             ]))
