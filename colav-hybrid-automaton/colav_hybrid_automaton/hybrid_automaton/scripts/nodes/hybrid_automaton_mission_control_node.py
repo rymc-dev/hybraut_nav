@@ -96,7 +96,7 @@ class HybridAutomatonMissionControlNode(Node):
             self.get_logger().error('/colav/hybrid_automaton/lifecycle/set_parameters: srv not available!')
 
         self._default_configuration_path = '/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav-hybrid-automaton/colav_hybrid_automaton/config/colav_hybrid_automaton_config.yml'
-        self._default_evaluation_frequency = 1
+        self._default_evaluation_frequency = 10
         self._default_control_frequency = 100
         self._current_goal_waypoint:Waypoint = None
 
