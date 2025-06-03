@@ -1,28 +1,12 @@
 import numpy as np
+import math
 
-
-def quaternion_to_heading(qx: float, qy: float, qz: float, qw: float) -> float:
-    """
-    Convert quaternion to 2D heading (yaw angle in radians, normalized to [-π, π])
-
-    Args:
-        qx, qy, qz, qw: Quaternion components
-
-    Returns:
-        heading: yaw angle in radians
-    """
-    if not all(np.isfinite([qx, qy, qz, qw])):
-        raise ValueError("Quaternion components must be finite numbers.")
-
-    # Yaw (Z-axis rotation) from quaternion
-    siny_cosp = 2 * (qw * qz + qx * qy)
-    cosy_cosp = 1 - 2 * (qy**2 + qz**2)
-    heading = np.arctan2(siny_cosp, cosy_cosp)
-
-    # Normalize to [-π, π]
-    heading = (heading + np.pi) % (2 * np.pi) - np.pi
-
-    return heading
+def quaternion_to_heading(qx, qy, qz, qw) -> float:
+    """Convert quaternion to heading angle in radians."""
+    # Yaw (Z-axis rotation)
+    siny_cosp = 2.0 * (qw * qz + qx * qy)
+    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+    return math.atan2(siny_cosp, cosy_cosp)
 
 
 def normalize_angle(angle: float):

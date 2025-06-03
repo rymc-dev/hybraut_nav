@@ -1,12 +1,12 @@
 import numpy as np
 from colav_interfaces.msg import Waypoints, Waypoint, AgentUpdate, ObstaclesUpdate, UnsafeSet
-from geometry_msgs.msg import Point32
+from geometry_msgs.msg import Point
 from builtin_interfaces.msg import Duration
 from shapely import Polygon, LineString
 from hybrid_automaton.utils import is_timestamps_within_tolerance, get_current_ros_time
 from typing import Tuple
 
-VW_ACCEPTANCE_RADIUS = 10
+VW_ACCEPTANCE_RADIUS = 10.0
 
 
 def remove_first_waypoint(waypoints: Waypoints) -> Tuple[Waypoints]:
@@ -61,20 +61,21 @@ def create_virtual_waypoint(
     agent_x = agent_state.pose.position.x
     agent_y = agent_state.pose.position.y
 
-    vertices = np.array(unsafe_set.vertices)
+    vertices = np.array(unsafe_set.vertices.data)
     if vertices.size == 0:
         raise ValueError(
             'Unsafe set does not contain any vertices, Guard with reset should not have occurred.')
 
+    vertices_reshaped = vertices.reshape(-1, 2)
     # Convert vertices to shapely Polygon
-    polygon = Polygon(vertices)
+    polygon = Polygon(vertices_reshaped)
     if not polygon.is_valid:
         raise ValueError('Unsafe set polygon is invalid.')
 
     visible_vertices = []
 
     # 2. Check visibility of each vertex using raycasting
-    for vx, vy in vertices:
+    for vx, vy in vertices_reshaped:
         ray = LineString([(agent_x, agent_y), (vx, vy)])
         # The ray must not cross the polygon boundary (except possibly touching
         # at the vertex)
@@ -113,7 +114,7 @@ def create_virtual_waypoint(
 
     # 6. Create new virtual waypoint with the adjusted position
     new_waypoint = Waypoint(
-        position=Point32(x=adjusted_x, y=adjusted_y, z=0.0),
+        position=Point(x=adjusted_x, y=adjusted_y, z=0.0),
         acceptance_radius=VW_ACCEPTANCE_RADIUS
     )
 

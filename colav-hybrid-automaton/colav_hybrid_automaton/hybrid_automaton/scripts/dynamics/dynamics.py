@@ -75,9 +75,10 @@ def proportional_yaw_rate_controller(
     Hybrid controller: simultaneously throttle velocity toward TARGET_VELOCITY
     and adjust yaw rate to steer toward the next waypoint.
     """
-    # Validate inputs
+
+    # Input validation
     if not isinstance(agent_state, AgentUpdate):
-        raise ValueError("agent state must be AgentUpdate")
+        raise ValueError("agent_state must be AgentUpdate")
     if not isinstance(waypoints, Waypoints):
         raise ValueError("waypoints must be Waypoints")
     if not isinstance(dt, float) or dt < 0.01:
@@ -85,11 +86,11 @@ def proportional_yaw_rate_controller(
     if not isinstance(error_tolerance, float) or error_tolerance < 0.001:
         raise ValueError("error_tolerance must be float >= 0.001")
     if not isinstance(proportional_gain, float) or proportional_gain <= 0 or proportional_gain > 10:
-        raise ValueError("proportional_gain must be >0 and <=10")
+        raise ValueError("proportional_gain must be > 0 and <= 10")
     if not isinstance(max_yaw_rate, float) or max_yaw_rate <= 0:
-        raise ValueError("max_yaw_rate must be float >0")
+        raise ValueError("max_yaw_rate must be float > 0")
     if not isinstance(tolerance, Duration):
-        raise ValueError('tolerance must be Duration type')
+        raise ValueError("tolerance must be Duration type")
 
     # Velocity control (P-controller)
     current_vel = agent_state.velocity
@@ -98,33 +99,37 @@ def proportional_yaw_rate_controller(
     updated_velocity = current_vel + accel_cmd * dt
 
     # Yaw control
-    # extract current heading from quaternion
     current_heading = quaternion_to_heading(
         qx=agent_state.pose.orientation.x,
         qy=agent_state.pose.orientation.y,
         qz=agent_state.pose.orientation.z,
         qw=agent_state.pose.orientation.w,
     )
-    # get next waypoint
+
+    # Next waypoint
     try:
         wp = waypoints.waypoints[0]
-    except Exception:
-        raise ValueError('no waypoint to navigate to')
+    except IndexError:
+        raise ValueError("No waypoint to navigate to")
+
     dx = wp.position.x - agent_state.pose.position.x
     dy = wp.position.y - agent_state.pose.position.y
     desired_heading = math.atan2(dy, dx)
 
-    # heading error [-pi, pi]
-    raw_error = desired_heading - current_heading
-    heading_error = (raw_error + math.pi) % (2 * math.pi) - math.pi
+    # Properly wrapped heading error [-pi, pi]
+    heading_error = math.atan2(
+        math.sin(desired_heading - current_heading),
+        math.cos(desired_heading - current_heading)
+    )
 
+    # Proportional yaw control with smoothing
     if abs(heading_error) < error_tolerance:
         target_yaw_rate = 0.0
     else:
-        # P-output scaled by dt
         raw_turn = proportional_gain * heading_error / dt
         target_yaw_rate = max(-max_yaw_rate, min(raw_turn, max_yaw_rate))
-        # low-pass filter for smoother steering
+
+        # Optional low-pass filter to smooth yaw rate
         alpha = 0.1
         target_yaw_rate = alpha * target_yaw_rate + (1 - alpha) * agent_state.yaw_rate
 

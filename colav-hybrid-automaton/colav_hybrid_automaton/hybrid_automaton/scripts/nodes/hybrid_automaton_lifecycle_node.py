@@ -16,7 +16,7 @@ from unique_identifier_msgs.msg import UUID
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from hybrid_automaton.utils import load_yml, process_automaton_config
 from colav_interfaces.msg import Waypoint, Waypoints
-from geometry_msgs.msg import Point32
+from geometry_msgs.msg import Point
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from rclpy.timer import Timer
 from rclpy.publisher import Publisher
@@ -26,6 +26,7 @@ from std_srvs.srv import Trigger
 from rclpy.service import Service
 from rclpy.client import Client
 from hybrid_automaton.utils import create_state_subscriptions
+import threading
 
 SYSTEM_CLOCK = None
 
@@ -55,6 +56,7 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
         self._reset_complete_time = None
         self._current_invariant_status = None
         self._automaton_active = False
+        self.transition_lock = threading.Lock()
         # Publishers
         self._mode_publisher:Publisher = None
         self._status_publisher:Publisher = None
@@ -86,7 +88,7 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
         self._automaton_modes:List[str] = None
         self._configuration_path: str = "" # Path to configuration
         self._configuration: dict = None
-        self._evaluation_frequency: int = 1 # default evaluation per second
+        self._evaluation_frequency: int = 100 # default evaluation per second
         self._control_frequency: int = 100 # default 100 evaluations per second
 
         self.declare_parameter(
@@ -259,7 +261,7 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
 
             # validate values are not None for goal waypoint if they are return errror
             self._goal_waypoint = Waypoint(
-                position=Point32(x=goal_waypoint_params['waypoint_x'], y=goal_waypoint_params['waypoint_y']),
+                position=Point(x=goal_waypoint_params['waypoint_x'], y=goal_waypoint_params['waypoint_y']),
                 acceptance_radius=goal_waypoint_params['waypoint_acceptance_radius']
             )
             waypoints = Waypoints(
@@ -452,68 +454,41 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
         if msg.data == HybridAutomatonStatus.TRANSITIONING.name:
             self.get_logger().info('Starting Transition')
 
-            # # TODO:  Get invariant need to move invariant check to evaluation loop back
-            # invariant = self._configuration['modes'][self._mode].get('invariants')
-            # if not invariant:
-            #     return  # No invariant found
+            with self.transition_lock:
+                # TODO: Move invariant check to evaluation loop if needed
 
-            # inv_func = self._configuration['invariants'][invariant]['function']
-            # state_inputs_raw = self._configuration['invariants'][invariant].get('state_inputs', [])
-            # state_inputs = [
-            #     self._configuration['states'][state_input]['state']
-            #     for state_input in state_inputs_raw if state_input in self._configuration['states']
-            # ]
-            # try:
-            #     invariant_output = inv_func(*state_inputs)
-            # except Exception as e:
-            #     self.get_logger().error(str(e))
-            #     self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
-            #     return
+                if isinstance(self._current_transition_evaluation, Transition):
+                    current_transition_eval: Transition = self._current_transition_evaluation
 
-            # If no transition is pending, re-publish current mode
-            if isinstance(self._current_transition_evaluation, Transition):
-                # Transition evaluation
-                current_transition_eval:Transition = self._current_transition_evaluation
+                    if not current_transition_eval.success:
+                        self.get_logger().error(f"Transition evaluation failed: {current_transition_eval.message}")
+                        self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
+                        return
 
-                if not current_transition_eval.success:
-                    self.get_logger().error(f"Transition evaluation failed: {current_transition_eval.message}")
+                    self.current_transition_uuid = current_transition_eval.transition_uuid
+                    pending = [
+                        name for idx, name in enumerate(current_transition_eval.transition_names)
+                        if current_transition_eval.transition_values[idx]
+                    ]
+                else:
                     self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
                     return
 
-                self.current_transition_uuid = current_transition_eval.transition_uuid
-                pending = [
-                    name for idx, name in enumerate(current_transition_eval.transition_names)
-                    if current_transition_eval.transition_values[idx]
-                ]
-            else:
-                # should never get to this point
-                self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
-                return 
-                # # No transitions pending: finalize or return based on invariant output
-                # if invariant_output is False:
-                #     self._status_publisher.publish(String(data=HybridAutomatonStatus.COMPLETED.name))
-                #     return
-                
-                # self.status_publisher.publish(String(data=HybridAutomatonStatus.ACTIVE.name))
-                # return
+                transition = self._select_highest_priority_transition(pending)
 
-            # Select the highest-priority transition
-            transition = self._select_highest_priority_transition(pending)
-            # no transitions and invariants is still true therefore we still active
-            if transition is None: # should not be none
-                self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
-                return
+                if transition is None:
+                    self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
+                    return
 
-            # Handle reset if required
-            reset_name = self._configuration['transitions'][transition].get('reset')
-            if reset_name and reset_name in self._configuration['resets']:
-                
-                self._perform_reset(transition)
-                self._parse_and_publish_transition(transition)
-                self._status_publisher.publish(String(data=HybridAutomatonStatus.EXECUTING_MODE.name))
-            else:
-                self._parse_and_publish_transition(transition)
-                self._status_publisher.publish(String(data=HybridAutomatonStatus.EXECUTING_MODE.name))
+                reset_name = self._configuration['transitions'][transition].get('reset')
+                if reset_name and reset_name in self._configuration['resets']:
+                    self._perform_reset(transition)
+                    self._parse_and_publish_transition(transition)
+                    self._status_publisher.publish(String(data=HybridAutomatonStatus.EXECUTING_MODE.name))
+                else:
+                    self._parse_and_publish_transition(transition)
+                    self._status_publisher.publish(String(data=HybridAutomatonStatus.EXECUTING_MODE.name))
+
 
     def _perform_reset(self, transition):
         """performs state reset"""
@@ -524,7 +499,8 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
         reset_outputs = reset_func(*state_inputs)
         state_outputs = self._configuration['resets']['remove_first_waypoint']['state_outputs']
         for idx, state_output in enumerate(state_outputs):
-            self._configuration['states'][state_output]['pub'].publish(reset_outputs[idx])
+            # self._configuration['states'][state_output]['pub'].publish(reset_outputs[idx])
+            self._waypoints_publisher.publish(reset_outputs[idx])
 
     def _parse_and_publish_transition(self, transition):
         """
