@@ -14,7 +14,7 @@ from hybrid_automaton.utils import (
 import math
 
 # Constant distance threshold (DSF) for now.
-DSF = 80  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
+DSF = 200  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
 tolerance = Duration(sec=1, nanosec=0)
 
 max_yaw_rate = 0.2
