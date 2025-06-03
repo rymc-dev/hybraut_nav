@@ -14,7 +14,7 @@ from hybrid_automaton.utils import (
 import math
 
 # Constant distance threshold (DSF) for now.
-DSF = 200  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
+DSF = 300  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
 tolerance = Duration(sec=1, nanosec=0)
 
 max_yaw_rate = 0.2
@@ -106,7 +106,7 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
 
 def is_heading_within_tolerance(agent_state: AgentUpdate,
                             waypoints_state: Waypoints,
-                            heading_error_tolerance: float = 0.5,
+                            heading_error_tolerance: float = 0.2,
                             tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for the second transition condition to T2LOS
@@ -248,7 +248,7 @@ def is_waypoint_reached(
 
 def is_heading_not_within_tolerance(agent_state: AgentUpdate,
                           waypoints: Waypoints,
-                          heading_error_tolerance: float = 0.5,
+                          heading_error_tolerance: float = 0.2,
                           tolerance: Duration = Duration(sec=1)) -> bool:
     """
     Guard for transition from T2LOS back to CRUISE

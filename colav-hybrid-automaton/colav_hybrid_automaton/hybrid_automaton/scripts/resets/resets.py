@@ -5,6 +5,7 @@ from builtin_interfaces.msg import Duration
 from shapely import Polygon, LineString
 from hybrid_automaton.utils import is_timestamps_within_tolerance, get_current_ros_time
 from typing import Tuple
+from hybrid_automaton.utils import quaternion_to_heading
 
 VW_ACCEPTANCE_RADIUS = 10.0
 
@@ -36,7 +37,7 @@ def create_virtual_waypoint(
 
     agent_x = agent_state.pose.position.x
     agent_y = agent_state.pose.position.y
-    agent_heading = agent_state.pose.orientation  # Assuming radians
+    agent_heading = quaternion_to_heading(qx=agent_state.pose.orientation.x, qy=agent_state.pose.orientation.y, qz=agent_state.pose.orientation.z, qw=agent_state.pose.orientation.w)  
 
     vertices = np.array(unsafe_set.vertices.data)
     if vertices.size == 0:
@@ -88,9 +89,9 @@ def create_virtual_waypoint(
     # If forward vector is (dx, dy), right vector is (dy, -dx)
     right_perp = np.array([direction[1], -direction[0]])
 
-    # Offset: 100 meters to the right + small forward offset (optional)
-    offset_right = 100.0
-    offset_forward = 0.0  # you can adjust this if you want some forward offset too
+    # Offset: 50 meters to the right + small forward offset (optional)
+    offset_right = 50.0
+    offset_forward = 10.0  # you can adjust this if you want some forward offset too
 
     adjusted_x = rightmost_x + offset_forward * direction[0] + offset_right * right_perp[0]
     adjusted_y = rightmost_y + offset_forward * direction[1] + offset_right * right_perp[1]
