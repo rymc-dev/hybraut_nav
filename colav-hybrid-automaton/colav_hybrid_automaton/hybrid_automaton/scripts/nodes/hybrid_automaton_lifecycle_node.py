@@ -30,6 +30,7 @@ import threading
 import time
 from lifecycle_msgs.msg import Transition
 from lifecycle_msgs.srv import ChangeState
+from rclpy.guard_condition import GuardCondition
 
 SYSTEM_CLOCK = None
 
@@ -312,9 +313,18 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
         self.undeclare_parameter('waypoint_y')
         self.undeclare_parameter('waypoint_acceptance_radius')
 
+        self._trigger_invariant_timeout_guard:GuardCondition = self.create_guard_condition(
+            self._invariant_timeout_guard_callback,
+            callback_group=ReentrantCallbackGroup()
+        )
+        self._invariant_timeout_guard_lock = threading.Lock()
+
         # start timers
         self._transition_evaluation_timer.reset()
         self._dynamics_timer.reset()
+        self._invariant_evaluation_timer.reset()
+
+
         # self._invariant_evaluation_timer.reset()
 
         return super().on_activate(state)
@@ -531,16 +541,37 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
             self._mode_transitions = _mode_transitions_dict
 
     def _on_invariant_callback(self, msg: Bool):
-        """callback for receiving an invariant update"""
-        if msg.data:
-            self._invariant = True
-        
-        self._invariant = False
+        """Callback for receiving an invariant update."""
+        if msg.data is False:  # invariant is true
+            if self._invariant_timeout_guard_lock.acquire(blocking=False):
+                try:
+                    self._trigger_invariant_timeout_guard.trigger()
+                finally:
+                    self._invariant_timeout_guard_lock.release()
+
+    def _invariant_timeout_guard_callback(self):
+        """
+        Triggered by a guard condition when an invariant holds.
+        Waits for 1 second to allow a mode transition.
+        If no transition occurs, checks if the mode is final.
+        """
+        with self._invariant_timeout_guard_lock:
+            self.get_logger().info('Invariant timeout guard triggered')
+            previous_mode = self._mode
+            rate = self.create_rate(1.0, SYSTEM_CLOCK)
+            rate.sleep()
+            if self._mode == previous_mode:
+                self.get_logger().info(
+                    f"Invariant held in mode {self._mode} with no transition within time tolerance."
+                )
+                self._status_publisher.publish(String(data=HybridAutomatonStatus.COMPLETED.name))
 
     def _on_status_received_callback(self, msg: String):
         if msg.data == HybridAutomatonStatus.COMPLETED.name: # simply move hybrid automaton back to deactivate lifecycle state
             with self.completed_lock:
                 self._status = HybridAutomatonStatus.COMPLETED
+                self.get_logger().info('Waypoint reached hybrid automaton has completed.')
+                future = self._trigger_transition_cli.call_async(ChangeState.Request(transition=Transition(id=Transition.TRANSITION_DEACTIVATE)))
         if msg.data == HybridAutomatonStatus.EXECUTING_MODE.name: # all this does is change the hybrid automaton state for executing mode
             with self.executing_mode_lock: 
                 self._status = HybridAutomatonStatus.EXECUTING_MODE
@@ -616,16 +647,16 @@ class HybridAutomatonLifecycleNode(LifecycleNode):
                 _invariant_key = next(iter(self._mode_invariant))
                 _invariant_inputs = self.get_invariant_inputs(_invariant_key)
                 _invariant_value:bool = self._mode_invariant[_invariant_key](*_invariant_inputs)
+
+                self._invariant = True
+                self._invariant_publisher.publish(Bool(data=_invariant_value))
             except Exception as e: 
                 self._status = HybridAutomatonStatus.ERROR.name
                 self.get_logger().error(f"Exception occured during invariant evaluation callback: {str(e)}")
                 self._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
                 # TODO: Maybe should stop the timer here.
                 return
-            
-            # need to update this for invariant
-            self._invariant = True
-            self._invariant_publisher.publish(Bool(data=_invariant_value))
+
             
     def _transition_evaluation_timer_callback(self):
         """
