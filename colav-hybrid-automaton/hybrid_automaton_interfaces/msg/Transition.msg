@@ -11,9 +11,6 @@
 # 'Custom Transition Parameters Start' and 'Custom Transition Parameters End'.
 # Only edit within that section to define or update your custom transition parameters.
 
-# Unique identifier for this transition evaluation instance.
-unique_identifier_msgs/UUID transition_uuid
-
 # Current Hybrid Automaton mode (e.g., GO_FORWARD, GO_RIGHT, etc.).
 string mode
 
