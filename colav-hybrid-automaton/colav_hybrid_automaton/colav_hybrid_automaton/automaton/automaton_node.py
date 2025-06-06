@@ -198,7 +198,18 @@ class HybridAutomatonNode(LifecycleNode):
 
             self._transition_evaluation_timer = self.create_timer(
                 timer_period_sec=1/self._evaluation_frequency, 
-                callback=evaluate_transitions_timer_callback,
+                callback=lambda: evaluate_transitions_timer_callback(
+                    lock= self._transition_eval_lock,
+                    mode = self._mode,
+                    available_modes = self._available_modes,
+                    status = self._status,
+                    states=self._states,
+                    stamp = self.get_clock().now().to_msg(),
+                    mode_transitions = self._mode_transitions,
+                    status_publisher = self._status_publisher,
+                    transiiton_evaluation_publisher = self._transition_evaluation_publisher,
+                    logger = self.get_logger()
+                ),
                 callback_group=ReentrantCallbackGroup(),
                 clock=SYSTEM_CLOCK,
                 autostart=False
@@ -317,13 +328,13 @@ class HybridAutomatonNode(LifecycleNode):
                 callback_group=ReentrantCallbackGroup()
             )
             # initialize hybrid automaton topic subscriptions
-            self._transition_evaluation_subscriber = self.create_subscription(
-                topic="/hybrid_automaton/transition_evaluations",
-                msg_type=COLAVTransition,
-                callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
-                qos_profile=QOS_PROFILE,
-                callback_group=ReentrantCallbackGroup()
-            )
+            # self._transition_evaluation_subscriber = self.create_subscription(
+            #     topic="/hybrid_automaton/transition_evaluations",
+            #     msg_type=COLAVTransition,
+            #     callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
+            #     qos_profile=QOS_PROFILE,
+            #     callback_group=ReentrantCallbackGroup()
+            # )
             self._status_subscription = self.create_subscription( # TODO: CLOSE THIS IN DEACTIVATE
                 msg_type=String,
                 topic='/hybrid_automaton/status',
@@ -331,6 +342,10 @@ class HybridAutomatonNode(LifecycleNode):
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
+
+            # TODO: need to do transition evaluation next
+            # TODO: Then do invariants
+            # Should add script to move automaton to inactive mode to launch before starting mission manager.
             
             self._mode_subscription = self.create_subscription(
                 String,
@@ -338,6 +353,7 @@ class HybridAutomatonNode(LifecycleNode):
                 callback=lambda msg: on_mode_callback(
                     lock=self._mode_callback_lock,
                     node=self,
+                    current_mode=self._mode,
                     mode=msg,
                     mode_configuration=self._configuration['modes'],
                     transition_configuration=self._configuration['transitions'],
@@ -369,7 +385,7 @@ class HybridAutomatonNode(LifecycleNode):
             self._waypoints_publisher.publish(Waypoints(waypoints=[self._goal_waypoint]))
             
             # start timers
-            # self._transition_evaluation_timer.reset()
+            self._transition_evaluation_timer.reset()
             self._dynamics_timer.reset()
             # self._invariant_evaluation_timer.reset()
     
@@ -377,7 +393,7 @@ class HybridAutomatonNode(LifecycleNode):
                 self.undeclare_parameter(param_key)
 
         except Exception as e:
-            self.get_logger().error(f"exception occured retrieving goal waypoint param")
+            self.get_logger().error(f"unexpected exception occured during transition from '{state.label}' to 'activate': {str(e)}")
             return TransitionCallbackReturn.FAILURE
 
         return super().on_activate(state)

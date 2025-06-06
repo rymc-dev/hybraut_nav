@@ -44,13 +44,12 @@ def evaluate_dynamics_timer_callback(
                 msg.success = True
             
             except Exception as e:
-                logger.error(f'Exception during dynamics creation: {str(e)}')
                 msg.success = False
-                msg.message = str(e)
+                msg.message = f"exception occured during '{mode}' dynamic evaluation: {str(e)}"
 
             dynamic_publisher.publish(msg)
     except Exception as e:
-        logger.error(e)
+        logger.error(f"unexpected exception occured during 'colav_hybrid_automaton.automaton.callbacks.dynamic_callbacks.evaluate_dynamics_timer_callback': '{str(e)}'")
 
 def _get_dynamic_inputs(state_input_keys: str, states: dict) -> List[Any]:
     """
