@@ -84,7 +84,7 @@ def generate_mode_profile(
             mode_dynamics[dynamic_function_name]  = {'function': dynamics_configuration[dynamic_function_name]['function'], 'state_inputs': dynamics_configuration[dynamic_function_name].get('state_inputs', [])}
 
             invariant_name = mode_configuration[mode]['invariants']
-            mode_invariant[invariant_name] = invariants_configuration[invariant_name]['function']
+            mode_invariant[invariant_name] = {'function': invariants_configuration[invariant_name]['function'], 'state_inputs': invariants_configuration[invariant_name].get('state_inputs', [])}
 
         except Exception as e: 
             raise ValueError(f'Exception occured _on_mode__received_callback, invalid mode received: {str(e)}')

@@ -50,6 +50,7 @@ from colav_hybrid_automaton.automaton.callbacks import (
     on_status_received_callback,
     handle_invariant_timeout_guard
 )
+from hybrid_automaton_interfaces.msg import Invariant
 
 SYSTEM_CLOCK = None
 
@@ -234,7 +235,16 @@ class HybridAutomatonNode(LifecycleNode):
 
             self._invariant_evaluation_timer = self.create_timer(
                 timer_period_sec=1/self._evaluation_frequency,
-                callback=evaluate_invariants_timer_callback,
+                callback=lambda: evaluate_invariants_timer_callback(
+                    lock=self._invariant_evaluation_lock,
+                    mode=self._mode,
+                    available_modes=self._available_modes,
+                    stamp=self.get_clock().now().to_msg(),
+                    invariant_config=self._mode_invariant,
+                    states = self._states,
+                    invariant_publisher = self._invariant_publisher,
+                    logger=self.get_logger()
+                ),
                 callback_group=ReentrantCallbackGroup(),
                 autostart=False
             )
@@ -298,7 +308,7 @@ class HybridAutomatonNode(LifecycleNode):
                 callback_group=ReentrantCallbackGroup()
             )
             self._invariant_publisher = self.create_publisher(
-                Bool,
+                Invariant,
                 '/hybrid_automaton/invariant',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
@@ -369,13 +379,14 @@ class HybridAutomatonNode(LifecycleNode):
                 callback_group=ReentrantCallbackGroup()
             )
 
-            self._invariant_subscription = self.create_subscription(
-                Bool,
-                '/hybrid_automaton/invariant',
-                qos_profile=QOS_PROFILE,
-                callback=on_invariant_status_received,
-                callback_group=ReentrantCallbackGroup()
-            )
+            # Todo: Remove this when ready.
+            # self._invariant_subscription = self.create_subscription(
+            #     Invariant,
+            #     '/hybrid_automaton/invariant',
+            #     qos_profile=QOS_PROFILE,
+            #     callback=on_invariant_status_received,
+            #     callback_group=ReentrantCallbackGroup()
+            # )
 
             self._invariant_timeout_guard_lock = threading.Lock()
             self._trigger_invariant_timeout_guard:GuardCondition = self.create_guard_condition(
@@ -388,7 +399,7 @@ class HybridAutomatonNode(LifecycleNode):
             # start timers
             self._transition_evaluation_timer.reset()
             self._dynamics_timer.reset()
-            # self._invariant_evaluation_timer.reset()
+            self._invariant_evaluation_timer.reset()
     
             for param_key in self._ACTIVATION_PARAMS:
                 self.undeclare_parameter(param_key)

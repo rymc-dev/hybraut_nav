@@ -2,24 +2,44 @@ from std_msgs.msg import Bool, String
 from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatus
 from rclpy.node import Node
 from typing import Optional, List, Any
+from threading import Lock
+from rclpy.publisher import Publisher
+from hybrid_automaton_interfaces.msg import Invariant
+from rclpy.impl.rcutils_logger import RcutilsLogger
+from builtin_interfaces.msg import Time
+from colav_hybrid_automaton.automaton.utils import validate_mode
 
-
-def evaluate_invariants_timer_callback(node: Node):
+def evaluate_invariants_timer_callback(
+    lock: Lock,
+    mode: str,
+    stamp: Time,
+    available_modes: dict,
+    invariant_config: dict,
+    states: dict, 
+    invariant_publisher: Publisher,
+    logger: RcutilsLogger
+):
     """invariant timer callback function"""
-    with node._invariant_evaluation_lock:
-        try:
-            _invariant_key = next(iter(node._mode_invariant))
-            _invariant_inputs = _get_invariant_inputs(_invariant_key)
-            _invariant_value:bool = node._mode_invariant[_invariant_key](*_invariant_inputs)
-
-            node._invariant = True
-            node._invariant_publisher.publish(Bool(data=_invariant_value))
-        except Exception as e: 
-            node._status = HybridAutomatonStatus.ERROR.name
-            node.get_logger().error(f"Exception occured during invariant evaluation callback: {str(e)}")
-            node._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
-            # TODO: Maybe should stop the timer here.
-            return
+    try:
+        with lock:
+            invariant = Invariant(stamp=stamp)
+            try:
+                invariant.mode = validate_mode(available_modes, mode)
+                invariant.invariant_name = next(iter(invariant_config))
+                invariant_inputs = _get_invariant_inputs(states=states, state_input_keys=invariant_config[invariant.invariant_name]['state_inputs'])
+                invariant.holds = bool(invariant_config[invariant.invariant_name]['function'](*invariant_inputs))
+            except Exception as e: 
+                error_message = f"exception occured during '{mode}' invariant evaluation: {str(e)}"
+                logger.debug(error_message)
+                # node._status = HybridAutomatonStatus.ERROR.name # TODO Add this when status callback functions are working.
+                # node._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
+                # TODO: Maybe should stop the timer here.
+                invariant.error = True
+                invariant.message = error_message
+            
+            invariant_publisher.publish(invariant)
+    except Exception as e:
+        logger.debug(f"unexpected exception occured in 'colav_hybrid_automaton.automaton.callbacks.innvariant_callbacks.evaluate_invariants_timer_callback': '{str(e)}'")
         
 def on_invariant_status_received(node: Node, invariant: Bool):
     """Callback for receiving an invariant update."""
@@ -47,16 +67,6 @@ def handle_invariant_timeout_guard(node: Node, system_clock=None):
             )
             node._status_publisher.publish(String(data=HybridAutomatonStatus.COMPLETED.name))
 
-def _get_invariant_inputs(node: Node, invariant_key: str) -> List[Any]:
+def _get_invariant_inputs(states: dict, state_input_keys: list) -> List[Any]:
     """Retrieves the state values for the given invariant's state inputs."""
-
-    invariants = node._configuration.get('invariants', {})
-    states = node._configuration.get('states', {})
-
-    state_input_names = invariants.get(invariant_key, {}).get('state_inputs', [])
-
-    return [
-        states[name]['state']
-        for name in state_input_names
-        if name in states
-    ]
+    return [states[s] for s in state_input_keys]

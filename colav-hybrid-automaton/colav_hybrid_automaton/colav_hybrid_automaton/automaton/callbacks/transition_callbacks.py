@@ -60,7 +60,7 @@ def evaluate_transitions_timer_callback(
                         status = HybridAutomatonStatus.TRANSITIONING
                         # status_publisher.publish(String(data=str(HybridAutomatonStatus.TRANSITIONING.name))) # TODO: Return these when status callback has been tested.
                     else:
-                        status = HybridAutomatonStatus.EXECUTING_MODE
+                        status = HybridAutomatonStatus.ACTIVE_MODE
                         # status_publisher.publish(String(data=str(HybridAutomatonStatus.EXECUTING_MODE.name)))
 
                     

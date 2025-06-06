@@ -29,6 +29,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TransitionTimer.msg"
   "msg/Output.msg"
   "msg/Guards.msg"
+  "msg/Invariant.msg"
 
   "srv/Reset.srv"
   "srv/StartHybridAutomaton.srv"
