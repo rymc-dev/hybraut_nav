@@ -7,7 +7,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from hybrid_automaton.config.qos_config import QOS_PROFILE
+from colav_hybrid_automaton.config.qos_config import QOS_PROFILE
 import rclpy
 from std_msgs.msg import Header
 from builtin_interfaces.msg import Time

@@ -70,7 +70,7 @@ states:
 # ============================================================================
 resets:
   remove_first_waypoint:
-    module: hybrid_automaton.scripts.resets
+    module: colav_hybrid_automaton.automaton.resets
     function: remove_first_waypoint
     state_inputs:
       - "waypoints_state"
@@ -78,7 +78,7 @@ resets:
       - "waypoints_state"
 
   create_virtual_waypoint:
-    module: hybrid_automaton.scripts.resets
+    module: colav_hybrid_automaton.automaton.resets
     function: create_virtual_waypoint
     state_inputs:
       - "agent_state"
@@ -94,7 +94,7 @@ resets:
 # ============================================================================
 guards:
   is_los_clear_to_waypoint:
-    module: hybrid_automaton.scripts.guards
+    module: colav_hybrid_automaton.automaton.guards
     function: is_los_clear_to_waypoint
     state_inputs:
       - "agent_state"
@@ -103,27 +103,27 @@ guards:
       - "waypoints_state"
 
   is_heading_within_tolerance:
-    module: hybrid_automaton.scripts.guards
+    module: colav_hybrid_automaton.automaton.guards
     function: is_heading_within_tolerance
     state_inputs:
       - "agent_state"
       - "waypoints_state"
 
   is_heading_not_within_tolerance:
-    module: hybrid_automaton.scripts.guards
+    module: colav_hybrid_automaton.automaton.guards
     function: is_heading_not_within_tolerance
     state_inputs:
       - "agent_state"
       - "waypoints_state"
 
   is_virtual_waypoints:
-    module: hybrid_automaton.scripts.guards
+    module: colav_hybrid_automaton.automaton.guards
     function: is_virtual_waypoints
     state_inputs:
       - "waypoints_state"
 
   is_unsafe_conditions:
-    module: hybrid_automaton.scripts.guards
+    module: colav_hybrid_automaton.automaton.guards
     function: is_unsafe_conditions
     state_inputs:
       - "agent_state"
@@ -131,7 +131,7 @@ guards:
       - "unsafe_set_state"
 
   is_waypoint_reached:
-    module: hybrid_automaton.scripts.guards
+    module: colav_hybrid_automaton.automaton.guards
     function: is_waypoint_reached
     state_inputs:
       - "agent_state"
@@ -143,17 +143,17 @@ guards:
 # ============================================================================
 invariants:
   is_at_final_waypoint:
-    module: hybrid_automaton.scripts.invariants
+    module: colav_hybrid_automaton.automaton.invariants
     function: is_at_final_waypoint
     state_inputs:
       - "waypoints_state"
 
   trivial_invariant:
-    module: hybrid_automaton.scripts.invariants
+    module: colav_hybrid_automaton.automaton.invariants
     function: trivial_invariant
 
   failing_invariant:
-    module: hybrid_automaton.scripts.invariants
+    module: colav_hybrid_automaton.automaton.invariants
     function: failing_invariant
 
 # ============================================================================
@@ -199,7 +199,7 @@ transitions:
 # ============================================================================
 dynamics:
   proportional_velocity_controller:
-    module: "hybrid_automaton.scripts.dynamics"
+    module: colav_hybrid_automaton.automaton.dynamics
     function: proportional_velocity_controller
     state_inputs:
       - "agent_state"
@@ -208,7 +208,7 @@ dynamics:
       yaw_rate: "rad/s"
 
   proportional_yaw_rate_controller:
-    module: "hybrid_automaton.scripts.dynamics"
+    module: colav_hybrid_automaton.automaton.dynamics
     function: proportional_yaw_rate_controller
     state_inputs:
       - "agent_state"
@@ -218,7 +218,7 @@ dynamics:
       yaw_rate: "rad/s"
 
   no_op_controller:
-    module: "hybrid_automaton.scripts.dynamics"
+    module: colav_hybrid_automaton.automaton.dynamics
     function: no_op_controller
     output:
       velocity: "m/s"

@@ -1,0 +1,6 @@
+colav_interfaces/Waypoint goal_waypoint
+
+---
+
+bool success
+string message

@@ -5,8 +5,7 @@ from hybrid_automaton_interfaces.action import HybridAutomaton
 from builtin_interfaces.msg import Time
 from unique_identifier_msgs.msg import UUID
 from colav_interfaces.msg import Waypoint, Waypoints
-from hybrid_automaton.utils import get_current_ros_time
-from geometry_msgs.msg import Pose, Point32, Quaternion
+from geometry_msgs.msg import Pose, Point, Quaternion
 from unique_identifier_msgs.msg import UUID
 import uuid
 import time
@@ -19,14 +18,14 @@ class HybridAutomatonClient(Node):
     def __init__(self):
         super().__init__('hybrid_automaton_client')
         self._action_client = ActionClient(
-            self, HybridAutomaton, '/colav/hybrid_automaton/hybrid_automaton_action_server')
+            self, HybridAutomaton, '/hybrid_automaton/hybrid_automaton_action_server')
 
     def send_goal(self):
         self.get_logger().info('Waiting for action server...')
         self._action_client.wait_for_server()
 
         goal_msg = HybridAutomaton.Goal()
-        goal_msg.stamp = get_current_ros_time()
+        goal_msg.stamp = self.get_clock().now().to_msg()
 
         # # Create UUIDs
         mission_uuid = uuid.uuid4()
@@ -36,7 +35,7 @@ class HybridAutomatonClient(Node):
         goal_msg.mission_uuid = UUID(uuid=np.frombuffer(mission_uuid.bytes, dtype=np.uint8))
         goal_msg.agent_uuid = UUID(uuid=np.frombuffer(agent_uuid.bytes, dtype=np.uint8))
         goal_msg.mission_profile = 'COLAV'
-        goal_msg.goal_waypoints = Waypoints(waypoints=[Waypoint(position=Point32(x=100.0, y=100.0, z=0.0), acceptance_radius = 0.5)])
+        goal_msg.goal_waypoints = Waypoints(waypoints=[Waypoint(position=Point(x=100.0, y=100.0, z=0.0), acceptance_radius = 0.5)])
 
         self._send_goal_future = self._action_client.send_goal_async(goal_msg, feedback_callback=self.feedback_callback)
         self._send_goal_future.add_done_callback(self.goal_response_callback)

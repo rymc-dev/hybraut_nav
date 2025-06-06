@@ -5,7 +5,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from hybrid_automaton.config.qos_config import QOS_PROFILE
+from colav_hybrid_automaton.config.qos_config import QOS_PROFILE
 from colav_interfaces.msg import Waypoint, Waypoints
 from geometry_msgs.msg import Point32
 
