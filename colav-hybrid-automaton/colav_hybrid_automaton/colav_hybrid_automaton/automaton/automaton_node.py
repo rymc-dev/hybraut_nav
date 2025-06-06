@@ -338,13 +338,13 @@ class HybridAutomatonNode(LifecycleNode):
                 callback_group=ReentrantCallbackGroup()
             )
             # initialize hybrid automaton topic subscriptions
-            # self._transition_evaluation_subscriber = self.create_subscription(
-            #     topic="/hybrid_automaton/transition_evaluations",
-            #     msg_type=COLAVTransition,
-            #     callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
-            #     qos_profile=QOS_PROFILE,
-            #     callback_group=ReentrantCallbackGroup()
-            # )
+            self._transition_evaluation_subscriber = self.create_subscription(
+                topic="/hybrid_automaton/transition_evaluations",
+                msg_type=COLAVTransition,
+                callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
+                qos_profile=QOS_PROFILE,
+                callback_group=ReentrantCallbackGroup()
+            )
             self._status_subscription = self.create_subscription( # TODO: CLOSE THIS IN DEACTIVATE
                 msg_type=String,
                 topic='/hybrid_automaton/status',
@@ -395,6 +395,7 @@ class HybridAutomatonNode(LifecycleNode):
             )
 
             self._waypoints_publisher.publish(Waypoints(waypoints=[self._goal_waypoint]))
+            self._mode_publisher.publish(String(data=str(self._configuration['init']['mode']))) # TODO: Need to add some validation to ensure init is given validly.
             
             # start timers
             self._transition_evaluation_timer.reset()
