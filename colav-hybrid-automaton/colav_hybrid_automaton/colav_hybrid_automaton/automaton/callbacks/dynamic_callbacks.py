@@ -45,7 +45,7 @@ def evaluate_dynamics_timer_callback(
             
             except Exception as e:
                 msg.success = False
-                msg.message = f"exception occured during '{mode}' dynamic evaluation: {str(e)}"
+                msg.message = f"exception occured during '{mode}' dynamic evaluation: '{str(e)}'"
 
             dynamic_publisher.publish(msg)
     except Exception as e:

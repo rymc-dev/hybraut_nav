@@ -353,6 +353,7 @@ class HybridAutomatonNode(LifecycleNode):
                 callback=lambda msg: on_mode_callback(
                     lock=self._mode_callback_lock,
                     node=self,
+                    available_modes=self._available_modes,
                     current_mode=self._mode,
                     mode=msg,
                     mode_configuration=self._configuration['modes'],

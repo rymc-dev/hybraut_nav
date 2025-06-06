@@ -87,8 +87,8 @@ def generate_mode_profile(
             mode_invariant[invariant_name] = invariants_configuration[invariant_name]['function']
 
         except Exception as e: 
-            raise f'Exception occured _on_mode__received_callback, invalid mode received: {str(e)}'
+            raise ValueError(f'Exception occured _on_mode__received_callback, invalid mode received: {str(e)}')
             
         return (mode, mode_transitions_dict, mode_dynamics, mode_invariant)
     except Exception as e:
-        raise f"unexpected error occured in 'colav_hybrid_automaton.automaton.callbacks.on_mode_callback': {str(e)}"
+        raise ValueError(f"unexpected error occured in 'colav_hybrid_automaton.automaton.callbacks.on_mode_callback': {str(e)}")

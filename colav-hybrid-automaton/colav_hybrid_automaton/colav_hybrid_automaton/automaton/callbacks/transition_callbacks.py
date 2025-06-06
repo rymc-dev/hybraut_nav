@@ -27,11 +27,13 @@ def evaluate_transitions_timer_callback(
     """
     try:
         with lock:
-            eval: AutomatonTransition = AutomatonTransition(stamp=stamp, mode=validate_mode(available_modes, mode)) 
+            eval: AutomatonTransition = AutomatonTransition(stamp=stamp) 
             try:
                 if status is HybridAutomatonStatus.TRANSITIONING:            
                     return
                 else:
+                    eval.mode = validate_mode(available_modes, mode)
+
                     eval.success = True
                     eval.transition_names = []
                     eval.transition_values = []
@@ -52,7 +54,7 @@ def evaluate_transitions_timer_callback(
                             eval.success = False
 
                     if error_messages:
-                        raise ValueError(f"exceptions during {mode} evaluation for transitions: \n" + "- ".join(error_messages))
+                        raise ValueError(f"\ntransition exceptions: \n" + "- ".join(error_messages))
 
                     if any(eval.transition_values):
                         status = HybridAutomatonStatus.TRANSITIONING
@@ -65,7 +67,7 @@ def evaluate_transitions_timer_callback(
             except Exception as e:
                 # status_publisher.publish(String(data=str(HybridAutomatonStatus.ERROR.name)))
                 eval.success = False
-                eval.message = str(e)
+                eval.message = f"exception occured during '{mode}' transition evaluation: '{str(e)}'" 
 
             transiiton_evaluation_publisher.publish(eval)
 

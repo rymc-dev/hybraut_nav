@@ -8,10 +8,13 @@ from colav_hybrid_automaton.automaton.factory import generate_mode_profile
 from typing import Tuple
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
+from colav_hybrid_automaton.automaton.utils import validate_mode
+from typing import List
 
 def on_mode_callback(
     lock: Lock,
     node: Node,
+    available_modes: List[str],
     current_mode: str,
     mode: String,
     mode_configuration: dict,
@@ -27,6 +30,8 @@ def on_mode_callback(
         with lock:
             if mode.data == current_mode:
                 return
+            
+            mode.data = validate_mode(available_modes, mode.data)
             
             (
                 mode, 
@@ -47,7 +52,11 @@ def on_mode_callback(
             node._mode_transitions = mode_transitions
             node._mode_dynamics = mode_dynamics
             node._mode_invariant = mode_invariant
+            logger.debug(f"Automaton mode successfully changed to '{mode}'.")
     except Exception as e:
-        logger.error(f"Exception occured in 'colav_hybrid_automaton.automaton.callbacks.mode_callbacks.on_mode_callback': {str(e)}")
+        logger.debug(f"Automaton mode change to '{mode}' was rejected due to an error: {e}")
+        logger.error(
+            f"Exception occurred in 'colav_hybrid_automaton.automaton.callbacks.mode_callbacks.on_mode_callback': {type(e).__name__}: {e}"
+        )
         # status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name)) # TODO Add this back later
     
