@@ -245,7 +245,7 @@ modes:
 
   t2los:
     index: 1
-    dynamics: "simple_yaw_direction_controller"
+    dynamics: "proportional_yaw_rate_controller"
     invariants: trivial_invariant
     transitions:
       t2los_to_fallback:

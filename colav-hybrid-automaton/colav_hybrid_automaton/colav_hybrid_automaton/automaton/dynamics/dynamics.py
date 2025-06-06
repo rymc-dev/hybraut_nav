@@ -62,60 +62,13 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     return [new_velocity, 0.0]
 
 
-def simple_yaw_direction_controller(
-    agent_state: AgentUpdate,
-    waypoints: Waypoints,
-    max_yaw_rate: float = 1.0,
-) -> Tuple[float, float]:
-    """
-    Simple yaw controller: commands max yaw rate left or right to face next waypoint.
-    Velocity control is not handled here, so velocity command is None.
-    """
-
-    # Validate inputs (minimal)
-    if not waypoints.waypoints:
-        raise ValueError("No waypoint to navigate to")
-
-    # Get current heading from quaternion
-    current_heading = quaternion_to_heading(
-        qx=agent_state.pose.orientation.x,
-        qy=agent_state.pose.orientation.y,
-        qz=agent_state.pose.orientation.z,
-        qw=agent_state.pose.orientation.w,
-    )
-
-    # Compute desired heading to first waypoint
-    wp = waypoints.waypoints[0]
-    dx = wp.position.x - agent_state.pose.position.x
-    dy = wp.position.y - agent_state.pose.position.y
-    desired_heading = math.atan2(dy, dx)
-
-    # Heading error wrapped [-pi, pi]
-    heading_error = math.atan2(
-        math.sin(desired_heading - current_heading),
-        math.cos(desired_heading - current_heading)
-    )
-
-    # Command max yaw rate left or right (or zero if heading is very close)
-    error_threshold = 0.01  # radians, ~0.57 degrees
-    if heading_error > error_threshold:
-        target_yaw_rate = max_yaw_rate  # turn left (positive yaw rate)
-    elif heading_error < -error_threshold:
-        target_yaw_rate = -max_yaw_rate  # turn right (negative yaw rate)
-    else:
-        target_yaw_rate = 0.0  # close enough, no yaw command
-
-    # No velocity control here, so return None or current velocity as placeholder
-    return None, target_yaw_rate
-
-
 def proportional_yaw_rate_controller(
         agent_state: AgentUpdate,
         waypoints: Waypoints,
         dt: float = 0.1,
         error_tolerance: float = 0.01,
         proportional_gain: float = 1.0,
-        max_yaw_rate: float = 1.0,
+        max_yaw_rate: float = 0.5,
         tolerance: Duration = Duration(sec=1, nanosec=0)
 ) -> Tuple[float, float]:
     """
@@ -140,10 +93,10 @@ def proportional_yaw_rate_controller(
         raise ValueError("tolerance must be Duration type")
 
     # Velocity control (P-controller)
-    current_vel = agent_state.velocity
-    vel_error = TARGET_VELOCITY - current_vel
-    accel_cmd = max(min(vel_error / dt, MAX_ACCELERATION), -MAX_DECELERATION)
-    updated_velocity = current_vel + accel_cmd * dt
+    # current_vel = agent_state.velocity
+    # vel_error = TARGET_VELOCITY - current_vel
+    # accel_cmd = max(min(vel_error / dt, MAX_ACCELERATION), -MAX_DECELERATION)
+    # updated_velocity = current_vel + accel_cmd * dt
 
     # Yaw control
     current_heading = quaternion_to_heading(
@@ -170,17 +123,26 @@ def proportional_yaw_rate_controller(
     )
 
     # Proportional yaw control with smoothing
+    # if abs(heading_error) < error_tolerance:
+    #     target_yaw_rate = 0.0
+    # else:
+    #     raw_turn = proportional_gain * heading_error / dt
+    #     target_yaw_rate = max(-max_yaw_rate, min(raw_turn, max_yaw_rate))
+
+    #     # Optional low-pass filter to smooth yaw rate
+    #     alpha = 0.1
+    #     target_yaw_rate = alpha * target_yaw_rate + (1 - alpha) * agent_state.yaw_rate
+
+    # return float(TARGET_VELOCITY), target_yaw_rate
+    # Binary controller
     if abs(heading_error) < error_tolerance:
         target_yaw_rate = 0.0
+    elif heading_error > 0:
+        target_yaw_rate = max_yaw_rate  # turn left
     else:
-        raw_turn = proportional_gain * heading_error / dt
-        target_yaw_rate = max(-max_yaw_rate, min(raw_turn, max_yaw_rate))
+        target_yaw_rate = -max_yaw_rate  # turn right
 
-        # Optional low-pass filter to smooth yaw rate
-        alpha = 0.1
-        target_yaw_rate = alpha * target_yaw_rate + (1 - alpha) * agent_state.yaw_rate
-
-    return updated_velocity, target_yaw_rate
+    return float(TARGET_VELOCITY), target_yaw_rate
 
 def no_op_controller() -> Tuple[float, float]:
     # Initially controller for fallback will return 0,0 commands therefore

@@ -96,7 +96,7 @@ class AutomatonMissionManager(Node):
             self.get_logger().error('/hybrid_automaton/set_parameters: srv not available!')
 
         self._default_configuration_path = DEFAULT_CONFIG_FILE_PATH
-        self._default_evaluation_frequency = 10
+        self._default_evaluation_frequency = 100
         self._default_control_frequency = 100
         self._current_goal_waypoint:Waypoint = None
 
