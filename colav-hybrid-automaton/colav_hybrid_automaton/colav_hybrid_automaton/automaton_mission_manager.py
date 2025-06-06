@@ -29,6 +29,7 @@ from hybrid_automaton_interfaces.msg import DynamicParameter
 from colav_interfaces.msg import Waypoints
 
 SYSTEM_CLOCK = None
+DEFAULT_CONFIG_FILE_PATH = "/etc/colav_hybrid_automaton_config.yml"
 
 class AutomatonMissionManager(Node):
     
@@ -94,7 +95,7 @@ class AutomatonMissionManager(Node):
         if not self._automaton_params_setter_cli.wait_for_service(timeout_sec=30.0):
             self.get_logger().error('/hybrid_automaton/lifecycle/set_parameters: srv not available!')
 
-        self._default_configuration_path = '/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav-hybrid-automaton/colav_hybrid_automaton/config/colav_hybrid_automaton_config.yml'
+        self._default_configuration_path = DEFAULT_CONFIG_FILE_PATH
         self._default_evaluation_frequency = 10
         self._default_control_frequency = 100
         self._current_goal_waypoint:Waypoint = None
