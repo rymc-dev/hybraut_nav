@@ -50,15 +50,63 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     if not isinstance(tolerance, Duration):
         raise ValueError('tolerance must be Duration type')
 
-    current_velocity = agent_state.velocity
-    velocity_change = TARGET_VELOCITY - current_velocity
-    # TODO: Replace -MAX_ACCELERATION with MAX_DECELERATION from agent
-    # parameters
-    acceleration = max(
-        min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)
-    new_velocity = current_velocity + acceleration * dt
+    # current_velocity = agent_state.velocity
+    # velocity_change = TARGET_VELOCITY - current_velocity
+    # # TODO: Replace -MAX_ACCELERATION with MAX_DECELERATION from agent
+    # # parameters
+    # acceleration = max(
+    #     min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)
+    # new_velocity = current_velocity + acceleration * dt
 
+    new_velocity = TARGET_VELOCITY
     return [new_velocity, 0.0]
+
+
+def simple_yaw_direction_controller(
+    agent_state: AgentUpdate,
+    waypoints: Waypoints,
+    max_yaw_rate: float = 1.0,
+) -> Tuple[float, float]:
+    """
+    Simple yaw controller: commands max yaw rate left or right to face next waypoint.
+    Velocity control is not handled here, so velocity command is None.
+    """
+
+    # Validate inputs (minimal)
+    if not waypoints.waypoints:
+        raise ValueError("No waypoint to navigate to")
+
+    # Get current heading from quaternion
+    current_heading = quaternion_to_heading(
+        qx=agent_state.pose.orientation.x,
+        qy=agent_state.pose.orientation.y,
+        qz=agent_state.pose.orientation.z,
+        qw=agent_state.pose.orientation.w,
+    )
+
+    # Compute desired heading to first waypoint
+    wp = waypoints.waypoints[0]
+    dx = wp.position.x - agent_state.pose.position.x
+    dy = wp.position.y - agent_state.pose.position.y
+    desired_heading = math.atan2(dy, dx)
+
+    # Heading error wrapped [-pi, pi]
+    heading_error = math.atan2(
+        math.sin(desired_heading - current_heading),
+        math.cos(desired_heading - current_heading)
+    )
+
+    # Command max yaw rate left or right (or zero if heading is very close)
+    error_threshold = 0.01  # radians, ~0.57 degrees
+    if heading_error > error_threshold:
+        target_yaw_rate = max_yaw_rate  # turn left (positive yaw rate)
+    elif heading_error < -error_threshold:
+        target_yaw_rate = -max_yaw_rate  # turn right (negative yaw rate)
+    else:
+        target_yaw_rate = 0.0  # close enough, no yaw command
+
+    # No velocity control here, so return None or current velocity as placeholder
+    return None, target_yaw_rate
 
 
 def proportional_yaw_rate_controller(

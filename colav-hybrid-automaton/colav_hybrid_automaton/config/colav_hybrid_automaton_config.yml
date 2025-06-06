@@ -245,7 +245,7 @@ modes:
 
   t2los:
     index: 1
-    dynamics: "proportional_yaw_rate_controller"
+    dynamics: "simple_yaw_direction_controller"
     invariants: trivial_invariant
     transitions:
       t2los_to_fallback:
@@ -257,7 +257,7 @@ modes:
 
   waypoint_reached:
     index: 2
-    dynamics: "proportional_velocity_controller"
+    dynamics: "no_op_controller"
     invariants: is_at_final_waypoint
     transitions:
       waypoint_reached_to_cruise:
