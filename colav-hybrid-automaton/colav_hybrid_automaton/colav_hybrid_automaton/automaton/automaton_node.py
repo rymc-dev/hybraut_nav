@@ -46,6 +46,8 @@ from colav_hybrid_automaton.automaton.callbacks import (
     evaluate_dynamics_timer_callback,
     evaluate_invariants_timer_callback,
     on_invariant_status_received,
+    transition_engine_callback,
+    on_transition_evaluation_received,
     on_mode_callback,
     on_status_received_callback,
     handle_invariant_timeout_guard
@@ -94,10 +96,9 @@ class HybridAutomatonNode(LifecycleNode):
     def __init__(
         self, 
         name: str, 
-        namespace: Optional[str]
     ):
         """init"""
-        super().__init__(name, namespace=namespace)
+        super().__init__(name)
 
         # Internal states
         self._mode:str = ""
@@ -107,6 +108,7 @@ class HybridAutomatonNode(LifecycleNode):
         self._mode_transitions = None
         self._status:HybridAutomatonStatus = None
         self._invariant:bool = None
+        self._current_transition:str = None
         self._current_transition_evaluation:Transition = None
         self._reset_event = None
         self._waiting_after_reset:bool = False
@@ -142,6 +144,9 @@ class HybridAutomatonNode(LifecycleNode):
         self._dynamics_timer:Timer = None
         self._invariant_timer:Timer = None
 
+        # Guards
+        self._transition_engine: GuardCondition = None  
+
         # Internal Continuous states
         self._goal_waypoint:Waypoint = None
 
@@ -164,7 +169,7 @@ class HybridAutomatonNode(LifecycleNode):
                 )
             )
 
-        self.get_logger().info(f"{namespace}/{name}: managed node initialized")
+        self.get_logger().info(f"{name}: managed node initialized")
 
 
     """ === LifeCycle Transition Functions === """
@@ -337,11 +342,27 @@ class HybridAutomatonNode(LifecycleNode):
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
-            # initialize hybrid automaton topic subscriptions
+            # self._transition_engine = self.create_guard_condition(
+            #     callback=transition_engine_callback,
+            #     callback_group=ReentrantCallbackGroup()
+            # )
+
             self._transition_evaluation_subscriber = self.create_subscription(
                 topic="/hybrid_automaton/transition_evaluations",
                 msg_type=COLAVTransition,
-                callback=lambda msg: self.__setattr__('_current_transition_evaluation', msg), # TODO: In callback lets do the prioritization analysis to see which mode we should transition to to set it to current state attributes instead of taking the whole message.
+                callback=lambda msg: on_transition_evaluation_received(
+                    lock=self._transition_eval_lock,
+                    mode=self._mode,
+                    states=self._states,
+                    transition_config=self._mode_transitions,
+                    status=self._status,
+                    available_modes=self._available_modes,
+                    transition_evaluation=msg,
+                    mode_publisher=self._mode_publisher,
+                    status_publisher=self._status_publisher,
+                    waypoints_publisher=self._waypoints_publisher,
+                    logger=self.get_logger()
+                ),
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
@@ -563,7 +584,7 @@ class HybridAutomatonNode(LifecycleNode):
 def main():
     rclpy.init()
    
-    automaton_node = HybridAutomatonNode(name='hybrid_automaton', namespace=None)
+    automaton_node = HybridAutomatonNode(name='hybrid_automaton')
     executor = MultiThreadedExecutor(num_threads=os.cpu_count())
 
     try:

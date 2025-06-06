@@ -29,7 +29,7 @@ from hybrid_automaton_interfaces.msg import DynamicParameter
 from colav_interfaces.msg import Waypoints
 
 SYSTEM_CLOCK = None
-DEFAULT_CONFIG_FILE_PATH = "/etc/colav_hybrid_automaton_config.yml"
+DEFAULT_CONFIG_FILE_PATH = "/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav-hybrid-automaton/colav_hybrid_automaton/config/colav_hybrid_automaton_config.yml"
 
 class AutomatonMissionManager(Node):
     
@@ -76,24 +76,24 @@ class AutomatonMissionManager(Node):
 
         self._state_cli = self.create_client(
             srv_type=GetState,
-            srv_name='/hybrid_automaton/lifecycle/get_state'
+            srv_name='/hybrid_automaton/get_state'
         )
         if not self._state_cli.wait_for_service(timeout_sec=30.0):
             self.get_logger().error('/hybrid_automaton/lifecycle/get_state: srv not available!')
 
         self._change_state_cli = self.create_client(
             srv_type=ChangeState,
-            srv_name='/hybrid_automaton/lifecycle/change_state'
+            srv_name='/hybrid_automaton/change_state'
         )
         if not self._change_state_cli.wait_for_service(timeout_sec=30.0):
-            self.get_logger().error('/hybrid_automaton/lifecycle/get_state: srv not available!')
+            self.get_logger().error('/hybrid_automaton/get_state: srv not available!')
         
         self._automaton_params_setter_cli = self.create_client(
             srv_type=SetParameters,
-            srv_name='/hybrid_automaton/lifecycle/set_parameters'
+            srv_name='/hybrid_automaton/set_parameters'
         )
         if not self._automaton_params_setter_cli.wait_for_service(timeout_sec=30.0):
-            self.get_logger().error('/hybrid_automaton/lifecycle/set_parameters: srv not available!')
+            self.get_logger().error('/hybrid_automaton/set_parameters: srv not available!')
 
         self._default_configuration_path = DEFAULT_CONFIG_FILE_PATH
         self._default_evaluation_frequency = 10
@@ -149,7 +149,7 @@ class AutomatonMissionManager(Node):
         self._hybrid_automaton_action_server = ActionServer(
             self,
             HybridAutomaton,
-            'hybrid_automaton_action_server',
+            'execute_automaton',
             execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
             handle_accepted_callback=self.handle_accepted_callback,

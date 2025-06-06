@@ -25,8 +25,8 @@ setup(
     license='MIT',
     entry_points={
         'console_scripts': [
-            "mission_control_node = hybrid_automaton.execute_hybrid_automaton_mission_control_node:main",
-            "lifecycle_node = hybrid_automaton.execute_hybrid_automaton_node:main"
+            "automaton_mission_manager = colav_hybrid_automaton.automaton_mission_manager:main",
+            "automaton = colav_hybrid_automaton.automaton.automaton_node:main"
         ],
     },
 )

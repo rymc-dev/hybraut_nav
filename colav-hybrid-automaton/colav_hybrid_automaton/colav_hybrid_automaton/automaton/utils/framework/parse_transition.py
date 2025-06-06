@@ -1,6 +1,7 @@
 from rclpy.node import Node
+from typing import List
 
-def parse_transition(node: Node, transition_name: str) -> str:
+def parse_transition(available_modes: List[str], transition_name: str) -> str:
     """
     Publishes the transition when no reset is needed.
     """
@@ -9,7 +10,7 @@ def parse_transition(node: Node, transition_name: str) -> str:
     # Split at the last underscore
     base, _, maybe_num = transition_to_raw.rpartition('_')
 
-    if maybe_num.isdigit() and base in list(node._configuration['modes'].keys()):
+    if maybe_num.isdigit() and base in available_modes:
         transition_to = base
     else:
         transition_to = transition_to_raw

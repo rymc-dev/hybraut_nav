@@ -6,18 +6,18 @@ pkg_name = 'colav_hybrid_automaton'
 
 def generate_launch_description():
 
-    lifecycle_node = Node(
+    automaton_node = Node(
         package=pkg_name,
-        executable='lifecycle_node',
+        executable='automaton',
         output='screen',
     )
-    mission_control_node = Node(
+    automaton_mission_manager_node = Node(
         package=pkg_name,
-        executable='mission_control_node',
+        executable='automaton_mission_manager',
         output='screen',
     )
 
     return LaunchDescription([
-        lifecycle_node,
-        mission_control_node
+        automaton_node,
+        automaton_mission_manager_node
     ])
