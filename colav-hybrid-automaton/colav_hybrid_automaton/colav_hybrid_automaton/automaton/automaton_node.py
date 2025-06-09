@@ -40,7 +40,7 @@ from colav_hybrid_automaton.automaton.constants import (
     QOS_PROFILE, 
     HybridAutomatonStatus
 )
-
+import sys  
 from colav_hybrid_automaton.automaton.callbacks import (
     evaluate_transitions_timer_callback,
     evaluate_dynamics_timer_callback,
@@ -575,11 +575,22 @@ class HybridAutomatonNode(LifecycleNode):
 
             # Log and shut down node
             self.get_logger().info("Shutdown complete. Resources cleaned up.")
-
+            self._exit_timer = self.create_timer(0.1, self._exit_after_shutdown)
             return TransitionCallbackReturn.SUCCESS
         except Exception as e:
             self.get_logger().error(f"Exception occurred during shutdown: {e}")
             return TransitionCallbackReturn.FAILURE
+        
+    def _exit_after_shutdown(self):
+        # Cancel timer so it runs only once
+        self._exit_timer.cancel()
+        self.destroy_timer(self._exit_timer)
+
+        self.get_logger().info('Exiting node process cleanly after shutdown')
+
+        rclpy.shutdown()
+        sys.exit(0)
+
         
 def main():
     rclpy.init()
@@ -594,7 +605,8 @@ def main():
         executor.shutdown()
         automaton_node.destroy_node()
         
-    rclpy.shutdown()
+    if rclpy.ok():
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

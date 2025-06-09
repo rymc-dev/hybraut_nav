@@ -27,6 +27,7 @@ from hybrid_automaton_interfaces.msg import Dynamics
 from colav_hybrid_automaton.automaton.constants import QOS_PROFILE, HybridAutomatonStatus, HybridAutomatonMissionProfile
 from hybrid_automaton_interfaces.msg import DynamicParameter
 from colav_interfaces.msg import Waypoints
+import sys
 
 SYSTEM_CLOCK = None
 DEFAULT_CONFIG_FILE_PATH = "/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav-hybrid-automaton/colav_hybrid_automaton/config/colav_hybrid_automaton_config.yml"
@@ -44,6 +45,9 @@ class AutomatonMissionManager(Node):
         self._current_status = "INITIALIZING"
         self._current_dynamics = None
         self._current_waypoints = None
+        self._goal_handle = None
+        self._current_goal_waypoint:Waypoint = None
+        self._goal_lock = threading.Lock()
 
         self.create_subscription(
             msg_type=String,
@@ -95,10 +99,21 @@ class AutomatonMissionManager(Node):
         if not self._automaton_params_setter_cli.wait_for_service(timeout_sec=30.0):
             self.get_logger().error('/hybrid_automaton/set_parameters: srv not available!')
 
-        self._default_configuration_path = DEFAULT_CONFIG_FILE_PATH
-        self._default_evaluation_frequency = 100
-        self._default_control_frequency = 100
-        self._current_goal_waypoint:Waypoint = None
+        future = self._state_cli.call_async(request=GetState.Request())
+        try:
+            rclpy.spin_until_future_complete(self, future, timeout_sec=1.0)
+        except Exception as e: 
+            pass
+        finally:
+            if not future.done():
+                self.get_logger().warning('error occured during the callback for _activate_automaton_callback to get the current hybrid automaton state')
+                self._goal_handle.is_cancel_requested = True
+        
+        future_response:GetState.Response = future.result()
+        if not future_response.current_state.id == State.PRIMARY_STATE_INACTIVE:
+            e = "error occured initializing hybrid_automaton mission manager, hybrid automaton needs to be in inactive state initially for mission manager to initialize."
+            self.get_logger().error(str(e))
+            raise Exception(e)
 
         self._activate_automaton:GuardCondition = self.create_guard_condition(
             self._activate_automaton_callback,
@@ -112,40 +127,6 @@ class AutomatonMissionManager(Node):
             callback_group=ReentrantCallbackGroup(),
             autostart=False
         )
-
-        future = self._automaton_params_setter_cli.call_async(
-            SetParameters.Request(
-                parameters=[
-                    Parameter(
-                        name='configuration_path', 
-                        value=ParameterValue(type=ParameterType.PARAMETER_STRING, string_value=self._default_configuration_path)
-                    ),
-                    Parameter(
-                        name='evaluation_frequency',
-                        value=ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=self._default_evaluation_frequency)
-                    ),
-                    Parameter(
-                        name='control_frequency',
-                        value=ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=self._default_control_frequency)
-                    )
-            ]))
-        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
-        if future.done():
-            if not all(result.successful for result in future.result().results):
-                self.get_logger().error('setting params failed for configuration')
-
-        # Transition to inactive state
-        future = self._change_state_cli.call_async(
-            ChangeState.Request(transition=Transition(id=Transition.TRANSITION_CONFIGURE))
-        )
-        rclpy.spin_until_future_complete(self,future, timeout_sec=5.0)
-        if future.done():
-            if not future.result().success:
-                self.get_logger().error('transition request to configure for hybrid automaton lifecycle failed')
-
-
-        self._goal_handle = None
-        self._goal_lock = threading.Lock()
         self._hybrid_automaton_action_server = ActionServer(
             self,
             HybridAutomaton,
@@ -370,20 +351,16 @@ class AutomatonMissionManager(Node):
         return result
 
 
-def main():
-    rclpy.init()
-    node = AutomatonMissionManager(name='mission_manager', namespace='hybrid_automaton')
-    executor = MultiThreadedExecutor(num_threads=os.cpu_count())
-
+def main(args=None):
+    rclpy.init(args=args)
     try:
-        executor.add_node(node)
-        executor.spin()
-    except Exception as e:
-        pass
-    executor.shutdown()
-    node.destroy_node()
-        
-    rclpy.shutdown()
+        node = AutomatonMissionManager(name='mission_manager', namespace='hybrid_automaton')
+        rclpy.spin(node)
+    except RuntimeError as e:
+        print(f"[mission_manager]: {e}")  # or use logging here
+        sys.exit(1)
+    finally:
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

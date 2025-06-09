@@ -67,7 +67,7 @@ def proportional_yaw_rate_controller(
         waypoints: Waypoints,
         dt: float = 0.1,
         error_tolerance: float = 0.01,
-        proportional_gain: float = 1.0,
+        proportional_gain: float = 3.0,
         max_yaw_rate: float = 0.5,
         tolerance: Duration = Duration(sec=1, nanosec=0)
 ) -> Tuple[float, float]:
@@ -123,26 +123,26 @@ def proportional_yaw_rate_controller(
     )
 
     # Proportional yaw control with smoothing
-    # if abs(heading_error) < error_tolerance:
-    #     target_yaw_rate = 0.0
-    # else:
-    #     raw_turn = proportional_gain * heading_error / dt
-    #     target_yaw_rate = max(-max_yaw_rate, min(raw_turn, max_yaw_rate))
+    if abs(heading_error) < error_tolerance:
+        target_yaw_rate = 0.0
+    else:
+        raw_turn = proportional_gain * heading_error / dt
+        target_yaw_rate = max(-max_yaw_rate, min(raw_turn, max_yaw_rate))
 
-    #     # Optional low-pass filter to smooth yaw rate
-    #     alpha = 0.1
-    #     target_yaw_rate = alpha * target_yaw_rate + (1 - alpha) * agent_state.yaw_rate
+        # Optional low-pass filter to smooth yaw rate
+        alpha = 0.1
+        target_yaw_rate = alpha * target_yaw_rate + (1 - alpha) * agent_state.yaw_rate
 
     # return float(TARGET_VELOCITY), target_yaw_rate
     # Binary controller
-    if abs(heading_error) < error_tolerance:
-        target_yaw_rate = 0.0
-    elif heading_error > 0:
-        target_yaw_rate = max_yaw_rate  # turn left
-    else:
-        target_yaw_rate = -max_yaw_rate  # turn right
+    # if abs(heading_error) < error_tolerance:
+    #     target_yaw_rate = 0.0
+    # elif heading_error > 0:
+    #     target_yaw_rate = max_yaw_rate  # turn left
+    # else:
+    #     target_yaw_rate = -max_yaw_rate  # turn right
 
-    return float(TARGET_VELOCITY), target_yaw_rate
+    # return float(TARGET_VELOCITY), target_yaw_rate
 
 def no_op_controller() -> Tuple[float, float]:
     # Initially controller for fallback will return 0,0 commands therefore
