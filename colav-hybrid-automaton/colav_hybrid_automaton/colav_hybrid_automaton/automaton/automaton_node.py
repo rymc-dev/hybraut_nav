@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from std_msgs.msg import String, Bool
                                            
-from hybrid_automaton_interfaces.msg import Transition as COLAVTransition, Dynamics
+from hybrid_automaton_interfaces.msg import HybridAutomatonDynamics, HybridAutomatonGuardEvaluations, HybridAutomatonMode, HybridAutomatonInvariant, HybridAutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from colav_hybrid_automaton.automaton.utils import load_yml
 from colav_hybrid_automaton.automaton.factory import (
@@ -22,7 +22,7 @@ from colav_hybrid_automaton.automaton.factory import (
     create_state_subscriptions,
     create_state_publishers
 )
-from colav_interfaces.msg import Waypoint, Waypoints
+from colav_interfaces.msg import Waypoint, WaypointsState
 from geometry_msgs.msg import Point
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.timer import Timer
@@ -38,21 +38,22 @@ from functools import partial
 
 from colav_hybrid_automaton.automaton.constants import (
     QOS_PROFILE, 
-    HybridAutomatonStatus
+    HybridAutomatonStatusEnum
 )
 import sys  
+
 from colav_hybrid_automaton.automaton.callbacks import (
-    evaluate_transitions_timer_callback,
+    evaluate_guards_timer_callback,
     evaluate_dynamics_timer_callback,
     evaluate_invariants_timer_callback,
-    on_invariant_status_received,
+    on_invariant_received_callback,
     transition_engine_callback,
-    on_transition_evaluation_received,
+    transition_evaluation_callback,
     on_mode_callback,
     on_status_received_callback,
     handle_invariant_timeout_guard
 )
-from hybrid_automaton_interfaces.msg import Invariant
+from hybrid_automaton_interfaces.msg import HybridAutomatonInvariant
 
 SYSTEM_CLOCK = None
 
@@ -95,7 +96,7 @@ class HybridAutomatonNode(LifecycleNode):
             
     def __init__(
         self, 
-        name: str, 
+        name: str, confi
     ):
         """init"""
         super().__init__(name)
@@ -106,7 +107,7 @@ class HybridAutomatonNode(LifecycleNode):
         self._mode_dynamics = None
         self._mode_invariant = None 
         self._mode_transitions = None
-        self._status:HybridAutomatonStatus = None
+        self._status:HybridAutomatonStatusEnum = None
         self._invariant:bool = None
         self._current_transition:str = None
         self._current_transition_evaluation:Transition = None
@@ -140,7 +141,7 @@ class HybridAutomatonNode(LifecycleNode):
         self._trigger_lifecycle_transition:Client = None
 
         # Timers
-        self._transition_evaluation_timer:Timer = None
+        self._guards_evaluation_timer:Timer = None
         self._dynamics_timer:Timer = None
         self._invariant_timer:Timer = None
 
@@ -202,9 +203,9 @@ class HybridAutomatonNode(LifecycleNode):
             
             self._available_modes = list(self._configuration['modes'].keys())
 
-            self._transition_evaluation_timer = self.create_timer(
+            self._guards_evaluation_timer = self.create_timer(
                 timer_period_sec=1/self._evaluation_frequency, 
-                callback=lambda: evaluate_transitions_timer_callback(
+                callback=lambda: evaluate_guards_timer_callback(
                     lock= self._transition_eval_lock,
                     mode = self._mode,
                     available_modes = self._available_modes,
@@ -307,50 +308,46 @@ class HybridAutomatonNode(LifecycleNode):
 
             # initialize hybrid automaton topic publishers
             self._mode_publisher = self.create_publisher(
-                String,
+                HybridAutomatonMode,
                 '/hybrid_automaton/mode',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._invariant_publisher = self.create_publisher(
-                Invariant,
+                HybridAutomatonInvariant,
                 '/hybrid_automaton/invariant',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._status_publisher = self.create_publisher(
-                String,
+                HybridAutomatonStatus,
                 '/hybrid_automaton/status',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
-            self._transition_evaluation_publisher = self.create_publisher(
-                topic="/hybrid_automaton/transition_evaluations",
-                msg_type=COLAVTransition,
+            self._guard_evaluation_publisher = self.create_publisher(
+                topic="/hybrid_automaton/guard_evaluations",
+                msg_type=HybridAutomatonGuardEvaluations, # TODO: should rename this GuardsEvaluation to make it semantically correct
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._dynamics_publisher = self.create_publisher(
-                msg_type=Dynamics,
+                msg_type=HybridAutomatonDynamics,
                 topic='/hybrid_automaton/dynamics',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._waypoints_publisher = self.create_publisher(
-                msg_type=Waypoints,
+                msg_type=WaypointsState,
                 topic='/hybrid_automaton/state/waypoints',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
-            # self._transition_engine = self.create_guard_condition(
-            #     callback=transition_engine_callback,
-            #     callback_group=ReentrantCallbackGroup()
-            # )
 
-            self._transition_evaluation_subscriber = self.create_subscription(
-                topic="/hybrid_automaton/transition_evaluations",
-                msg_type=COLAVTransition,
-                callback=lambda msg: on_transition_evaluation_received(
+            self._guard_evaluation_subscriber = self.create_subscription(
+                topic="/hybrid_automaton/guards_evaluation",
+                msg_type=HybridAutomatonGuardEvaluations,
+                callback=lambda msg: transition_evaluation_callback(
                     lock=self._transition_eval_lock,
                     mode=self._mode,
                     states=self._states,
@@ -366,20 +363,20 @@ class HybridAutomatonNode(LifecycleNode):
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
-            self._status_subscription = self.create_subscription( # TODO: CLOSE THIS IN DEACTIVATE
-                msg_type=String,
-                topic='/hybrid_automaton/status',
-                callback=on_status_received_callback,
-                qos_profile=QOS_PROFILE,
-                callback_group=ReentrantCallbackGroup()
-            )
+            # self._status_subscription = self.create_subscription( # TODO: CLOSE THIS IN DEACTIVATE
+            #     msg_type=HybridAutomatonStatus,
+            #     topic='/hybrid_automaton/status',
+            #     callback=on_status_received_callback,
+            #     qos_profile=QOS_PROFILE,
+            #     callback_group=ReentrantCallbackGroup()
+            # )
 
             # TODO: need to do transition evaluation next
             # TODO: Then do invariants
             # Should add script to move automaton to inactive mode to launch before starting mission manager.
             
             self._mode_subscription = self.create_subscription(
-                String,
+                HybridAutomatonMode,
                 '/hybrid_automaton/mode',
                 callback=lambda msg: on_mode_callback(
                     lock=self._mode_callback_lock,
@@ -405,7 +402,7 @@ class HybridAutomatonNode(LifecycleNode):
             #     Invariant,
             #     '/hybrid_automaton/invariant',
             #     qos_profile=QOS_PROFILE,
-            #     callback=on_invariant_status_received,
+            #     callback=on_invariant_received_callback,
             #     callback_group=ReentrantCallbackGroup()
             # )
 
@@ -415,11 +412,11 @@ class HybridAutomatonNode(LifecycleNode):
                 callback_group=ReentrantCallbackGroup()
             )
 
-            self._waypoints_publisher.publish(Waypoints(waypoints=[self._goal_waypoint]))
+            self._waypoints_publisher.publish(WaypointsState(waypoints=[self._goal_waypoint]))
             self._mode_publisher.publish(String(data=str(self._configuration['init']['mode']))) # TODO: Need to add some validation to ensure init is given validly.
             
             # start timers
-            self._transition_evaluation_timer.reset()
+            self._guards_evaluation_timer.reset()
             self._dynamics_timer.reset()
             self._invariant_evaluation_timer.reset()
     
@@ -437,7 +434,7 @@ class HybridAutomatonNode(LifecycleNode):
 
         try:
             # stop the timers.
-            self._transition_evaluation_timer.cancel()
+            self._guards_evaluation_timer.cancel()
             self._dynamics_timer.cancel()
             self._invariant_evaluation_timer.cancel()
 
@@ -516,9 +513,9 @@ class HybridAutomatonNode(LifecycleNode):
 
         try:
             # Destroy timers
-            if hasattr(self, '_transition_evaluation_timer'):
-                self._transition_evaluation_timer.cancel()
-                self.destroy_timer(self._transition_evaluation_timer)
+            if hasattr(self, '_guards_evaluation_timer'):
+                self._guards_evaluation_timer.cancel()
+                self.destroy_timer(self._guards_evaluation_timer)
                 self._transition_eval_timer:Timer = None
 
             if hasattr(self, '_dynamics_timer'):
@@ -564,9 +561,9 @@ class HybridAutomatonNode(LifecycleNode):
 
             # Stop and destroy timers if still active
             if hasattr(self, '_transition_eval_timer'):
-                self._transition_evaluation_timer.cancel()
-                self.destroy_timer(self._transition_evaluation_timer)
-                del self._transition_evaluation_timer
+                self._guards_evaluation_timer.cancel()
+                self.destroy_timer(self._guards_evaluation_timer)
+                del self._guards_evaluation_timer
 
             if hasattr(self, '_dynamics_eval_timer'):
                 self._dynamics_timer.cancel()

@@ -1,4 +1,4 @@
-# Transitions.msg
+# GuardEvaluation.msg
 # ROS 2 interface for the Hybrid Automaton framework.
 #
 # This message enables real-time evaluation of control mode transitions 
@@ -12,12 +12,12 @@
 # Only edit within that section to define or update your custom transition parameters.
 
 # Current Hybrid Automaton mode (e.g., GO_FORWARD, GO_RIGHT, etc.).
-string mode
+hybrid_automaton_interfaces/HybridAutomatonMode mode
 
 # Names of transitions evaluated in this update cycle.
 string[] transition_names # key
-bool[] transition_values # value
-int32[] transition_priority # priorite for transitions 
+bool[] guard_evaluations # value
+int32[] guard_priority # priorite for transitions 
 
 # Timestamp when this transition update was published.
 builtin_interfaces/Time stamp

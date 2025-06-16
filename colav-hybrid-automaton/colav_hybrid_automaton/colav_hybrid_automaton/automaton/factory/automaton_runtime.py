@@ -7,7 +7,7 @@ from std_msgs.msg import String
 from rclpy.publisher import Publisher
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from typing import Tuple
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatus
+from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
 
 
 def create_state_subscriptions(node: Node, state_configuration: dict) -> dict: 

@@ -1,4 +1,4 @@
-from hybrid_automaton_interfaces.msg import Dynamics
+from hybrid_automaton_interfaces.msg import HybridAutomatonDynamics
 from rclpy.node import Node
 from typing import List, Any, Dict, Callable
 from threading import Lock
@@ -24,7 +24,7 @@ def evaluate_dynamics_timer_callback(
     """
     try:
         with lock:
-            msg = Dynamics(stamp=stamp)
+            msg = HybridAutomatonDynamics(stamp=stamp)
             try:
                 validated_mode = validate_mode(available_modes, mode)
                 

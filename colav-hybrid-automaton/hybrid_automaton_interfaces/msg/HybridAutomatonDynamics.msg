@@ -11,7 +11,7 @@
 # The name of the current control mode. Must match one of the configured mode names.
 string mode
 
-hybrid_automaton_interfaces/DynamicParameter dynamic_parameters
+hybrid_automaton_interfaces/HybridAutomatonDynamicParameter dynamic_parameters
 
 # Timestamp of when the dynamic update was published.
 builtin_interfaces/Time stamp

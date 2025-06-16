@@ -1,6 +1,6 @@
 from std_msgs.msg import String
 from rclpy.node import Node
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatus
+from colav_hybrid_automaton.automaton.constants import  HybridAutomatonStatusEnum
 from threading import Lock
 from rclpy.publisher import Publisher
 from colav_hybrid_automaton.automaton.factory import generate_mode_profile
@@ -10,13 +10,14 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
 from colav_hybrid_automaton.automaton.utils import validate_mode
 from typing import List
+from hybrid_automaton_interfaces.msg import HybridAutomatonMode
 
 def on_mode_callback(
     lock: Lock,
     node: Node,
     available_modes: List[str],
-    current_mode: str,
-    mode: String,
+    current_mode: HybridAutomatonMode,
+    mode: HybridAutomatonMode,
     mode_configuration: dict,
     transition_configuration: dict,
     dynamics_configuration: dict,
@@ -31,7 +32,7 @@ def on_mode_callback(
             if mode.data == current_mode:
                 return
             
-            mode.data = validate_mode(available_modes, mode.data)
+            mode.mode = validate_mode(available_modes, mode.mode)
             
             (
                 mode, 

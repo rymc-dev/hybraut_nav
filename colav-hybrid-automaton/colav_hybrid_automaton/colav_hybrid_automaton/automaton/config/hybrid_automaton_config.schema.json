@@ -31,7 +31,7 @@
                     "minProperties": 1,
                     "maxProperties": 1,
                     "patternProperties": {
-                      "^(update_hz|timeout_sec)$": { "type": "number" }
+                      "^(update_hz|timeout_sec|buffer_size)$": { "type": "number" }
                     },
                     "additionalProperties": false
                   }
@@ -47,10 +47,10 @@
             "patternProperties": {
               "^[a-zA-Z0-9_]+$": {
                 "type": "object",
-                "required": ["module", "function", "state_inputs", "state_outputs"],
+                "required": ["module", "class", "state_inputs", "state_outputs", "configuration"],
                 "properties": {
                     "module": {"type": "string"},
-                    "function": {"type": "string"},
+                    "class": {"type": "string"},
                     "state_inputs": {
                         "type": "array",
                         "items": {
@@ -62,6 +62,10 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "additionalProperties": true
                     }
                 },
                 "additionalProperties": false
@@ -133,7 +137,7 @@
                 "type": "object",
                 "properties": {
                     "module": {"type": "string"},
-                    "function": {"type": "string"}
+                    "class": {"type": "string"}
                 },
                 "additionalProperties": false
             }
@@ -171,13 +175,13 @@
         },
         "additionalProperties": false
     },
-    "modes_goal": {
+    "goal_modes": {
         "type": "array",
         "items": {
             "type": "string"
         }
     },
-    "init": {
+    "initial_mode": {
         "type": "object",
         "required": ["mode"],
         "properties": {
@@ -187,20 +191,24 @@
         },
         "additionalProperties": false
     },
-    "params": {
+    "parameters": {
         "type": "object",
-        "required": ["transition_evaluation_hz", "transition_evaluation_timeout"],
+        "required": ["evaluation_frequency", "control_frequency"],
         "properties": {
-          "transition_evaluation_hz": {
+          "goal_waypoint": {
+            "type": "string",
+            "minimum": 0
+          },
+          "evaluation_frequency": {
             "type": "number",
             "minimum": 0
           },
-          "transition_evaluation_timeout": {
-            "type": "number",
+          "control_frequency": {
+            "type": "string",
             "minimum": 0
           }
         },
         "additionalProperties": false
     },
-    "required": ["states", "resets", "guards", "invariants", "transitions", "dynamics", "modes", "init", "params"]
+    "required": ["states", "resets", "guards", "invariants", "transitions", "dynamics", "modes", "initial_mode", "parameters"]
 }

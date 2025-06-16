@@ -1,8 +1,8 @@
 # This files determines the dynamics of the system/ aka the mode behavior/control policies
 # while in each mode.
 
-from colav_interfaces.msg import AgentUpdate, Waypoints
-from hybrid_automaton_interfaces.msg import DynamicParameter
+from colav_interfaces.msg import AgentState, WaypointsState
+from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicParameter
 import math
 from colav_hybrid_automaton.automaton.utils import quaternion_to_heading, get_current_ros_time, is_timestamps_within_tolerance
 from builtin_interfaces.msg import Duration
@@ -18,7 +18,7 @@ MAX_DECELERATION = 0.5
 from typing import Tuple
 
 
-def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Tuple[float, float]:
+def proportional_velocity_controller(agent_state: AgentState, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Tuple[float, float]:
     """
     Computes the dynamics for the CRUISE control mode of the agent.
 
@@ -31,7 +31,7 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     along a straight line (e.g., line-of-sight path following).
 
     Parameters:
-        agent_state (AgentUpdate): The current state of the agent.
+        agent_state (AgentState): The current state of the agent.
         dt (float): Time step for the update (default is 0.1 seconds).
 
     Returns:
@@ -40,7 +40,7 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
     Raises:
         ValueError: (Not currently raised, placeholder for future use if needed.)
     """
-    if not isinstance(agent_state, AgentUpdate):
+    if not isinstance(agent_state, AgentState):
         raise ValueError("agent state received is of none type not type AgentUpdate")
 
     if not isinstance(dt, float):
@@ -63,8 +63,8 @@ def proportional_velocity_controller(agent_state: AgentUpdate, dt: float = 0.1, 
 
 
 def proportional_yaw_rate_controller(
-        agent_state: AgentUpdate,
-        waypoints: Waypoints,
+        agent_state: AgentState,
+        waypoints: WaypointsState,
         dt: float = 0.1,
         error_tolerance: float = 0.01,
         proportional_gain: float = 3.0,
@@ -77,9 +77,9 @@ def proportional_yaw_rate_controller(
     """
 
     # Input validation
-    if not isinstance(agent_state, AgentUpdate):
+    if not isinstance(agent_state, AgentState):
         raise ValueError("agent_state must be AgentUpdate")
-    if not isinstance(waypoints, Waypoints):
+    if not isinstance(waypoints, WaypointsState):
         raise ValueError("waypoints must be Waypoints")
     if not isinstance(dt, float) or dt < 0.01:
         raise ValueError("dt must be float >= 0.01")
@@ -108,7 +108,7 @@ def proportional_yaw_rate_controller(
 
     # Next waypoint
     try:
-        wp = waypoints.waypoints[0]
+        wp = waypoints.current_waypoint
     except IndexError:
         raise ValueError("No waypoint to navigate to")
 

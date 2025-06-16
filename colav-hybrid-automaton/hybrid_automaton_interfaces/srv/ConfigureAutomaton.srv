@@ -1,9 +1,0 @@
-# ConfigureAutomaton.srv 
-# A srv interfaces for configuring the hybrid automaton
-
-string configuration_path
-
---- 
-
-bool success
-string message

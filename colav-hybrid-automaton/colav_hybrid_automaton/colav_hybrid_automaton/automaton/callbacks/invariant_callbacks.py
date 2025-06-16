@@ -1,10 +1,10 @@
 from std_msgs.msg import Bool, String
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatus
+from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
 from rclpy.node import Node
 from typing import Optional, List, Any
 from threading import Lock
 from rclpy.publisher import Publisher
-from hybrid_automaton_interfaces.msg import Invariant
+from hybrid_automaton_interfaces.msg import HybridAutomatonInvariant
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from builtin_interfaces.msg import Time
 from colav_hybrid_automaton.automaton.utils import validate_mode
@@ -22,7 +22,7 @@ def evaluate_invariants_timer_callback(
     """invariant timer callback function"""
     try:
         with lock:
-            invariant = Invariant(stamp=stamp)
+            invariant: HybridAutomatonInvariant = HybridAutomatonInvariant(stamp=stamp)
             try:
                 invariant.mode = validate_mode(available_modes, mode)
                 invariant.invariant_name = next(iter(invariant_config))
@@ -41,7 +41,7 @@ def evaluate_invariants_timer_callback(
     except Exception as e:
         logger.debug(f"unexpected exception occured in 'colav_hybrid_automaton.automaton.callbacks.innvariant_callbacks.evaluate_invariants_timer_callback': '{str(e)}'")
         
-def on_invariant_status_received(node: Node, invariant: Bool):
+def on_invariant_received_callback(node: Node, invariant: Bool):
     """Callback for receiving an invariant update."""
     if invariant.data is False:  # invariant is true
         if node._invariant_timeout_guard_lock.acquire(blocking=False):
@@ -65,7 +65,7 @@ def handle_invariant_timeout_guard(node: Node, system_clock=None):
             node.get_logger().info(
                 f"Invariant held in mode {node._mode} with no transition within time tolerance."
             )
-            node._status_publisher.publish(String(data=HybridAutomatonStatus.COMPLETED.name))
+            node._status_publisher.publish(String(data=HybridAutomatonStatusEnum.COMPLETED.value))
 
 def _get_invariant_inputs(states: dict, state_input_keys: list) -> List[Any]:
     """Retrieves the state values for the given invariant's state inputs."""

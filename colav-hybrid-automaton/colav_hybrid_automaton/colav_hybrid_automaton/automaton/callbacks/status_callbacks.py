@@ -1,40 +1,40 @@
 import rclpy
 from lifecycle_msgs.srv import ChangeState
 from lifecycle_msgs.msg import Transition as LifecycleTransition
-from hybrid_automaton_interfaces.msg import Transition as COLAVTransition
+from hybrid_automaton_interfaces.msg import HybridAutomatonGuardEvaluations
 from rclpy.node import Node
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatus
+from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
 from colav_hybrid_automaton.automaton.utils import select_highest_priority_transition
 from std_msgs.msg import String
 from time import time
 
 def on_status_received_callback(node: Node, status: String):
 
-    if status.data == HybridAutomatonStatus.COMPLETED.name: 
+    if status.data == HybridAutomatonStatusEnum.COMPLETED.name: 
         with node.completed_lock:
             _handle_completed_status(node)
 
-    if status.data == HybridAutomatonStatus.ACTIVE_MODE.name: # all this does is change the hybrid automaton state for executing mode
+    if status.data == HybridAutomatonStatusEnum.ACTIVE_MODE.name: # all this does is change the hybrid automaton state for executing mode
         with node.executing_mode_lock: 
             _handle_active_mode_status(node)
    
-    if status.data == HybridAutomatonStatus.ERROR.name:
+    if status.data == HybridAutomatonStatusEnum.ERROR.name:
         with node.error_lock: # On exception print set the status and move hybrid automaton to deactivate state
             _handle_error_status(node)
             
-    if status.data == HybridAutomatonStatus.TRANSITIONING.name:
+    if status.data == HybridAutomatonStatusEnum.TRANSITIONING.name:
         with node.transition_lock:
             _handle_transition_status(node)
 
 
 def _handle_completed_status(node: Node):
-        node._status = HybridAutomatonStatus.COMPLETED
+        node._status = HybridAutomatonStatusEnum.COMPLETED
         node.get_logger().info('Waypoint reached hybrid automaton has completed.')
         future = node._trigger_transition_cli.call_async(ChangeState.Request(transition=LifecycleTransition(id=LifecycleTransition.TRANSITION_DEACTIVATE)))
 
 def _handle_error_status(node: Node):
     node.destroy_subscription(node._status_subscription)
-    node._status = HybridAutomatonStatus.ERROR
+    node._status = HybridAutomatonStatusEnum.ERROR
     future = node._trigger_transition_cli.call_async(ChangeState.Request(transition=LifecycleTransition(id=LifecycleTransition.TRANSITION_DEACTIVATE)))
     
     rclpy.spin_until_future_complete(node,future, timeout_sec=5.0)
@@ -43,19 +43,19 @@ def _handle_error_status(node: Node):
             node.get_logger().error('transition request to configure for hybrid automaton lifecycle failed')
 
 def _handle_active_mode_status(node: Node):
-    node._status = HybridAutomatonStatus.ACTIVE_MODE
+    node._status = HybridAutomatonStatusEnum.ACTIVE_MODE
 
 def _handle_transition_status(node: Node):
     try:
-        node._status = HybridAutomatonStatus.TRANSITIONING.name
+        node._status = HybridAutomatonStatusEnum.TRANSITIONING.name
         # TODO: Move invariant check to evaluation loop if needed
 
-        if isinstance(node._current_transition_evaluation, COLAVTransition):
-            current_transition_eval: COLAVTransition = node._current_transition_evaluation
+        if isinstance(node._current_transition_evaluation, HybridAutomatonGuardEvaluations):
+            current_transition_eval: HybridAutomatonGuardEvaluations = node._current_transition_evaluation
 
             if not current_transition_eval.success:
                 node.get_logger().error(f"Transition evaluation failed: {current_transition_eval.message}")
-                node._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
+                node._status_publisher.publish(String(data=HybridAutomatonStatusEnum.ERROR.name))
                 return
 
             pending = [
@@ -63,7 +63,7 @@ def _handle_transition_status(node: Node):
                 if current_transition_eval.transition_values[idx]
             ]
         else:
-            node._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name))
+            node._status_publisher.publish(String(data=HybridAutomatonStatusEnum.ERROR.name))
             return
 
         transition = select_highest_priority_transition(pending)
@@ -91,8 +91,8 @@ def _handle_transition_status(node: Node):
                 break
             rate.sleep()  # avoid busy waiting
 
-        node._status_publisher.publish(String(data=HybridAutomatonStatus.EXECUTING_MODE.name))
+        node._status_publisher.publish(String(data=HybridAutomatonStatusEnum.EXECUTING_MODE.name))
     except Exception as e:
         node.get_logger().error(f"exception occured attempting transition: {str(e)}, transitioning to error state")
-        node._status_publisher.publish(String(data=HybridAutomatonStatus.ERROR.name)) 
+        node._status_publisher.publish(String(data=HybridAutomatonStatusEnum.ERROR.name)) 
         

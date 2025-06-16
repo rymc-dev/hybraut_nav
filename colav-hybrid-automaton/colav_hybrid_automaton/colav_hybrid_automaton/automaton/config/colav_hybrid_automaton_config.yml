@@ -14,10 +14,10 @@
 #   HA = (Q, Q_goal, X, F, Init, Inv, E, G, R)
 #
 #   Q      = modes
-#   Q_goal = modes_goal # Optional
+#   Q_goal = goal_modes # Optional
 #   X      = states
 #   F      = dynamics
-#   Init   = init
+#   Init   = init_mode
 #   Inv    = invariants
 #   E      = transitions
 #   G      = guards
@@ -29,22 +29,24 @@
 # ============================================================================
 # Continuous States (X)
 # These are received via ROS2 topics. Metadata is included per state.
+# Each of these states have buffers associated with buffer_size set in params
 # ============================================================================
 states:
   agent_state:
     topic: "/state/agent"
     type:
       pkg: "colav_interfaces.msg"
-      msg: "AgentUpdate"
+      msg: "AgentState"
     params:
       - update_hz: 10.0
       - timeout_sec: 0.5
+      - buffer_size: 100
 
   obstacles_state:
     topic: "/state/obstacles"
     type:
       pkg: "colav_interfaces.msg"
-      msg: "ObstaclesUpdate"
+      msg: "ObstaclesState"
     params:
       - update_hz: 4.0
       - timeout_sec: 1.0
@@ -59,10 +61,10 @@ states:
       - timeout_sec: 1.5
 
   waypoints_state:
-    topic: "/hybrid_automaton/state/waypoints"
+    topic: "/state/waypoints"
     type:
       pkg: "colav_interfaces.msg"
-      msg: "Waypoints"
+      msg: WaypointsState
 
 # ============================================================================
 # Reset Functions (R)
@@ -71,15 +73,16 @@ states:
 resets:
   remove_first_waypoint:
     module: colav_hybrid_automaton.automaton.resets
-    function: remove_first_waypoint
+    class_name: RemoveFirstWaypoint
     state_inputs:
       - "waypoints_state"
     state_outputs:
       - "waypoints_state"
+    configuration: []
 
-  create_virtual_waypoint:
+  generate_virtual_waypoint:
     module: colav_hybrid_automaton.automaton.resets
-    function: create_virtual_waypoint
+    class_name: GenerateVirtualWaypoint
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -87,6 +90,10 @@ resets:
       - "waypoints_state"
     state_outputs:
       - "waypoints_state"
+    configuration:
+      longitudinal_offset_distance: 30.0
+      lateral_offset_distance: 5.0
+      virtual_waypoint_acceptance_radius: 20.0
 
 # ============================================================================
 # Guard Conditions (G)
@@ -95,47 +102,53 @@ resets:
 guards:
   is_los_clear_to_waypoint:
     module: colav_hybrid_automaton.automaton.guards
-    function: is_los_clear_to_waypoint
+    class_name: is_los_clear_to_waypoint
     state_inputs:
       - "agent_state"
       - "obstacles_state"
       - "unsafe_set_state"
       - "waypoints_state"
+    configuration: []
 
   is_heading_within_tolerance:
     module: colav_hybrid_automaton.automaton.guards
-    function: is_heading_within_tolerance
+    class_name: is_heading_within_tolerance
     state_inputs:
       - "agent_state"
       - "waypoints_state"
+    configuration: []
 
   is_heading_not_within_tolerance:
     module: colav_hybrid_automaton.automaton.guards
-    function: is_heading_not_within_tolerance
+    class_name: is_heading_not_within_tolerance
     state_inputs:
       - "agent_state"
       - "waypoints_state"
+    configuration: []
 
   is_virtual_waypoints:
     module: colav_hybrid_automaton.automaton.guards
-    function: is_virtual_waypoints
+    class_name: is_virtual_waypoints
     state_inputs:
       - "waypoints_state"
+    configuration: []
 
   is_unsafe_conditions:
     module: colav_hybrid_automaton.automaton.guards
-    function: is_unsafe_conditions
+    class_name: is_unsafe_conditions
     state_inputs:
       - "agent_state"
       - "obstacles_state"
       - "unsafe_set_state"
+    configuration: []
 
   is_waypoint_reached:
     module: colav_hybrid_automaton.automaton.guards
-    function: is_waypoint_reached
+    class_name: is_waypoint_reached
     state_inputs:
       - "agent_state"
       - "waypoints_state"
+    configuration: []
 
 # ============================================================================
 # Invariants (Inv)
@@ -144,17 +157,20 @@ guards:
 invariants:
   is_at_final_waypoint:
     module: colav_hybrid_automaton.automaton.invariants
-    function: is_at_final_waypoint
+    class_name: is_at_final_waypoint
     state_inputs:
       - "waypoints_state"
+    configuration: []
 
   trivial_invariant:
     module: colav_hybrid_automaton.automaton.invariants
-    function: trivial_invariant
+    class_name: trivial_invariant
+  configuration: []
 
   failing_invariant:
     module: colav_hybrid_automaton.automaton.invariants
-    function: failing_invariant
+    class_name: failing_invariant
+  configuration: []
 
 # ============================================================================
 # Transitions (E)
@@ -163,7 +179,7 @@ invariants:
 transitions:
   cruise_to_t2los_1:
     guard: "is_los_clear_to_waypoint"
-    reset: "create_virtual_waypoint"
+    reset: "generate_virtual_waypoint"
 
   cruise_to_t2los_2:
     guard: "is_heading_not_within_tolerance"
@@ -177,7 +193,7 @@ transitions:
     guard: "is_waypoint_reached"
     reset: null
 
-  t2los_to_cruise:
+  t2los_to_cruise:cruise_to_t2los_1
     guard: "is_heading_within_tolerance"
     reset: null
 
@@ -198,31 +214,57 @@ transitions:
 # Controllers used for continuous evolution within each mode.
 # ============================================================================
 dynamics:
-  proportional_velocity_controller:
-    module: colav_hybrid_automaton.automaton.dynamics
-    function: proportional_velocity_controller
-    state_inputs:
-      - "agent_state"
-    output:
-      velocity: "m/s"
-      yaw_rate: "rad/s"
+  dynamic_parameters: 
+    dynamic_parameter_names: 
+      - "velocity"
+      - "yaw_rate"
+    dynamic_parameter_value_types: 
+      - float
+      - float
+    dynamic_parameter_metrics: 
+      - "m/s"
+      - "rad/s"
+  
+  dynamic_classes: 
+    cruise_pid_controller:
+      module: colav_hybrid_automaton.automaton.dynamics
+      class_name: PIDYawVelocityController
+      state_inputs:
+        - "agent_state"
+        - "waypoints_state"
+      configuration:
+        target_velocity: 25.0 # updated cruise speed
+        yaw_kp: 0.3 # gentle heading proportional gain
+        yaw_ki: 0.01 # small integral for smooth correction
+        yaw_kd: 0.05 # small derivative gain to damp oscillations
+        vel_kp: 0.5 # moderate velocity proportional gain
+        vel_ki: 0.05 # small integral to avoid windup
+        vel_kd: 0.05 # small derivative for smooth velocity changes
+        error_tolerance: 0.01 # precision in heading error
+        max_yaw_rate: 0.1 # limit yaw rate to gentle turns
 
-  proportional_yaw_rate_controller:
-    module: colav_hybrid_automaton.automaton.dynamics
-    function: proportional_yaw_rate_controller
-    state_inputs:
-      - "agent_state"
-      - "waypoints_state"
-    output:
-      velocity: "m/s"
-      yaw_rate: "rad/s"
+    t2los_pid_controller:
+      module: colav_hybrid_automaton.automaton.dynamics
+      class_name: PIDYawVelocityController
+      state_inputs:
+        - "agent_state"
+        - "waypoints_state"
+      configuration:
+        target_velocity: 25.0 # updated cruise speed
+        yaw_kp: 0.3 # gentle heading proportional gain
+        yaw_ki: 0.01 # small integral for smooth correction
+        yaw_kd: 0.05 # small derivative gain to damp oscillations
+        vel_kp: 0.5 # moderate velocity proportional gain
+        vel_ki: 0.05 # small integral to avoid windup
+        vel_kd: 0.05 # small derivative for smooth velocity changes
+        error_tolerance: 0.01 # precision in heading error
+        max_yaw_rate: 0.1 # limit yaw rate to gentle turns
 
-  no_op_controller:
-    module: colav_hybrid_automaton.automaton.dynamics
-    function: no_op_controller
-    output:
-      velocity: "m/s"
-      yaw_rate: "rad/s"
+    no_op_controller:
+      module: colav_hybrid_automaton.automaton.dynamics
+      class_name: no_operation_controller
+      state_inputs: []
+      configuration: []
 
 # ============================================================================
 # Modes (Q)
@@ -269,29 +311,32 @@ modes:
     invariants: failing_invariant
     transitions: []
 
-  error:
-    index: 4
-    dynamics: "no_op_controller"
-    invariants: failing_invariant
-    transitions: []
-
 # ============================================================================
 # Goal Modes (Q_goal)
 # ============================================================================
-modes_goal:
+goal_modes:
   - waypoint_reached
-  - fallback
-  - error
 
 # ============================================================================
 # Initial Mode (Init)
+# This is the mode the hybrid automaton will initially enter on
+# automaton activation
 # ============================================================================
-init:
-  mode: "cruise"
+initial_mode: "cruise"
 
 # ============================================================================
 # Parameters
+# these are parameters of the hybrid automaton set on
+# activation
 # ============================================================================
-params:
-  transition_evaluation_hz: 1.0
-  transition_evaluation_timeout: 1.0
+parameters:
+  goal_waypoint:
+    type:
+      pkg: "colav_interfaces.msg"
+      msg: "Waypoint"
+
+  evaluation_frequency:
+    type: float
+
+  control_frequency:
+    type: float

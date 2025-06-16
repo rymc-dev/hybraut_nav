@@ -20,22 +20,15 @@ find_package(colav_interfaces REQUIRED)
 
 # ADDED dependencies END --------------------------
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/DynamicParameter.msg"
-  "msg/Dynamics.msg"
-  "msg/DynamicsTimer.msg"
-  "msg/Mode.msg"
-  "msg/Transition.msg"
-  "msg/TransitionPending.msg"
-  "msg/TransitionTimer.msg"
-  "msg/Output.msg"
-  "msg/Guards.msg"
-  "msg/Invariant.msg"
+  "msg/HybridAutomatonDynamicParameter.msg"
+  "msg/HybridAutomatonDynamics.msg"
+  "msg/HybridAutomatonMode.msg"
+  "msg/HybridAutomatonGuardEvaluations.msg"
+  "msg/HybridAutomatonInvariant.msg"
+  "msg/HybridAutomatonOutput.msg"
+  "msg/HybridAutomatonStatus.msg"
 
-  "srv/Reset.srv"
-  "srv/StartHybridAutomaton.srv"
-  "srv/StopHybridAutomaton.srv"
-
-  "action/HybridAutomaton.action"
+  "action/HybridAutomatonExecuteMission.action"
 
   DEPENDENCIES geometry_msgs nav_msgs std_msgs builtin_interfaces unique_identifier_msgs colav_interfaces
 )

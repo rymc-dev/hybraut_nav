@@ -1,10 +1,16 @@
 
+# ExecuteHybridAutomaton.action
+# ROS2 action interface for the Hybrid Automatons mission manager
+# which is a node that manages waypoints automatically managings the automaton
+# lifecycle as we navigate through the automaton mission.
+
+
 # Goal
 builtin_interfaces/Time stamp         # Timestamp for synchronization
 unique_identifier_msgs/UUID mission_uuid  # Unique identifier for the mission
 unique_identifier_msgs/UUID agent_uuid   # Unique identifier for the agent (e.g., vessel, drone)
 string mission_profile  # Define the type of mission (e.g., "fastest_path", "safe_navigation")
-colav_interfaces/Waypoints goal_waypoints  # Target waypoint for the agent to reach
+colav_interfaces/Waypoint[] goal_waypoints  # Target waypoint for the agent to reach
 
 ---
 # Result
@@ -14,4 +20,4 @@ string message
 ---
 
 # Response
-hybrid_automaton_interfaces/Output feedback
+hybrid_automaton_interfaces/HybridAutomatonOutput feedback
