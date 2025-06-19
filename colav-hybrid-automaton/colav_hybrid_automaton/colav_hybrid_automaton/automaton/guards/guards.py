@@ -1,4 +1,4 @@
-from colav_interfaces.msg import AgentUpdate, ObstaclesUpdate, UnsafeSet, Waypoint, Waypoints
+from colav_interfaces.msg import AgentState, ObstaclesState, UnsafeSetState, Waypoint, WaypointsState
 from builtin_interfaces.msg import Duration
 from shapely.geometry import Polygon, LineString
 import numpy as np
@@ -12,6 +12,215 @@ from colav_hybrid_automaton.automaton.utils import (
     get_current_ros_time
 )
 import math
+from .guard_abstract import HybridAutomatonGuard
+
+
+class IsLOSClearToWaypoint(HybridAutomatonGuard):
+    def __init__(self, los_distance_threshold: float, *args, **kwargs):
+        """
+            los_distance_threshold: float: represents the distance which we analyse los 
+                                           to determine if los is clear to the waypoint
+        """
+
+        self.los_distance_threshold = los_distance_threshold
+        
+        super().__init__(*args, **kwargs)
+
+    def __call__(
+        self,
+        agent_state: AgentState,
+        obstacles_state: ObstaclesState,
+        unsafe_set_state: UnsafeSetState,
+        waypoints_state: WaypointsState     
+     ):
+        return super().__call__([agent_state, obstacles_state, unsafe_set_state, waypoints_state])
+    
+    def _validate_initialization(self, *args, **kwargs):
+
+        if not isinstance(self.los_distance_threshold, float):
+            raise TypeError('los_distance_threshold must be type float')
+        if self.los_distance_threshold < 1.0: 
+            raise ValueError('line of sight distance treshold must be greater than 1.0 meters')
+
+        return super()._validate_initialization(*args, **kwargs)
+    
+    def _validate_state_inputs(self, *state_inputs):
+        if not len(state_inputs) == 4:
+            raise Va 
+
+
+        return super()._validate_state_inputs(*state_inputs)
+
+
+class IsHeadingWithinTolerance(HybridAutomatonGuard):
+    """guard for validating whether """
+
+    def __init__(self, heading_tolerance: float, *args, **kwargs):
+        
+        self.heading_tolerance = heading_tolerance
+
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, agent_state: AgentState, waypoints_state: WaypointsState):
+        super().__call__([agent_state, waypoints_state])
+
+        current_waypoint:Waypoint = waypoints_state.current_waypoint
+        error = delta_heading(
+            x_a=agent_state.pose.position.x,
+            y_a=agent_state.pose.position.y,
+            theta_a=quaternion_to_heading(
+                qx=agent_state.pose.orientation.x,
+                qy=agent_state.pose.orientation.y,
+                qz=agent_state.pose.orientation.z,
+                qw=agent_state.pose.orientation.w
+            ),
+            x_w=current_waypoint.position.x,
+            y_w=current_waypoint.position.y
+        )
+
+        # If the heading error is within the allowed tolerance, return True.
+        return (abs(error) <= self.heading_tolerance) or \
+            math.isclose(abs(error), self.heading_tolerance, abs_tol=1e-6)
+
+    def _validate_initialization(self, *args, **kwargs):
+        super()._validate_initialization(*args, **kwargs)
+        if not isinstance(self.heading_tolerance, float):
+            raise TypeError('heading tolerance is invalid type')
+        if self.heading_tolerance < 0.01: 
+            raise ValueError("heading tolerance value invalid can not be less than 0.01")
+
+    def _validate_state_inputs(self, *state_inputs):
+        super()._validate_state_inputs(*state_inputs)  
+
+        if not len(*state_inputs) == 2: 
+            raise ValueError('state inputs are not length 2') 
+
+        agent_state:AgentState = state_inputs[0]
+        waypoints_state:WaypointsState = state_inputs[1]
+
+        if not isinstance(agent_state, AgentState):
+            raise TypeError("is_heading_within_tolerance input state 'agent_state' not received.")
+        if not isinstance(waypoints_state, WaypointsState): 
+            raise TypeError("is_heading_within_tolerance input state 'waypoints_state' not received.")
+        
+        if not isinstance(waypoints_state.current_waypoint, Waypoint): 
+            raise ValueError("is_heading_within_tolerance input state 'waypoints_state' does not have waypoints.")     
+
+class IsUnsafeConditions(HybridAutomatonGuard):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, *state_inputs):
+        return super().__call__(*state_inputs)
+    
+    def _validate_initialization(self, *args, **kwargs):
+        return super()._validate_initialization(*args, **kwargs)
+    
+    def _validate_state_inputs(self, *state_inputs):
+        return super()._validate_state_inputs(*state_inputs)
+
+class IsWaypointReached(HybridAutomatonGuard):
+    def __call__(self, agent_state: AgentState, waypoints_state: WaypointsState) -> bool:
+        super().__call__([agent_state, waypoints_state])  # only keep if base method has side effects
+
+        agent_coords = [agent_state.pose.position.x, agent_state.pose.position.y]
+        waypoint_coords = [
+            waypoints_state.current_waypoint.position.x,
+            waypoints_state.current_waypoint.position.y
+        ]
+        
+        return euclidean_distance(agent_coords, waypoint_coords) <= \
+               waypoints_state.current_waypoint.acceptance_radius
+    
+    def _validate_state_inputs(self, *state_inputs):
+        super()._validate_state_inputs(*state_inputs)
+    
+        agent_state: AgentState = state_inputs[0]
+        waypoints_state: WaypointsState = state_inputs[1]
+
+        if not isinstance(agent_state, AgentState):
+            raise TypeError('agent_state invalid type')
+        if not isinstance(waypoints_state, WaypointsState):
+            raise TypeError('waypoints_state invalid type')
+
+        try:
+            if not isinstance(waypoints_state.current_waypoint, Waypoint):
+                raise ValueError('current waypoint is invalid.')
+        except Exception as e: 
+            raise e 
+
+class IsHeadingNotWithinTolerance(HybridAutomatonGuard):
+    def __init__(self, heading_tolerance: float, *args, **kwargs):
+
+        self.heading_tolerance = heading_tolerance
+
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, agent_state: AgentState, waypoints_state: WaypointsState):
+        super().__call__([agent_state, waypoints_state])
+
+        current_waypoint:Waypoint = waypoints_state.current_waypoint
+        error = delta_heading(
+            x_a=agent_state.pose.position.x,
+            y_a=agent_state.pose.position.y,
+            theta_a=quaternion_to_heading(
+                qx=agent_state.pose.orientation.x,
+                qy=agent_state.pose.orientation.y,
+                qz=agent_state.pose.orientation.z,
+                qw=agent_state.pose.orientation.w
+            ),
+            x_w=current_waypoint.position.x,
+            y_w=current_waypoint.position.y
+        )
+
+        # returns true is heading error is within tolerance
+        return (abs(error) <= self.heading_tolerance) or \
+            math.isclose(abs(error), self.heading_tolerance, abs_tol=1e-6)
+
+    
+    def _validate_initialization(self, *args, **kwargs):
+        super()._validate_initialization(*args, **kwargs)
+        if not isinstance(self.heading_tolerance, float):
+            raise TypeError('heading tolerance is invalid type')
+        if self.heading_tolerance < 0.01: 
+            raise ValueError("heading tolerance value invalid can not be less than 0.01")
+    
+
+    def _validate_state_inputs(self, *state_inputs):
+        super()._validate_state_inputs(*state_inputs)  
+
+        if not len(*state_inputs) == 2: 
+            raise ValueError('state inputs are not length 2') 
+
+        agent_state:AgentState = state_inputs[0]
+        waypoints_state:WaypointsState = state_inputs[1]
+
+        if not isinstance(agent_state, AgentState):
+            raise TypeError("is_heading_within_tolerance input state 'agent_state' not received.")
+        if not isinstance(waypoints_state, WaypointsState): 
+            raise TypeError("is_heading_within_tolerance input state 'waypoints_state' not received.")
+        
+        if not isinstance(waypoints_state.current_waypoint, Waypoint): 
+            raise ValueError("is_heading_within_tolerance input state 'waypoints_state' does not have waypoints.")   
+
+class IsVirtualWaypoinnts(HybridAutomatonGuard):
+    """
+    guard class on call which check if current waypoints 
+    state contains a virtual waypoint
+    """
+
+    def __call__(self, waypoints_state: WaypointsState):
+        super().__call__([waypoints_state])
+
+        virtual_waypoints = waypoints_state.virtual_waypoints
+        return len(virtual_waypoints) > 0 
+    
+    def _validate_state_inputs(self, *state_inputs):
+        super()._validate_state_inputs(*state_inputs)
+
+        waypoints_state: WaypointsState = state_inputs[0]
+        if not isinstance(waypoints_state, WaypointsState):
+            raise TypeError('waypoints state invalid type')
 
 # Constant distance threshold (DSF) for now.
 DSF = 300  # TODO: Consider changing to: Dmaneuver = Cs + (vrel * Tp)
@@ -107,7 +316,7 @@ def is_los_clear_to_waypoint(agent_state: AgentUpdate,
 def is_heading_within_tolerance(agent_state: AgentUpdate,
                             waypoints_state: Waypoints,
                             heading_error_tolerance: float = 0.05,
-                            tolerance: Duration = Duration(sec=1)) -> bool:
+                            ) -> bool:
     """
     Guard for the second transition condition to T2LOS
 
@@ -129,32 +338,7 @@ def is_heading_within_tolerance(agent_state: AgentUpdate,
     """
     # Calculate the heading error between the agent's current heading and the
     # direction to the waypoint.
-    if not isinstance(agent_state, AgentUpdate):
-        raise ValueError("is_heading_within_tolerance input state 'agent_state' not received.")
-    if not isinstance(waypoints_state, Waypoints): 
-        raise ValueError("is_heading_within_tolerance input state 'waypoints_state' not received.")
-    
-    if len(waypoints_state.waypoints) > 0: 
-        current_waypoint = waypoints_state.waypoints[0]
-    else:
-        raise ValueError("is_heading_within_tolerance input state 'waypoints_state' does not have waypoints.")
-    
-    error = delta_heading(
-        x_a=agent_state.pose.position.x,
-        y_a=agent_state.pose.position.y,
-        theta_a=quaternion_to_heading(
-            qx=agent_state.pose.orientation.x,
-            qy=agent_state.pose.orientation.y,
-            qz=agent_state.pose.orientation.z,
-            qw=agent_state.pose.orientation.w
-        ),
-        x_w=current_waypoint.position.x,
-        y_w=current_waypoint.position.y
-    )
 
-    # If the heading error is within the allowed tolerance, return True.
-    return (abs(error) <= heading_error_tolerance) or \
-       math.isclose(abs(error), heading_error_tolerance, abs_tol=1e-6)
 
 def is_unsafe_conditions(agent_state: AgentUpdate,
                        obstacles_state: ObstaclesUpdate,

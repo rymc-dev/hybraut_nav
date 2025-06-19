@@ -1,4 +1,4 @@
-from colav_interfaces.msg import AgentUpdate, UnsafeSet
+from colav_interfaces.msg import AgentState, UnsafeSet
 from shapely.geometry import Polygon, Point
 import inspect
 from typing import List, Tuple
@@ -19,7 +19,7 @@ def extract_polygon_vertices(
 
 
 def is_inside_unsafe_set(
-        agent_state: AgentUpdate,
+        agent_state: AgentState,
         unsafe_set: UnsafeSet) -> bool:
     """
     Checks if the agent is within the unsafe set based on its safety radius.
@@ -65,7 +65,7 @@ def is_inside_unsafe_set(
 
 
 def is_imminent_collision(
-        agent_state: AgentUpdate,
+        agent_state: AgentState,
         unsafe_set: UnsafeSet) -> bool:
     """
     is_imminent_collision

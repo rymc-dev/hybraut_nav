@@ -1,24 +1,13 @@
-# automaton_status
+from enum import IntEnum
+from typing import Union
 
-from enum import Enum, auto
+class HybridAutomatonStatusEnum(IntEnum):
+    INITIALIZING = 1
+    ACTIVE_MODE = 2
+    TRANSITIONING = 3
+    COMPLETED = 4
+    DEACTIVATING = 5
+    ERROR = 6
 
-class HybridAutomatonStatus(Enum):
-    """Enumeration of internal states for a hybrid automaton lifecycle."""
-
-    INITIALIZING = auto()
-    """Used when moving from configured state to active"""
-
-    ACTIVE_MODE = auto()
-    """Currently executing within an active mode (continuous evolution)."""
-
-    TRANSITIONING = auto()
-    """A transition is occurring between modes (guard condition triggered, reset in progress)."""
-
-    COMPLETED = auto()
-    """Final goal or terminal condition has been reached; automaton is shutting down cleanly."""
-
-    DEACTIVATING = auto()
-    """Automaton is being externally stopped or deactivated."""
-
-    ERROR = auto()
-    """An unrecoverable error occurred during execution, transition, or mode evaluation."""
+# Use this for type hints
+HybridAutomatonStatusValue = Union[HybridAutomatonStatusEnum, int]

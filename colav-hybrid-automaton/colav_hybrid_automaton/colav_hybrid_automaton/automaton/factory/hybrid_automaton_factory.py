@@ -11,7 +11,7 @@ from std_msgs.msg import String
 from rclpy.publisher import Publisher
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from typing import Tuple
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatus
+from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
 
 # Load JSON Schema
 package_name = 'colav_hybrid_automaton'
