@@ -22,7 +22,7 @@ builtin_interfaces/Duration elapsed_time     # Elapsed time since automaton star
 
 # --- Additional Output Data Start ---
 
-colav_interfaces/Waypoints waypoints  # Internal state waypoints for COLAV Hybrid Automaton
+colav_interfaces/Waypoint[] waypoints  # Internal state waypoints for COLAV Hybrid Automaton
 
 # --- Additional Output Data End ---
 
