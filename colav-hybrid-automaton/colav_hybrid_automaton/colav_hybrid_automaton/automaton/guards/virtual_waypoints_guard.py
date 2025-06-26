@@ -1,5 +1,6 @@
 from .guard import Guard
-from colav_interfaces.msg import WaypointsState as ROSWaypointsState
+from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
+from typing import List
 
 class VirtualWaypointsGuard(Guard):
     """
@@ -7,15 +8,16 @@ class VirtualWaypointsGuard(Guard):
     state contains a virtual waypoint
     """
 
-    def __call__(self, waypoints_state: ROSWaypointsState):
-        super().__call__([waypoints_state])
+    def __call__(self, **state_kwargs):
+        super().__call__(**state_kwargs)
 
-        virtual_waypoints = waypoints_state.virtual_waypoints
+        waypoints_state: ROSWaypointsState = state_kwargs.get('waypoints_state')
+        virtual_waypoints: List[ROSWaypoint] = waypoints_state.virtual_waypoints 
         return len(virtual_waypoints) > 0 
     
-    def _validate_state_inputs(self, *state_inputs):
-        super()._validate_state_inputs(*state_inputs)
+    def _validate_states(self, **state_kwargs):
+        super()._validate_states(**state_kwargs)
 
-        waypoints_state: ROSWaypointsState = state_inputs[0]
-        if not isinstance(waypoints_state, ROSWaypointsState):
+        
+        if not isinstance(state_kwargs.get('waypoints_state'), ROSWaypointsState):
             raise TypeError('waypoints state invalid type')

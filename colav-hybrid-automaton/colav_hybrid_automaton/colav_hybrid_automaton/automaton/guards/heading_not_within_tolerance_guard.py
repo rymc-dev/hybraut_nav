@@ -24,7 +24,7 @@ class HeadingNotWithinToleranceGuard(Guard):
 
     def __call__(self, **state_kwargs):
         super().__call__(**state_kwargs)
-
+        # self._validate_state(**state_kwargs)
         agent_state: ROSAgentState = state_kwargs.get('agent_state')
         waypoints_state: ROSWaypointsState = state_kwargs.get('waypoints_state')
 
@@ -75,7 +75,9 @@ class HeadingNotWithinToleranceGuard(Guard):
         if kwargs.get('heading_tolerance') < 0.0:
             raise ValueError('heading tolerance cannot be less than 0.0')
 
-    def _validate_state_inputs(self, *state_kwargs):
+    def _validate_state(self, **state_kwargs):
+        super.__init__(**state_kwargs)
+        
         agent_state = state_kwargs.get('agent_state')
         waypoints_state = state_kwargs.get('waypoints_state')
         if not isinstance(agent_state, ROSAgentState):

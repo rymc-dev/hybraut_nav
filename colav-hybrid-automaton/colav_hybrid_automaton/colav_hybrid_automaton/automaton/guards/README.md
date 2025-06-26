@@ -1,4 +1,4 @@
-# Hybrid AutomatonGuards
+# Hybrid Automaton Guards
  This pkg is inw of the core compinebts of the Hybrid Automaton framework
 within the ['guards.py'](./guards) we define guard conditional finctions 
 

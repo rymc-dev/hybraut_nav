@@ -161,3 +161,23 @@ def test_heading_not_within_tolerance_guard_comprehensive(
     actual_guard_evaluation = guard.__call__(**state_kwargs)
     assert actual_guard_evaluation == expected_guard_evaluation, \
         f"Test case '{test_description}' failed: expected {expected_guard_evaluation}, got {actual_guard_evaluation}"
+    
+def test_guard_invalid_initialization_missing_param():
+    with pytest.raises(TypeError):
+        HeadingWithinToleranceGuard()
+
+def test_guard_invalid_initialization_invalid_type():
+    with pytest.raises(TypeError):
+        init_kwargs = {'heading_tolerance': 'invalid_type'}
+        HeadingWithinToleranceGuard(**init_kwargs)
+
+def test_guard_call_invalid_state_mission_params():
+    init_kwargs = {"heading_tolerance": 0.2}
+    guard = HeadingWithinToleranceGuard(**init_kwargs)
+
+    with pytest.raises(TypeError):
+        state_kwargs = {'agent_state': ROSAgentState()}
+        guard.__call__(**state_kwargs)
+    with pytest.raises(TypeError):
+        state_kwargs = {'waypoints_state': ROSWaypointsState()}
+        guard.__call__(**state_kwargs)

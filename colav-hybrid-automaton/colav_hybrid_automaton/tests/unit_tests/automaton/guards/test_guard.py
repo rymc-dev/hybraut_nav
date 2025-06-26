@@ -53,7 +53,6 @@ def test_guard_creation_and_calls():
     assert guard.__str__() == "Guard Function: TestGuard"
     assert guard.__repr__() == "TestGuard(initialized=True)"
 
-
 def test_guard_invalid_initialization_missing_param():
     class TestGuard(Guard):
         def _validate_initialization(self, **kwargs):

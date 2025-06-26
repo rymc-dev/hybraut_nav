@@ -123,7 +123,8 @@ class Guard(ABC):
             ValueError: If state inputs are invalid
             TypeError: If state inputs are of wrong type
         """
-        pass
+        if not self.is_initialized:
+            raise RuntimeError('guard is not initialized')
         
     def get_guard_info(self) -> Dict[str, Any]:
         """
