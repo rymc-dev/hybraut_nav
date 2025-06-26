@@ -1,17 +1,14 @@
-from .guards import (
-    is_los_clear_to_waypoint,
-    is_heading_within_tolerance,
-    is_unsafe_conditions,
-    is_waypoint_reached,
-    is_heading_not_within_tolerance,
-    is_virtual_waypoints
-)
+from .heading_not_within_tolerance_guard import HeadingNotWithinToleranceGuard
+# from .heading_within_tolerance_guard import IsHeadingWithinToleranceGuard
+# from .los_clear_to_waypoint_guard import IsLOSClearToWaypointGuard
+# from .los_clear_to_waypoint_guard import IsLOSClearToWaypointGuard
 
 __all__ = [
-    'is_los_clear_to_waypoint',
-    'is_heading_within_tolerance',
-    'is_unsafe_conditions',
-    'is_waypoint_reached',
-    'is_heading_not_within_tolerance',
-    'is_virtual_waypoints',
+    "HeadingNotWithinToleranceGuard"
+    # "IsLOSClearToWaypoint",
+    # "IsHeadingNotWithinTolerance",
+    # "IsHeadingWithinTolerance",
+    # "IsUnsafeConditions",
+    # "IsVirtualWaypoints",
+    # "IsWaypointReached"
 ]

@@ -1,11 +1,11 @@
 from .invariants import (
-    is_at_final_waypoint, 
-    trivial_invariant,
-    failing_invariant
+    IsGoalWaypoint,
+    FailingInvariant,
+    TrivialInvariant
 )
 
 __all__ = [
-    'is_at_final_waypoint',
-    'trivial_invariant',
-    'failing_invariant'
+    'IsGoalWaypoint',
+    'FailingInvariant',
+    'TrivialInvariant'
 ]

@@ -1,3 +1,4 @@
+# Formal Automaton Model Definition (FAMD)
 # ============================================================================
 # ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
 # ============================================================================
@@ -55,14 +56,14 @@ states:
     topic: "/state/unsafe_set"
     type:
       pkg: "colav_interfaces.msg"
-      msg: "UnsafeSet"
+      msg: "UnsafeSetState"
     params:
       - update_hz: 2.0
       - timeout_sec: 1.5
 
   waypoints_state:
     topic: "/state/waypoints"
-    type:
+    type: 
       pkg: "colav_interfaces.msg"
       msg: WaypointsState
 
@@ -102,40 +103,43 @@ resets:
 guards:
   is_los_clear_to_waypoint:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: is_los_clear_to_waypoint
+    class_name: IsLOSClearToWaypoint
     state_inputs:
       - "agent_state"
       - "obstacles_state"
       - "unsafe_set_state"
       - "waypoints_state"
-    configuration: []
+    configuration: 
+      - los_distance_threshold: 100.0
 
   is_heading_within_tolerance:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: is_heading_within_tolerance
+    class_name: IsHeadingWithinTolerance
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    configuration: []
+    configuration: 
+      - heading_tolerace: 0.2
 
-  is_heading_not_within_tolerance:
+  IsHeadingNotWithinTolerance:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: is_heading_not_within_tolerance
+    class_name: IsHeadingNotWithinTolerance
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    configuration: []
+    configuration: 
+      - heading_tolerance: 0.2
 
   is_virtual_waypoints:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: is_virtual_waypoints
+    class_name: IsVirtualWaypoints
     state_inputs:
       - "waypoints_state"
     configuration: []
 
   is_unsafe_conditions:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: is_unsafe_conditions
+    class_name: IsUnsafeConditions
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -144,7 +148,7 @@ guards:
 
   is_waypoint_reached:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: is_waypoint_reached
+    class_name: IsWaypointReached
     state_inputs:
       - "agent_state"
       - "waypoints_state"
@@ -157,20 +161,20 @@ guards:
 invariants:
   is_at_final_waypoint:
     module: colav_hybrid_automaton.automaton.invariants
-    class_name: is_at_final_waypoint
+    class_name: IsGoalWaypoint
     state_inputs:
       - "waypoints_state"
     configuration: []
 
   trivial_invariant:
     module: colav_hybrid_automaton.automaton.invariants
-    class_name: trivial_invariant
-  configuration: []
+    class_name: TrivialInvariant
+    configuration: []
 
   failing_invariant:
     module: colav_hybrid_automaton.automaton.invariants
-    class_name: failing_invariant
-  configuration: []
+    class_name: FailingInvariant
+    configuration: []
 
 # ============================================================================
 # Transitions (E)
@@ -193,7 +197,7 @@ transitions:
     guard: "is_waypoint_reached"
     reset: null
 
-  t2los_to_cruise:cruise_to_t2los_1
+  t2los_to_cruise:cruise_to_t2los_1:
     guard: "is_heading_within_tolerance"
     reset: null
 
@@ -262,7 +266,7 @@ dynamics:
 
     no_op_controller:
       module: colav_hybrid_automaton.automaton.dynamics
-      class_name: no_operation_controller
+      class_name: NoOpController
       state_inputs: []
       configuration: []
 

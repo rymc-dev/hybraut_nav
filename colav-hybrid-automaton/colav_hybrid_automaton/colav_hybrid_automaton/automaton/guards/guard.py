@@ -25,7 +25,7 @@ from colav_interfaces.msg import WaypointsState, AgentState, ObstaclesState
 import rclpy
 from rclpy.logging import get_logger
 
-class HybridAutomatonGuard(ABC):
+class Guard(ABC):
     """
     Abstract base class for hybrid automaton reset functions.
     
@@ -38,7 +38,7 @@ class HybridAutomatonGuard(ABC):
         is_initialized: Flag indicating if the reset has been properly initialized
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **init_kwargs):
         """
         Initialize the reset function with static configuration parameters.
         
@@ -56,11 +56,11 @@ class HybridAutomatonGuard(ABC):
         """
         self.logger = get_logger(self.__class__.__name__)
         self.is_initialized = False
-        self._validate_initialization(*args, **kwargs)
+        self._validate_initialization(**init_kwargs)
         self.is_initialized = True
 
     @abstractmethod
-    def __call__(self, *state_inputs) -> bool:
+    def __call__(self, **state_kwargs) -> bool:
         """
         Execute the reset function with current state inputs.
         
@@ -68,7 +68,7 @@ class HybridAutomatonGuard(ABC):
         It receives the current state values and returns updated state values.
         
         Args:
-            *state_inputs: Variable number of state inputs (e.g., WaypointsState, 
+            *kwargs: Variable number of state kwargs inputs (e.g., WaypointsState, 
                           AgentState, ObstaclesState) as defined in the configuration
                           
         Returns:
@@ -90,12 +90,9 @@ class HybridAutomatonGuard(ABC):
             raise RuntimeError(f"{self.__class__.__name__} must be initialized before calling")
         
         # Validate inputs
-        self._validate_state_inputs(*state_inputs)
-        
-        # Abstract method - must be implemented by subclasses
-        pass
+        self._validate_states(**state_kwargs)
 
-    def _validate_initialization(self, *args, **kwargs) -> None:
+    def _validate_initialization(self, **init_kwargs) -> None:
         """
         Validate initialization parameters.
         
@@ -112,7 +109,7 @@ class HybridAutomatonGuard(ABC):
         """
         pass
     
-    def _validate_state_inputs(self, *state_inputs) -> None:
+    def _validate_states(self, **state_kwargs) -> None:
         """
         Validate state inputs before processing.
         
@@ -126,8 +123,7 @@ class HybridAutomatonGuard(ABC):
             ValueError: If state inputs are invalid
             TypeError: If state inputs are of wrong type
         """
-        if not state_inputs:
-            raise ValueError("At least one state input is required")
+        pass
         
     def get_guard_info(self) -> Dict[str, Any]:
         """
@@ -137,19 +133,20 @@ class HybridAutomatonGuard(ABC):
             Dict[str, Any]: Dictionary containing reset metadata including
                           class name, initialization status, and configuration
         """
+        class_doc = self.__class__.__doc__
         return {
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
             'is_initialized': self.is_initialized,
-            'description': self.__doc__.split('\n')[0] if self.__doc__ else "No description"
+            'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
         }
     
     def __repr__(self) -> str:
-        """String representation of the reset function."""
+        """String representation of the guard function."""
         return f"{self.__class__.__name__}(initialized={self.is_initialized})"
     
     def __str__(self) -> str:
         """Human-readable string representation."""
-        return f"Invariant Function: {self.__class__.__name__}"
+        return f"Guard Function: {self.__class__.__name__}"
         
     

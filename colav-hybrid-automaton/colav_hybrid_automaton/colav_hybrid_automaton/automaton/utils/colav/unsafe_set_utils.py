@@ -1,11 +1,11 @@
-from colav_interfaces.msg import AgentState, UnsafeSet
+from colav_interfaces.msg import AgentState, UnsafeSetState
 from shapely.geometry import Polygon, Point
 import inspect
 from typing import List, Tuple
 
 
 def extract_polygon_vertices(
-        unsafe_set: UnsafeSet) -> List[Tuple[float, float]]:
+        unsafe_set: UnsafeSetState) -> List[Tuple[float, float]]:
     """
       extract_polygon_vertices
       This function extracts the vertices of the unsafe_set
@@ -20,7 +20,7 @@ def extract_polygon_vertices(
 
 def is_inside_unsafe_set(
         agent_state: AgentState,
-        unsafe_set: UnsafeSet) -> bool:
+        unsafe_set: UnsafeSetState) -> bool:
     """
     Checks if the agent is within the unsafe set based on its safety radius.
 
@@ -66,7 +66,7 @@ def is_inside_unsafe_set(
 
 def is_imminent_collision(
         agent_state: AgentState,
-        unsafe_set: UnsafeSet) -> bool:
+        unsafe_set: UnsafeSetState) -> bool:
     """
     is_imminent_collision
     checks if a collision with unsafe set inevitable given the constraints of the agent_vessel

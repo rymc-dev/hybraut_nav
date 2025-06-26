@@ -34,7 +34,7 @@ class LifecycleClient(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    target_node = sys.argv[1] if len(sys.argv) > 1 else 'automaton'
+    target_node = 'hybrid_automaton' # sys.argv[1] if len(sys.argv) > 1 else 'hybrid_automaton'
     node = LifecycleClient(target_node)
 
 

@@ -9,37 +9,41 @@
 # 'Additional Output Data Start' to 'Additional Output Data End'
 
 # === Core Identity & State ===
-unique_identifier_msgs/UUID automaton_uuid     # Unique identifier for this automaton instance
 hybrid_automaton_interfaces/HybridAutomatonMode mode                                    # Current active control mode (e.g., GO_FORWARD, AVOID_OBSTACLE)
-string previous_mode                        # Previous control mode (useful for transition analysis)
 hybrid_automaton_interfaces/HybridAutomatonStatus status                                  # Execution status (INITIALIZING, ACTIVE, TRANSITIONING, COMPLETE, ERROR, PAUSED)
+
+uint32 num_planned_goal_waypoints
+colav_interfaces/Waypoint[] planned_goal_waypoints
+uint32 current_goal_waypoint_index 
+colav_interfaces/Waypoint[] current_virtual_waypoints
 
 # === Dynamics & Control ===
 hybrid_automaton_interfaces/HybridAutomatonDynamicParameter dynamics  # Current system dynamics and control outputs
 
-# === Transition Information ===
-builtin_interfaces/Duration time_since_last_transition     # Time elapsed since last mode transition
-builtin_interfaces/Duration time_in_current_mode          # Total time spent in current mode
 
-bool transition_pending                                    # is transition pending
-hybrid_automaton_interfaces/HybridAutomatonGuardEvaluations guards
+# # === Transition Information ===
+# builtin_interfaces/Duration time_since_last_transition     # Time elapsed since last mode transition
+# builtin_interfaces/Duration time_in_current_mode          # Total time spent in current mode
 
-int32 transition_count                                    # Total number of transitions executed
+# bool transition_pending                                    # is transition pending
+# hybrid_automaton_interfaces/HybridAutomatonGuardEvaluations guards
 
-# === Performance & Health ===
-float64 cycle_frequency                        # Current execution frequency (Hz)
-float64 average_cycle_time                     # Average time per execution cycle (seconds)
+# int32 transition_count                                    # Total number of transitions executed
+
+# # === Performance & Health ===
+# float64 cycle_frequency                        # Current execution frequency (Hz)
+# float64 average_cycle_time                     # Average time per execution cycle (seconds)
 
 # === Timing Information ===
 builtin_interfaces/Time stamp                  # Timestamp when this message was generated
 builtin_interfaces/Duration elapsed_time       # Total runtime since automaton initialization
 
-# === Goal & Progress ===
-bool goal_reached                              # True if the automaton has reached its objective
-float64 progress_percentage                    # Completion progress (0.0 to 100.0)
+# # === Goal & Progress ===
+# bool goal_reached                              # True if the automaton has reached its objective
+# float64 progress_percentage                    # Completion progress (0.0 to 100.0)
 
 # --- Additional Output Data Start ---
-colav_interfaces/Waypoint[] waypoints_state        # Internal state waypoints for COLAV Hybrid Automaton
+# colav_interfaces/Waypoint[] waypoints_state        # Internal state waypoints for COLAV Hybrid Automaton
 # --- Additional Output Data End ---
 
 # === Error Handling & Diagnostics ===

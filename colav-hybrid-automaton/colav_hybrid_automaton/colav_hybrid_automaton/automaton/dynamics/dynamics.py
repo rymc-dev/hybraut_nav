@@ -2,150 +2,143 @@
 # while in each mode.
 
 from colav_interfaces.msg import AgentState, WaypointsState
-from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicParameter
 import math
-from colav_hybrid_automaton.automaton.utils import quaternion_to_heading, get_current_ros_time, is_timestamps_within_tolerance
-from builtin_interfaces.msg import Duration
+from colav_hybrid_automaton.automaton.utils import quaternion_to_heading
+from typing import NamedTuple
+from colav_interfaces.msg import Waypoint
+from typing import Deque, Any
 
-# constant target velocity for now but in the future would like to change
-# this t obe based on agent static dynamic params Convert knots to meters
-# per second (1 knot = 0.514444 m/s)
-TARGET_VELOCITY = 30 * 0.514444
-# TODO: Get this value from colav_params/agent_constraints Limit
-# acceleration to (m/s^2)
-MAX_ACCELERATION = 1.0
-MAX_DECELERATION = 0.5
-from typing import Tuple
+class ControlOutput(NamedTuple):
+    velocity: float
+    yaw_rate: float
 
-
-def proportional_velocity_controller(agent_state: AgentState, dt: float = 0.1, tolerance: Duration = Duration(sec=1, nanosec=0)) -> Tuple[float, float]:
+class PIDYawVelocityController:
     """
-    Computes the dynamics for the CRUISE control mode of the agent.
-
-    In this mode, a proportional velocity controller is used to adjust the agent's speed
-    toward a predefined TARGET_VELOCITY. The controller computes the required acceleration
-    based on the velocity error and clamps it within the maximum allowable acceleration
-    and deceleration limits, ensuring that the agent adheres to its dynamic constraints.
-
-    During CRUISE mode, the yaw rate is fixed to zero, assuming that the agent is moving
-    along a straight line (e.g., line-of-sight path following).
-
-    Parameters:
-        agent_state (AgentState): The current state of the agent.
-        dt (float): Time step for the update (default is 0.1 seconds).
-
-    Returns:
-        CRUISEDynamics: Updated velocity and yaw rate for the next time step.
-
-    Raises:
-        ValueError: (Not currently raised, placeholder for future use if needed.)
+    PIDYawVelocityController
+    A PID controller for velocity and yaw rate based on heading and position error
+    relative to the target waypoint.
     """
-    if not isinstance(agent_state, AgentState):
-        raise ValueError("agent state received is of none type not type AgentUpdate")
 
-    if not isinstance(dt, float):
-        raise ValueError("delta time must be type float")
-    if dt < 0.01:
-        raise ValueError("delta time must be greater than or equal to 0.01")
-    if not isinstance(tolerance, Duration):
-        raise ValueError('tolerance must be Duration type')
-
-    # current_velocity = agent_state.velocity
-    # velocity_change = TARGET_VELOCITY - current_velocity
-    # # TODO: Replace -MAX_ACCELERATION with MAX_DECELERATION from agent
-    # # parameters
-    # acceleration = max(
-    #     min(velocity_change / dt, MAX_ACCELERATION), -MAX_ACCELERATION)
-    # new_velocity = current_velocity + acceleration * dt
-
-    new_velocity = TARGET_VELOCITY
-    return [new_velocity, 0.0]
-
-
-def proportional_yaw_rate_controller(
-        agent_state: AgentState,
-        waypoints: WaypointsState,
-        dt: float = 0.1,
+    def __init__(
+        self,
+        target_velocity: float = 30 * 0.514444,
+        yaw_kp: float = 0.8,
+        yaw_ki: float = 0.05,
+        yaw_kd: float = 0.2,
+        vel_kp: float = 1.0,
+        vel_ki: float = 0.1,
+        vel_kd: float = 0.1,
         error_tolerance: float = 0.01,
-        proportional_gain: float = 3.0,
-        max_yaw_rate: float = 0.5,
-        tolerance: Duration = Duration(sec=1, nanosec=0)
-) -> Tuple[float, float]:
+        max_yaw_rate: float = 0.2,
+        dt: float = 0.1,
+        **kwargs
+    ):
+        if dt < 0.01:
+            raise ValueError("dt must be >= 0.01")
+
+        self.target_velocity = target_velocity
+        self.dt = dt
+        self.error_tolerance = error_tolerance
+        self.max_yaw_rate = max_yaw_rate
+
+        # PID gains
+        self.yaw_kp = yaw_kp
+        self.yaw_ki = yaw_ki
+        self.yaw_kd = yaw_kd
+
+        self.vel_kp = vel_kp
+        self.vel_ki = vel_ki
+        self.vel_kd = vel_kd
+
+        # PID state (integrals & previous errors)
+        self.heading_error_integral = 0.0
+        self.prev_heading_error = 0.0
+
+        self.velocity_error_integral = 0.0
+        self.prev_velocity_error = 0.0
+
+    def __call__(self, status_buffer: Deque[AgentState], current_waypoints: WaypointsState, **kwargs) -> ControlOutput:
+        if not status_buffer or not isinstance(status_buffer[-1], AgentState):
+            raise ValueError("status_buffer must contain at least one AgentState as its latest entry.")
+
+        current_state = status_buffer[-1]
+
+        if not isinstance(current_waypoints, WaypointsState):
+            raise ValueError("current_waypoints")
+        
+        if not isinstance(current_waypoints.current_waypoint, Waypoint): 
+            raise ValueError("current waypoint not set in waypointsstate")
+
+        try:
+            wp: Waypoint = current_waypoints.current_waypoint
+        except IndexError:
+            raise ValueError("No waypoint to navigate to")
+
+        # Compute desired heading
+        dx = wp.position.x - current_state.pose.position.x
+        dy = wp.position.y - current_state.pose.position.y
+        desired_heading = math.atan2(dy, dx)
+
+        # Get current heading
+        current_heading = quaternion_to_heading(
+            qx=current_state.pose.orientation.x,
+            qy=current_state.pose.orientation.y,
+            qz=current_state.pose.orientation.z,
+            qw=current_state.pose.orientation.w,
+        )
+
+        # Yaw PID
+        heading_error = math.atan2(
+            math.sin(desired_heading - current_heading),
+            math.cos(desired_heading - current_heading)
+        )
+
+        self.heading_error_integral += heading_error * self.dt
+        heading_error_derivative = (heading_error - self.prev_heading_error) / self.dt
+        self.prev_heading_error = heading_error
+
+        raw_yaw_rate = (
+            self.yaw_kp * heading_error +
+            self.yaw_ki * self.heading_error_integral +
+            self.yaw_kd * heading_error_derivative
+        )
+        target_yaw_rate = max(-self.max_yaw_rate, min(raw_yaw_rate, self.max_yaw_rate))
+
+        # Velocity PID
+        current_velocity = current_state.velocity
+        velocity_error = self.target_velocity - current_velocity
+        self.velocity_error_integral += velocity_error * self.dt
+        velocity_error_derivative = (velocity_error - self.prev_velocity_error) / self.dt
+        self.prev_velocity_error = velocity_error
+
+        velocity_command = (
+            self.vel_kp * velocity_error +
+            self.vel_ki * self.velocity_error_integral +
+            self.vel_kd * velocity_error_derivative
+        )
+
+        # Final target velocity = current + PID adjustment
+        final_velocity = current_velocity + velocity_command
+
+        return final_velocity, target_yaw_rate
+
+class NoOpController:
     """
-    Hybrid controller: simultaneously throttle velocity toward TARGET_VELOCITY
-    and adjust yaw rate to steer toward the next waypoint.
+    NoOpController
+    A placeholder controller that outputs zero velocity and yaw rate
+    regardless of input. Useful for disabling control or as a fallback.
     """
 
-    # Input validation
-    if not isinstance(agent_state, AgentState):
-        raise ValueError("agent_state must be AgentUpdate")
-    if not isinstance(waypoints, WaypointsState):
-        raise ValueError("waypoints must be Waypoints")
-    if not isinstance(dt, float) or dt < 0.01:
-        raise ValueError("dt must be float >= 0.01")
-    if not isinstance(error_tolerance, float) or error_tolerance < 0.001:
-        raise ValueError("error_tolerance must be float >= 0.001")
-    if not isinstance(proportional_gain, float) or proportional_gain <= 0 or proportional_gain > 10:
-        raise ValueError("proportional_gain must be > 0 and <= 10")
-    if not isinstance(max_yaw_rate, float) or max_yaw_rate <= 0:
-        raise ValueError("max_yaw_rate must be float > 0")
-    if not isinstance(tolerance, Duration):
-        raise ValueError("tolerance must be Duration type")
+    def __init__(self) -> None:
+        """Initialize the NoOpController (no state needed)."""
+        pass
 
-    # Velocity control (P-controller)
-    # current_vel = agent_state.velocity
-    # vel_error = TARGET_VELOCITY - current_vel
-    # accel_cmd = max(min(vel_error / dt, MAX_ACCELERATION), -MAX_DECELERATION)
-    # updated_velocity = current_vel + accel_cmd * dt
+    def __call__(self, *args: Any, **kwargs: Any) -> ControlOutput:
+        """
+        Return a no-operation control command.
 
-    # Yaw control
-    current_heading = quaternion_to_heading(
-        qx=agent_state.pose.orientation.x,
-        qy=agent_state.pose.orientation.y,
-        qz=agent_state.pose.orientation.z,
-        qw=agent_state.pose.orientation.w,
-    )
+        Returns:
+            ControlOutput: velocity = 0.0, yaw_rate = 0.0
+        """
+        return ControlOutput(velocity=0.0, yaw_rate=0.0)
 
-    # Next waypoint
-    try:
-        wp = waypoints.current_waypoint
-    except IndexError:
-        raise ValueError("No waypoint to navigate to")
-
-    dx = wp.position.x - agent_state.pose.position.x
-    dy = wp.position.y - agent_state.pose.position.y
-    desired_heading = math.atan2(dy, dx)
-
-    # Properly wrapped heading error [-pi, pi]
-    heading_error = math.atan2(
-        math.sin(desired_heading - current_heading),
-        math.cos(desired_heading - current_heading)
-    )
-
-    # Proportional yaw control with smoothing
-    if abs(heading_error) < error_tolerance:
-        target_yaw_rate = 0.0
-    else:
-        raw_turn = proportional_gain * heading_error / dt
-        target_yaw_rate = max(-max_yaw_rate, min(raw_turn, max_yaw_rate))
-
-        # Optional low-pass filter to smooth yaw rate
-        alpha = 0.1
-        target_yaw_rate = alpha * target_yaw_rate + (1 - alpha) * agent_state.yaw_rate
-
-    # return float(TARGET_VELOCITY), target_yaw_rate
-    # Binary controller
-    # if abs(heading_error) < error_tolerance:
-    #     target_yaw_rate = 0.0
-    # elif heading_error > 0:
-    #     target_yaw_rate = max_yaw_rate  # turn left
-    # else:
-    #     target_yaw_rate = -max_yaw_rate  # turn right
-
-    # return float(TARGET_VELOCITY), target_yaw_rate
-
-def no_op_controller() -> Tuple[float, float]:
-    # Initially controller for fallback will return 0,0 commands therefore
-    # enabling the controller on ATL vessel to ramp down by itself
-
-    return [0.0, 0.0]

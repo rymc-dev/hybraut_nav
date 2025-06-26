@@ -12,8 +12,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
-        ('share/' + package_name + '/config', glob('config/*.yml')),
-        ('share/' + package_name + '/schemas', glob('schemas/*.schema.json'))
+        ('share/' + package_name + '/automaton' + '/config', glob('colav_hybrid_automaton/automaton/colav-famd.yml')),
+        ('share/' + package_name + '/automaton' + '/schemas', glob('colav_hybrid_automaton/automaton/factory/schemas/famd.schema.json')) 
     ],
     install_requires=['setuptools', 'launch_testing'],
     zip_safe=True,
@@ -27,7 +27,7 @@ setup(
         'console_scripts': [
             "mission_manager = colav_hybrid_automaton.automaton_mission_manager:main",
             "automaton = colav_hybrid_automaton.automaton.automaton_node:main",
-            "lifecycle_transition_client =  colav_hybrid_automaton.automaton_lifecycle_transition_cli:main"
+            "automaton_configure_client =  colav_hybrid_automaton.automaton_lifecycle_transition_cli:main"
         ],
     },
 )

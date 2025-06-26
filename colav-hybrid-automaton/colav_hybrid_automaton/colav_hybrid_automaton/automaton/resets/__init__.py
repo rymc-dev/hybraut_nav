@@ -1,6 +1,9 @@
-from .resets import remove_first_waypoint, create_virtual_waypoint
+from .resets import (
+    RemoveFirstWaypoint,
+    GenerateVirtualWaypoint
+)
 
 __all__ = [
-    'remove_first_waypoint',
-    'create_virtual_waypoint'
+    'RemoveFirstWaypoint',
+    'GenerateVirtualWaypoint'
 ]

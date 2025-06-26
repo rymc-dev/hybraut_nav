@@ -1,11 +1,7 @@
-# Mode.msg 
-# ROS 2 interface for the Hybrid Automaton Framework.
-# Provides real-time updates of the current Hybrid Automaton mode.
+uint8 CRUISE=0
+uint8 T2LOS=1
+uint8 FALLBACK=2
+uint8 WAYPOINT_REACHED=3
 
-# NOTE: Do not modify this .msg definition.
-
-uint32 mode_idx  # modes idx
-string mode  # The current Hybrid Automaton mode (e.g., "GO_FORWARD", "GO_RIGHT", etc.)
-
-builtin_interfaces/Time stamp  # Timestamp indicating when the mode was last updated
-string origin_transition  # The transition that triggered the mode change (e.g., "cruise_to_waypoint_reached")
+uint8 mode
+builtin_interfaces/Time stamp

@@ -53,6 +53,12 @@ from colav_hybrid_automaton.automaton.callbacks import (
     on_status_received_callback,
     handle_invariant_timeout_guard
 )
+from colav_hybrid_automaton.automaton.factory import (
+    initialize_dynamics,
+    initialize_guards,
+    initialize_invariants,
+    initialize_resets
+)
 from hybrid_automaton_interfaces.msg import HybridAutomatonInvariant
 
 SYSTEM_CLOCK = None
@@ -96,7 +102,7 @@ class HybridAutomatonNode(LifecycleNode):
             
     def __init__(
         self, 
-        name: str, confi
+        name: str,
     ):
         """init"""
         super().__init__(name)
@@ -199,6 +205,12 @@ class HybridAutomatonNode(LifecycleNode):
                 config=load_yml(
                     yml_path=_configuration_file_path
             ))
+
+            self._configuration["guards"] = initialize_guards(guards_configuration=self._configuration["guards"])
+            self._configuration["dynamics"] = initialize_dynamics(dynamics_configuration=self._configuration["dynamics"])
+            self._configuration["resets"] = initialize_resets(resets_configuration=self._configuration["resets"])
+            self._configuration["invariants"] = initialize_invariants(invariants_configuration=self._configuration["invariants"])
+
             self._states = create_state_subscriptions(node=self, state_configuration=self._configuration['states'])
             
             self._available_modes = list(self._configuration['modes'].keys())

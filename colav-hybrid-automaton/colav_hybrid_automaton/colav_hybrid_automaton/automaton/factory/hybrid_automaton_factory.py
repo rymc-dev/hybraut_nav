@@ -13,10 +13,12 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 from typing import Tuple
 from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
 
+
+
 # Load JSON Schema
 package_name = 'colav_hybrid_automaton'
 pkg_share_dir = get_package_share_directory(package_name)
-schema_path = os.path.join(pkg_share_dir, 'schemas', 'hybrid_automaton_config.schema.json')
+schema_path = os.path.join(pkg_share_dir, 'automaton', 'schemas', 'famd.schema.json')
 
 with open(schema_path, 'r') as f:
     schema = yaml.safe_load(f)
@@ -40,13 +42,13 @@ def _validate_internal_references(config: Dict[str, Any]) -> None:
     # TODO: Implement reference validation logic
     pass
 
-def _dynamic_import_binds(components: Dict[str, Dict[str, Any]], key_module='module', key_func='function') -> Dict[str, Any]:
+def _dynamic_import_binds(components: Dict[str, Dict[str, Any]], key_module='module', key_class='class_name') -> Dict[str, Any]:
     """Generic dynamic import helper for guards, resets, dynamics, and invariants."""
     if len(components) > 0:
         for key, value in components.items():
             module = importlib.import_module(value[key_module])
             del components[key][key_module]
-            components[key][key_func] = getattr(module, value[key_func])
+            components[key][key_class] = getattr(module, value[key_class])
     return components
 
 def _dynamic_state_import_binds(states: Dict[str, Any]) -> Dict[str, Any]:
@@ -71,11 +73,14 @@ def create_hybrid_automaton_config(config: Dict[str, Any]) -> Dict[str, Any]:
     _validate_config_against_schema(config)
     _validate_internal_references(config)
 
+    # dynamically import the classes
     config['states'] = _dynamic_state_import_binds(config['states'])
     config['resets'] = _dynamic_import_binds(config['resets'])
     config['guards'] = _dynamic_import_binds(config['guards'])
-    config['dynamics'] = _dynamic_import_binds(config['dynamics'])
+    config['dynamics'] = _dynamic_import_binds(config['dynamics']["dynamic_classes"])
     config['invariants'] = _dynamic_import_binds(config['invariants'])
+
+    # dynamically initialize the classes with the configuration settings set in teh famd
 
     return config
 
