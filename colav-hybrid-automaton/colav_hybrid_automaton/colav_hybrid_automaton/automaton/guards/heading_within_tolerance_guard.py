@@ -36,7 +36,7 @@ class HeadingWithinToleranceGuard(Guard):
 
         # If waypoint at agent, aligned
         if ax == wx and ay == wy:
-            return False
+            return True
 
         # Compute headings
         wrapped_yaw = quaternion_to_heading(
