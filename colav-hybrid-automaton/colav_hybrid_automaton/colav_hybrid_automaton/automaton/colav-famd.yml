@@ -63,7 +63,7 @@ states:
 
   waypoints_state:
     topic: "/state/waypoints"
-    type: 
+    type:
       pkg: "colav_interfaces.msg"
       msg: WaypointsState
 
@@ -109,7 +109,7 @@ guards:
       - "obstacles_state"
       - "unsafe_set_state"
       - "waypoints_state"
-    configuration: 
+    configuration:
       - los_distance_threshold: 100.0
 
   is_heading_within_tolerance:
@@ -118,7 +118,7 @@ guards:
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    configuration: 
+    configuration:
       - heading_tolerace: 0.2
 
   IsHeadingNotWithinTolerance:
@@ -127,7 +127,7 @@ guards:
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    configuration: 
+    configuration:
       - heading_tolerance: 0.2
 
   is_virtual_waypoints:
@@ -218,18 +218,18 @@ transitions:
 # Controllers used for continuous evolution within each mode.
 # ============================================================================
 dynamics:
-  dynamic_parameters: 
-    dynamic_parameter_names: 
+  dynamic_parameters:
+    dynamic_parameter_names:
       - "velocity"
       - "yaw_rate"
-    dynamic_parameter_value_types: 
+    dynamic_parameter_value_types:
       - float
       - float
-    dynamic_parameter_metrics: 
+    dynamic_parameter_metrics:
       - "m/s"
       - "rad/s"
-  
-  dynamic_classes: 
+
+  dynamic_classes:
     cruise_pid_controller:
       module: colav_hybrid_automaton.automaton.dynamics
       class_name: PIDYawVelocityController
