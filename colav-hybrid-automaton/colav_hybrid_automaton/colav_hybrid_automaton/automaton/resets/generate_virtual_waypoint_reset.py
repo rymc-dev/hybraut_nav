@@ -1,72 +1,3 @@
-"""
-    Resets for the colav hybrid automaton
-    bui
-"""
-
-
-import numpy as np
-from colav_interfaces.msg import WaypointsState, Waypoint, AgentState, ObstaclesState, UnsafeSetState
-from geometry_msgs.msg import Point
-from builtin_interfaces.msg import Duration
-from shapely import Polygon, LineString
-from colav_hybrid_automaton.automaton.utils import is_timestamps_within_tolerance, get_current_ros_time, quaternion_to_heading
-from typing import Tuple
-from .reset_abstract import HybridAutomatonReset
-
-class RemoveFirstWaypoint(HybridAutomatonReset):
-    """
-    Reset utilized on the transition from waypoint reached back to cruise
-    this reset removes the current virtual waypoint in the list and assigns the 
-    new current waypoint as the next value in the virtual waypoints list or the
-    goal waypoint.
-    """
-
-    def __init__(self, **kwargs):
-        # Call parent constructor to properly initialize the reset
-        super().__init__(**kwargs)
-    
-    def __call__(
-        self,
-        waypoints_state: WaypointsState
-    ) -> Tuple[WaypointsState]:
-        """Pops the first virtual waypoint and sets the new current waypoint in waypoints state"""
-        # Validate input - this calls the parent's validation method
-        self._validate_state_inputs(waypoints_state)
-        
-        # Remove the first virtual waypoint
-        waypoints_state.virtual_waypoints = waypoints_state.virtual_waypoints[1:]
-        
-        # Update current waypoint
-        if len(waypoints_state.virtual_waypoints) > 0:
-            waypoints_state.current_waypoint = waypoints_state.virtual_waypoints[0]
-        else:
-            waypoints_state.current_waypoint = waypoints_state.goal_waypoint
-        
-        # Return as tuple as required by the abstract class
-        return (waypoints_state,)
-    
-    def _validate_state_inputs(self, *state_inputs) -> None:
-        """Validate the state inputs for the callback"""
-        # Call parent validation first
-        super()._validate_state_inputs(*state_inputs)
-        
-        # Assuming single waypoints_state input
-        if len(state_inputs) != 1:
-            raise ValueError("RemoveFirstWaypoint expects exactly one state input")
-        
-        waypoints_state = state_inputs[0]
-        
-        if not isinstance(waypoints_state, WaypointsState):
-            raise TypeError(
-                'Exception occurred: waypoints arg passed invalid type, should be type: "colav_interfaces.msg.WaypointsState"'
-            )
-        
-        if len(waypoints_state.virtual_waypoints) < 1:
-            raise ValueError(
-                'Waypoints list size less than 1, something has gone wrong in guard condition'
-            )
-        
-
 class GenerateVirtualWaypoint(HybridAutomatonReset):
     """
     Reset utilized in reset from cruise to t2los 1. 
@@ -251,7 +182,6 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
         
         if not hasattr(unsafe_set_state.vertices, 'data') or len(unsafe_set_state.vertices.data) == 0:
             raise ValueError('unsafe_set_state.vertices.data is empty')
-
 
 
 
