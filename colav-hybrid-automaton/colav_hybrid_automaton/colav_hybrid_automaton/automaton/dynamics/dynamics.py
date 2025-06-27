@@ -61,11 +61,13 @@ class Dynamics(ABC):
             raise RuntimeError(f"{self.__class__.__name__} is not initialized")
 
     def get_dynamics_info(self) -> Dict[str, Any]:
+        class_doc = self.__class__.__doc__
         return {
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
             'is_initialized': self.is_initialized,
             'output_type': self.output_type.__name__,
+            'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
         }
 
     def __repr__(self) -> str:
