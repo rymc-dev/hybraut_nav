@@ -44,6 +44,8 @@ class PIDControllerDynamics(Dynamics):
         self._velocity_error_integral = 0.0
         self._prev_velocity_error = 0.0
 
+        # TODO: Should have an internal state for storing agent_states to help the PID controller. please add this for the future.
+
     def _validate_initialization(self, **init_kwargs):
         super()._validate_initialization(**init_kwargs)
 
