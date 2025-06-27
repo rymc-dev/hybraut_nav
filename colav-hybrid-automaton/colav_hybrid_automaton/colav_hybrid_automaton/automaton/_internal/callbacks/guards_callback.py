@@ -52,7 +52,7 @@ def evaluate_guards_timer_callback(
                             eval.success = False
 
                     if error_messages:
-                        raise ValueError(f"\guards exceptions: \n" + "- ".join(error_messages))
+                        raise ValueError(f"guards exceptions: \n" + "- ".join(error_messages))
 
                     if any(eval.guard_evaluations):
                         status = HybridAutomatonStatus.TRANSITIONING
