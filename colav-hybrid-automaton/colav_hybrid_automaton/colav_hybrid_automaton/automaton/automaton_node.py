@@ -109,14 +109,14 @@ class HybridAutomatonNode(LifecycleNode):
 
         # Internal states
         self._mode:str = ""
-        self._states:dict = None
+        self._states:dict = {}
         self._mode_dynamics = None
         self._mode_invariant = None 
         self._mode_transitions = None
-        self._status:HybridAutomatonStatusEnum = None
-        self._invariant:bool = None
-        self._current_transition:str = None
-        self._current_transition_evaluation:Transition = None
+        self._status:HybridAutomatonStatusEnum
+        self._invariant:bool
+        self._current_transition:str
+        self._current_transition_evaluation:Transition
         self._reset_event = None
         self._waiting_after_reset:bool = False
         self._reset_complete_time = None
@@ -528,17 +528,17 @@ class HybridAutomatonNode(LifecycleNode):
             if hasattr(self, '_guards_evaluation_timer'):
                 self._guards_evaluation_timer.cancel()
                 self.destroy_timer(self._guards_evaluation_timer)
-                self._transition_eval_timer:Timer = None
+                # self._transition_eval_timer:Timer = None
 
             if hasattr(self, '_dynamics_timer'):
                 self._dynamics_timer.cancel()
                 self.destroy_timer(self._dynamics_timer)
-                self._dynamics_timer:Timer = None
+                # self._dynamics_timer:Timer = None
 
             if hasattr(self, '_invariant_timer'):
                 self._invariant_timer.cancel()
                 self.destroy_timer(self._invariant_timer)
-                self._invariant_timer:Timer = None
+                # self._invariant_timer:Timer = None
 
             # Remove other attributes
             for attr in [

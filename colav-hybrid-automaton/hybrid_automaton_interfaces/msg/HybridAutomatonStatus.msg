@@ -6,23 +6,25 @@
 # consistent status reporting across all nodes.
 
 # Used when moving from configured state to active
-uint8 INITIALIZING=0
+uint8 STATUS_INITIALIZING=0
 
 # Currently executing within an active mode (continuous evolution)
-uint8 ACTIVE_MODE=1
+uint8 STATUS_ACTIVE_MODE=1
 
 # A transition is occurring between modes (guard condition triggered, reset in progress)
-uint8 TRANSITIONING=2
+uint8 STATUS_TRANSITIONING=2
 
 # Final goal or terminal condition has been reached; automaton is shutting down cleanly
-uint8 COMPLETED=3
+uint8 STATUS_COMPLETED=3
 
 # Automaton is being externally stopped or deactivated
-uint8 DEACTIVATING=4
+uint8 STATUS_DEACTIVATING=4
 
 # An unrecoverable error occurred during execution, transition, or mode evaluation
-uint8 ERROR=5
+uint8 STATUS_ERROR=5
 
 # The actual status value
-uint8 status
+uint8 STATUS_INACTIVE=255
+
+uint8 type
 builtin_interfaces/Time stamp
