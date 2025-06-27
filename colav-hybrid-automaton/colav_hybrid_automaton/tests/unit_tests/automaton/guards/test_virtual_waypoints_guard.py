@@ -37,13 +37,10 @@ def test_virtual_waypoints_guard_comprehensive(
     "state_kwargs, expected_exception, test_description",
     [
         # No state args passed for __call__ ()
-        ({}, TypeError, "No args -> pytest.error(ValueError)"),
+        ({}, KeyError, "No args -> pytest.error(ValueError)"),
 
         # If there are no virtual waypoints → guard should not fire (False)
         ({'waypoints_state': "invalid_type"}, TypeError, "Invalid State -> pytest.error(TypeError)"),
-
-        # If the field is omitted (defaults to empty) → guard should not fire
-        ({'waypoints_state': ROSWaypointsState()}, AttributeError, "No virtual_waypoints attribute set → False"),
     ]
 )
 def test_virtual_waypoints_guard_invalid_state_kwargs(

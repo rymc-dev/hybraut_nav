@@ -1,14 +1,12 @@
 from .guard import Guard
 
 class UnsafeConditionsGuard(Guard):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    """
+    
+    # TODO: TO be implemented
+    """
 
-    def __call__(self, *state_inputs):
-        return super().__call__(*state_inputs)
-    
-    def _validate_initialization(self, *args, **kwargs):
-        return super()._validate_initialization(*args, **kwargs)
-    
-    def _validate_state_inputs(self, *state_inputs):
-        return super()._validate_state_inputs(*state_inputs)
+    def __call__(self, **state_kwargs):
+        super().__call__(**state_kwargs)
+        # dummy guard, currently just returns False always.
+        return False

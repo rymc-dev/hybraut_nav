@@ -70,15 +70,32 @@ class HeadingWithinToleranceGuard(Guard):
         return True
 
     def _validate_initialization(self, **kwargs):
-        if not isinstance(kwargs.get('heading_tolerance'), float):
-            raise TypeError('heading tolerance is invalid type')
-        if kwargs.get('heading_tolerance') < 0.0:
-            raise ValueError('heading tolerance cannot be less than 0.0')
 
-    def _validate_state_inputs(self, *state_kwargs):
-        agent_state = state_kwargs.get('agent_state')
-        waypoints_state = state_kwargs.get('waypoints_state')
-        if not isinstance(agent_state, ROSAgentState):
-            raise TypeError("input state 'agent_state' not received.")
-        if not isinstance(waypoints_state, ROSWaypointsState):
-            raise TypeError("input state 'waypoints_state' not received.")
+        try:
+            try:
+                if not isinstance(kwargs['heading_tolerance'], float):
+                    raise TypeError('heading tolerance is invalid type')
+                if kwargs.get('heading_tolerance') < 0.0:
+                    raise ValueError('heading tolerance cannot be less than 0.0')
+            except KeyError:
+                raise KeyError('heading tolerance not given in __init__')
+        except Exception as e:
+            raise e
+
+    def _validate_states(self, **state_kwargs):
+        super()._validate_states(**state_kwargs)
+        
+        try:
+            try:
+                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
+                    raise TypeError(f"agent_state data passed in __call__ invalid type")
+            except KeyError:
+                raise KeyError(f"agent_state value not given in __call__")
+            
+            try:
+                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
+                    raise TypeError(f"waypoints_state data passed in __call__ invalid type")
+            except KeyError:
+                raise KeyError(f"waypoints_state key not given in __call__")
+        except Exception as e: 
+            raise e

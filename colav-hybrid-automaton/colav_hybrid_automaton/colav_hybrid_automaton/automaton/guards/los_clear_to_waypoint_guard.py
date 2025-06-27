@@ -119,7 +119,6 @@ class LOSClearToWaypointGuard(Guard):
         except Exception as e:
             raise e
 
-
     def _validate_states(self, **state_kwargs):
         super()._validate_states(**state_kwargs)
         try:

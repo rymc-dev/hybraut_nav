@@ -25,11 +25,11 @@ def test_waypoint_reached_guard_comprehesive(agent_state:ROSAgentState, waypoint
         test_description (str): _description_
     """
     guard = WaypointReachedGuard()
-    kwargs = {
+    state_kwargs = {
         'agent_state': agent_state,
         'waypoints_state': waypoints_state
     }
-    actual_guard_evaluation = guard.__call__(**kwargs)
+    actual_guard_evaluation = guard.__call__(**state_kwargs)
 
     assert guard.__repr__() == "WaypointReachedGuard(initialized=True)"
     assert guard.__str__() == "Guard Function: WaypointReachedGuard" 

@@ -42,16 +42,24 @@ class WaypointReachedGuard(Guard):
         return euclidean_distance(agent_coords, waypoint_coords) <= \
                waypoints_state.current_waypoint.acceptance_radius
     
-    def _validate_states(self, **state_inputs):
-        super()._validate_states(**state_inputs)
+    def _validate_states(self, **state_kwargs):
+        super()._validate_states(**state_kwargs)
 
-        if not isinstance(state_inputs.get('agent_state'), ROSAgentState):
-            raise TypeError('agent_state invalid type')
-        if not isinstance(state_inputs.get('waypoints_state'), ROSWaypointsState):
-            raise TypeError('waypoints_state invalid type')
 
         try:
-            if not isinstance(state_inputs.get('waypoints_state').current_waypoint, ROSWaypoint):
-                raise ValueError('current waypoint is invalid.')
+            try:
+                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
+                    raise TypeError('agent_state is invalid type')
+            except KeyError:
+                raise KeyError('agent_state not given in __call__')
+            
+            try:
+                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
+                    raise TypeError('waypoints_state is invalid type')
+                        
+                if not isinstance(state_kwargs['waypoints_state'].current_waypoint, ROSWaypoint):
+                    raise AttributeError('waypoints_state does not contain a valid current_waypoint of type ROSWaypoint.')
+            except KeyError:
+                raise KeyError('waypoints_state not given in __call__')
         except Exception as e: 
-            raise e 
+            raise e

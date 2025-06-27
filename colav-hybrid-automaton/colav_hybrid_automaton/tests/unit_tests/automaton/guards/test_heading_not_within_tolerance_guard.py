@@ -162,23 +162,93 @@ def test_heading_not_within_tolerance_guard_comprehensive(
     actual_guard_evaluation = guard.__call__(**state_kwargs)
     assert actual_guard_evaluation == expected_guard_evaluation, \
         f"Test case '{test_description}' failed: expected {expected_guard_evaluation}, got {actual_guard_evaluation}"
-    
-def test_guard_invalid_initialization_missing_param():
-    with pytest.raises(TypeError):
-        HeadingNotWithinToleranceGuard()
 
-def test_guard_invalid_initialization_invalid_type():
-    with pytest.raises(TypeError):
-        init_kwargs = {'heading_tolerance': 'invalid_type'}
+@pytest.mark.parametrize(
+    "init_kwargs, expected_exception, test_description",
+    [
+        # Test 1: no args given 
+        (
+            {}, KeyError, 'heading error tolerance arg not given -> pytest.raise(KeyError)'
+        ),
+        # Test 2: invalid arg type
+        (
+            {'heading_tolerance': int(1)}, TypeError, 'heading error tolerance not float datatype -> pytest.raise(TypeError)'
+        ),
+        # Test 3: invalid arg value
+        (
+            {'heading_tolerance': -0.1}, ValueError, 'heading error tolerance has invalid negative valued -> pytest.raise(ValueError)'
+        )
+    ]
+)
+def test_heading_not_within_toleracne_guard_invalid_initializations(init_kwargs, expected_exception, test_description):
+    with pytest.raises(expected_exception):
         HeadingNotWithinToleranceGuard(**init_kwargs)
 
-def test_guard_call_invalid_state_mission_params():
-    init_kwargs = {"heading_tolerance": 0.2}
-    guard = HeadingNotWithinToleranceGuard(**init_kwargs)
+@pytest.mark.parametrize(
+    "state_kwargs, expected_exception, test_description",
+    [
+        # Test 1: No args given 
+        (
+            {}, KeyError, 'no state inputs given -> KeyError("agent_state value not given in **call**")'
+        ),
+        
+        # Test 2: Missing agent_state only
+        (
+            {'waypoints_state': ROSWaypointsState()}, KeyError, 'agent_state missing -> KeyError("agent_state value not given in **call**")'
+        ),
+        
+        # Test 3: Missing waypoints_state only
+        (
+            {'agent_state': ROSAgentState()}, KeyError, 'waypoints_state missing -> KeyError("waypoints_state key not given in **call**")'
+        ),
+        
+        # Test 4: Invalid agent_state type
+        (
+            {
+                'agent_state': "wrong_type",
+                'waypoints_state': ROSWaypointsState()
+            }, TypeError, 'agent_state wrong type -> TypeError("agent_state data passed in **call** invalid type")'
+        ),
+        
+        # Test 5: Invalid waypoints_state type
+        (
+            {
+                'agent_state': ROSAgentState(),
+                'waypoints_state': "wrong_type"
+            }, TypeError, 'waypoints_state wrong type -> TypeError("waypoints_state data passed in **call** invalid type")'
+        ),
+        
+        # Test 6: Both states wrong type (agent_state checked first)
+        (
+            {
+                'agent_state': 123,
+                'waypoints_state': 456
+            }, TypeError, 'both states wrong type -> TypeError("agent_state data passed in **call** invalid type")'
+        ),
+        
+        # Test 7: agent_state is None
+        (
+            {
+                'agent_state': None,
+                'waypoints_state': ROSWaypointsState()
+            }, TypeError, 'agent_state is None -> TypeError("agent_state data passed in **call** invalid type")'
+        ),
+        
+        # Test 8: waypoints_state is None
+        (
+            {
+                'agent_state': ROSAgentState(),
+                'waypoints_state': None
+            }, TypeError, 'waypoints_state is None -> TypeError("waypoints_state data passed in **call** invalid type")'
+        ),
+    ]
+)
+def test_heading_not_within_tolerance_guard_invalid_state_kwargs(state_kwargs, expected_exception, test_description):
+    """
+    Test HeadingNotWithinToleranceGuard with invalid state arguments.
+    Tests both missing arguments (KeyError) and wrong argument types (TypeError).
+    """
+    guard = HeadingNotWithinToleranceGuard(heading_tolerance=0.2)
 
-    with pytest.raises(TypeError):
-        state_kwargs = {'agent_state': ROSAgentState()}
-        guard.__call__(**state_kwargs)
-    with pytest.raises(TypeError):
-        state_kwargs = {'waypoints_state': ROSWaypointsState()}
-        guard.__call__(**state_kwargs)
+    with pytest.raises(expected_exception):
+        guard.__call__(**state_kwargs)  # Note: should be **state_kwargs, not *state_kwargs

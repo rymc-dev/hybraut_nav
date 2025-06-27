@@ -17,7 +17,12 @@ class VirtualWaypointsGuard(Guard):
     
     def _validate_states(self, **state_kwargs):
         super()._validate_states(**state_kwargs)
-
         
-        if not isinstance(state_kwargs.get('waypoints_state'), ROSWaypointsState):
-            raise TypeError('waypoints state invalid type')
+        try: 
+            try:
+                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
+                    raise TypeError('waypoints state invalid type') 
+            except KeyError:
+                raise KeyError('waypoints_state value not given in __call__')
+        except Exception as e:
+            raise e
