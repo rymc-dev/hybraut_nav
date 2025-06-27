@@ -11,3 +11,4 @@ pytest-ordering
 pytest-dependency 
 PyYAML
 jsonschema
+git+https://github.com/Artemis-QUB-COLAV/colav-interfaces
