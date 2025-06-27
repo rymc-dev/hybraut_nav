@@ -1,5 +1,4 @@
-colav-bridge
-colav-protobuf-utils
+colav-proto
 pytest-dependency
 coverage
 ruff
