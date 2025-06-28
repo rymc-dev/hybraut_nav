@@ -1,5 +1,4 @@
-colav-bridge
-colav-protobuf-utils
+colav-proto
 pytest-dependency
 coverage
 ruff
@@ -12,3 +11,4 @@ pytest-ordering
 pytest-dependency 
 PyYAML
 jsonschema
+git+https://github.com/Artemis-QUB-COLAV/colav-interfaces
