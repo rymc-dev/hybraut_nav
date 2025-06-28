@@ -1,4 +1,16 @@
-class GenerateVirtualWaypoint(HybridAutomatonReset):
+from .reset import Reset
+from colav_interfaces.msg import (
+    AgentState as ROSAgentState,
+    ObstaclesState as ROSObstaclesState,
+    UnsafeSetState as ROSUnsafeSetState,
+    WaypointsState as ROSWaypointsState,
+    Waypoint as ROSWaypoint
+)
+from shapely import LineString, Polygon, Point  
+import numpy as np
+from colav_hybrid_automaton.automaton._internal.utils import quaternion_to_heading
+
+class GenerateVirtualWaypointReset(Reset):
     """
     Reset utilized in reset from cruise to t2los 1. 
     This function resets the waypoints state by generating 
@@ -6,7 +18,13 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
     to the left or right depending on colregs.
     """
 
-    def __init__(self, longitudinal_offset_distance: float, lateral_offset_distance: float, virtual_waypoint_acceptance_radius: float, *args, **kwargs):
+    RESET_TARGETS = {
+        'waypoints_state': ROSWaypointsState
+    }
+
+
+
+    def __init__(self, **init_kwargs):
         """
         This initializes the static params of this reset. 
         longitudinal offset distance is in meters the position forwards/backwards of the 
@@ -15,25 +33,23 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
         and virtual waypoint acceptance radius is the radius which the virtual waypoint should be considered entered
         by the agent.
         """
-        # Store parameters before calling super().__init__()
-        self.longitudinal_offset_distance = longitudinal_offset_distance
-        self.lateral_offset_distance = lateral_offset_distance
-        self.virtual_waypoint_acceptance_radius = virtual_waypoint_acceptance_radius
 
-        # Call parent constructor - this will trigger validation
-        super().__init__(*args, **kwargs)
+        super().__init__(self.RESET_TARGETS, **init_kwargs)
 
-    def __call__(
-        self,
-        agent_state: AgentState,
-        obstacles_state: ObstaclesState,
-        unsafe_set_state: UnsafeSetState,
-        waypoints_state: WaypointsState,
-    ) -> Tuple[WaypointsState]:
+        self.longitudinal_offset_distance: float = init_kwargs.get("longitudinal_offset_distance")
+        self.lateral_offset_distance: float = init_kwargs.get("lateral_offset_distance")
+        self.virtual_waypoint_acceptance_radius: float = init_kwargs.get('virtual_waypoint_acceptance_radius')
+
+    def __call__(self, **state_kwargs) -> dict[str, ROSWaypointsState]:
         """Create a new virtual waypoint"""
         # Validate inputs first
-        self._validate_state_inputs(agent_state, obstacles_state, unsafe_set_state, waypoints_state)
+        super()._validate_states(**state_kwargs)
 
+        agent_state: ROSAgentState = state_kwargs.get('agent_state')
+        obstacles_state: ROSObstaclesState = state_kwargs.get('obstacles_state')
+        unsafe_set_state: ROSUnsafeSetState = state_kwargs.get('unsafe_set_state')
+        waypoints_state: ROSWaypointsState = state_kwargs.get('waypoints_state')
+        
         agent_x = agent_state.pose.position.x
         agent_y = agent_state.pose.position.y
         agent_heading = quaternion_to_heading(
@@ -43,7 +59,7 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
             qw=agent_state.pose.orientation.w
         )  
 
-        vertices = np.array(unsafe_set_state.vertices.data)
+        vertices = np.array(unsafe_set_state.convex_hull_vertices.data)
         if vertices.size == 0:
             raise ValueError(
                 'Unsafe set does not contain any vertices, Guard with reset should not have occurred.')
@@ -97,7 +113,7 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
         adjusted_y = rightmost_y + self.longitudinal_offset_distance * direction[1] + self.lateral_offset_distance * right_perp[1]
 
         # Create new virtual waypoint
-        new_waypoint = Waypoint(
+        new_waypoint = ROSWaypoint(
             position=Point(x=adjusted_x, y=adjusted_y, z=0.0),
             acceptance_radius=self.virtual_waypoint_acceptance_radius
         )
@@ -107,31 +123,42 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
                         f"with acceptance radius {self.virtual_waypoint_acceptance_radius}")
 
         waypoints_state.virtual_waypoints.insert(0, new_waypoint)
-        return (waypoints_state,)
+        
+        return self._validate_reset_output(reset_output={'waypoints_state': waypoints_state})
 
-    def _validate_initialization(self, *args, **kwargs) -> None:
+    def _validate_initialization(self, **init_kwargs) -> None:
         """Validate initialization params"""
         
-        super()._validate_initialization(*args, **kwargs)
+        super()._validate_initialization(**init_kwargs)
+        
+        try: 
+            # Validate longitudinal_offset_distance
+            if not isinstance(init_kwargs['longitudinal_offset_distance'], (int, float)):
+                raise TypeError(f"longitudinal_offset_distance must be a number, got {type(self.longitudinal_offset_distance)}")
+        except KeyError:
+            raise KeyError()
 
-        # Validate longitudinal_offset_distance
-        if not isinstance(self.longitudinal_offset_distance, (int, float)):
-            raise TypeError(f"longitudinal_offset_distance must be a number, got {type(self.longitudinal_offset_distance)}")
-        
-        # Validate lateral_offset_distance  
-        if not isinstance(self.lateral_offset_distance, (int, float)):
-            raise TypeError(f"lateral_offset_distance must be a number, got {type(self.lateral_offset_distance)}")
-        
+        # Validate lateral_offset_distance
+        try:   
+            if not isinstance(init_kwargs['lateral_offset_distance'], (int, float)):
+                raise TypeError(f"lateral_offset_distance must be a number, got {type(self.lateral_offset_distance)}")
+        except KeyError:
+            raise KeyError()
+
         # Validate virtual_waypoint_acceptance_radius
-        if not isinstance(self.virtual_waypoint_acceptance_radius, (int, float)):
-            raise TypeError(f"virtual_waypoint_acceptance_radius must be a number, got {type(self.virtual_waypoint_acceptance_radius)}")
-        
-        # Additional validation - ensure positive values where appropriate
-        if self.virtual_waypoint_acceptance_radius <= 0:
-            raise ValueError("virtual_waypoint_acceptance_radius must be positive")
+        try: 
+            if not isinstance(init_kwargs['virtual_waypoint_acceptance_radius'], (int, float)):
+                raise TypeError(f"virtual_waypoint_acceptance_radius must be a number, got {type(self.virtual_waypoint_acceptance_radius)}")
+            # Additional validation - ensure positive values where appropriate
+            if init_kwargs['virtual_waypoint_acceptance_radius'] <= 0:
+                raise ValueError("virtual_waypoint_acceptance_radius must be positive")
 
+        except KeyError:
+            raise KeyError() 
+    
+       
         # Calculate the total offset distance (Euclidean distance from origin)
-        total_offset_distance = (self.longitudinal_offset_distance**2 + self.lateral_offset_distance**2)**0.5
+        total_offset_distance = (init_kwargs['longitudinal_offset_distance']**2 + init_kwargs['lateral_offset_distance']**2)**0.5
         
         # Ensure acceptance radius is not greater than the offset distance
         if total_offset_distance > 0 and self.virtual_waypoint_acceptance_radius > total_offset_distance:
@@ -141,47 +168,46 @@ class GenerateVirtualWaypoint(HybridAutomatonReset):
                 f"This would make the waypoint acceptance zone overlap with the origin point."
             )
         
-    def _validate_state_inputs(self, *state_inputs) -> None:
+    def _validate_states(self, **state_kwargs) -> None:
         """Validate state inputs"""
-
-        super()._validate_state_inputs(*state_inputs)
+        super()._validate_states(**state_kwargs)
     
-        # Check correct number of inputs
-        if len(state_inputs) != 4: 
-            raise ValueError(f'Expected exactly 4 state inputs, got {len(state_inputs)}')
-        
-        agent_state = state_inputs[0]
-        obstacles_state = state_inputs[1]
-        unsafe_set_state = state_inputs[2]
-        waypoints_state = state_inputs[3]
 
         # Type validation with descriptive error messages
-        if not isinstance(agent_state, AgentState):
-            raise TypeError(f"First input must be AgentState, got {type(agent_state)}")
-        if not isinstance(obstacles_state, ObstaclesState):
-            raise TypeError(f"Second input must be ObstaclesState, got {type(obstacles_state)}")
-        if not isinstance(unsafe_set_state, UnsafeSetState):
-            raise TypeError(f"Third input must be UnsafeSet, got {type(unsafe_set_state)}")
-        if not isinstance(waypoints_state, WaypointsState):
-            raise TypeError(f"Fourth input must be WaypointsState, got {type(waypoints_state)}")
+        try:
+            if not isinstance(state_kwargs['agent_state'], ROSAgentState):
+                raise TypeError(f"First input must be AgentState, got {type()}")
+        except KeyError:
+            raise KeyError()
         
-        # Validate current waypoint is set
-        if not hasattr(waypoints_state, 'current_waypoint') or waypoints_state.current_waypoint is None:
-            raise ValueError('current_waypoint is not set in waypoints_state')
+        try:
+            if not isinstance(state_kwargs['obstacles_state'], ROSObstaclesState):
+                raise TypeError(f"Second input must be ObstaclesState, got {type()}")
+        except KeyError:
+            raise KeyError()
         
-        if not isinstance(waypoints_state.current_waypoint, Waypoint):
-            raise TypeError(f'current_waypoint must be of type Waypoint, got {type(waypoints_state.current_waypoint)}')
+        try:
+            if not isinstance(state_kwargs['unsafe_set_state'], ROSUnsafeSetState):
+                raise TypeError(f"Third input must be UnsafeSet, got {type()}")
+            
+                    # Validate unsafe set has vertices
+            if not hasattr(state_kwargs['unsafe_set_state'], 'vertices') or state_kwargs['unsafe_set_state'].vertices is None:
+                raise ValueError('vertices are not set in unsafe_set_state')
+            
+            if not hasattr(state_kwargs['unsafe_set_state'].convex_hull_vertices, 'data') or len(state_kwargs['unsafe_set_state'].convex_hull_vertices.data) == 0:
+                raise ValueError('unsafe_set_state.vertices.data is empty')
+        except KeyError:
+            raise KeyError()
         
-        # Validate agent pose is set
-        if not hasattr(agent_state, 'pose') or agent_state.pose is None:
-            raise ValueError('agent pose is not set in agent_state')
+        try:
+            if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
+                raise TypeError(f"Fourth input must be WaypointsState, got {type()}")
+            
+            if not hasattr(state_kwargs['waypoints_state'], 'current_waypoint') or state_kwargs['waypoints_state'].current_waypoint is None:
+                raise ValueError('current_waypoint is not set in waypoints_state')
+            
+            if not isinstance(state_kwargs['waypoints_state'].current_waypoint, ROSWaypoint):
+                raise TypeError(f'current_waypoint must be of type Waypoint, got {type(waypoints_state.current_waypoint)}')
         
-        # Validate unsafe set has vertices
-        if not hasattr(unsafe_set_state, 'vertices') or unsafe_set_state.vertices is None:
-            raise ValueError('vertices are not set in unsafe_set_state')
-        
-        if not hasattr(unsafe_set_state.vertices, 'data') or len(unsafe_set_state.vertices.data) == 0:
-            raise ValueError('unsafe_set_state.vertices.data is empty')
-
-
-
+        except KeyError:
+            raise KeyError()

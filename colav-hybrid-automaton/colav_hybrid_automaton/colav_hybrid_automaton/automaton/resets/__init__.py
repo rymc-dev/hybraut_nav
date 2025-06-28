@@ -1,9 +1,9 @@
 from .reset import Reset
-from .generate_virtual_waypoint_reset import GenerateVirtualWaypoint
-from .remove_first_waypoint import RemoveFirstWaypoint
+from .generate_virtual_waypoint_reset import GenerateVirtualWaypointReset
+from .remove_first_waypoint import RemoveFirstWaypointReset
 
 __all__ = [
     'Reset',
-    'GenerateVirtualWaypoint',
-    'RemoveFirstWaypoint'
+    'GenerateVirtualWaypointReset',
+    'RemoveFirstWaypointReset'
 ]
