@@ -59,7 +59,7 @@ def _dynamic_state_import_binds(states: Dict[str, Any]) -> Dict[str, Any]:
             states[key]['type'] = getattr(pkg, value['type']['msg'])
     return states
 
-def create_hybrid_automaton_config(config: Dict[str, Any]) -> Dict[str, Any]:
+def hybrid_automaton_registry(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validates and processes a hybrid automaton configuration dictionary:
     1. Validates against schema.

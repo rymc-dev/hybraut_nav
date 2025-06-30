@@ -72,18 +72,18 @@ states:
 # Executed during transitions to modify continuous state.
 # ============================================================================
 resets:
-  remove_first_waypoint:
+  remove_virtual_waypoint_reset:
     module: colav_hybrid_automaton.automaton.resets
-    class_name: RemoveFirstWaypoint
+    class_name: RemoveVirtualWaypointReset
     state_inputs:
       - "waypoints_state"
     state_outputs:
       - "waypoints_state"
     configuration: []
 
-  generate_virtual_waypoint:
+  generate_virtual_waypoint_reset:
     module: colav_hybrid_automaton.automaton.resets
-    class_name: GenerateVirtualWaypoint
+    class_name: GenerateVirtualWaypointReset
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -101,9 +101,9 @@ resets:
 # Boolean functions checked during transition evaluation.
 # ============================================================================
 guards:
-  is_los_clear_to_waypoint:
+  los_clear_to_waypoint_guard:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: IsLOSClearToWaypoint
+    class_name: LOSClearToWaypointGuard
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -112,43 +112,43 @@ guards:
     configuration:
       - los_distance_threshold: 100.0
 
-  is_heading_within_tolerance:
+  heading_within_tolerance_guard:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: IsHeadingWithinTolerance
+    class_name: HeadingWithinToleranceGuard
     state_inputs:
       - "agent_state"
       - "waypoints_state"
     configuration:
       - heading_tolerace: 0.2
 
-  IsHeadingNotWithinTolerance:
+  heading_not_within_tolerance_guard:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: IsHeadingNotWithinTolerance
+    class_name: HeadingNotWithinToleranceGuard
     state_inputs:
       - "agent_state"
       - "waypoints_state"
     configuration:
       - heading_tolerance: 0.2
 
-  is_virtual_waypoints:
+  virtual_waypoints_guard:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: IsVirtualWaypoints
+    class_name: VirtualWaypointsGuard
     state_inputs:
       - "waypoints_state"
     configuration: []
 
-  is_unsafe_conditions:
+  unsafe_conditions_guard:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: IsUnsafeConditions
+    class_name: UnsafeConditionsGuard
     state_inputs:
       - "agent_state"
       - "obstacles_state"
       - "unsafe_set_state"
     configuration: []
 
-  is_waypoint_reached:
+  waypoint_reached_guard:
     module: colav_hybrid_automaton.automaton.guards
-    class_name: IsWaypointReached
+    class_name: WaypointReachedGuard
     state_inputs:
       - "agent_state"
       - "waypoints_state"
@@ -159,9 +159,9 @@ guards:
 # Leave empty if no mode constraints exist.
 # ============================================================================
 invariants:
-  is_at_final_waypoint:
+  is_goal_waypoint_invariant:
     module: colav_hybrid_automaton.automaton.invariants
-    class_name: IsGoalWaypoint
+    class_name: IsGoalWaypointInvariant
     state_inputs:
       - "waypoints_state"
     configuration: []
@@ -181,35 +181,61 @@ invariants:
 # Mapping of transition names to guard and reset functions.
 # ============================================================================
 transitions:
-  cruise_to_t2los_1:
+  plan_evasive_maneuver:
+    origin_modes: 
+      - "cruise"
+    origin_priorities:
+      - 2
+    target_mode: "t2los"
     guard: "is_los_clear_to_waypoint"
     reset: "generate_virtual_waypoint"
 
-  cruise_to_t2los_2:
+  correct_heading:
+    origin_modes: 
+      - "cruise"
+    origin_priorities:
+      - 3
+    target_mode: "t2los"
     guard: "is_heading_not_within_tolerance"
     reset: null
 
-  cruise_to_fallback:
+  enter_emergency_fallback:
+    origin_modes: 
+      - "cruise"
+      - "t2los"
+    origin_priorities:
+      - 0
+      - 0
+    target_mode: "fallback"
     guard: "is_unsafe_conditions"
     reset: null
 
-  cruise_to_waypoint_reached:
+  waypoint_arrival:
+    origin_modes: 
+      - "cruise"
+      - "t2los"
+    origin_priorities:
+      - 1
+      - 2
+    target_mode: "waypoint_reached"
     guard: "is_waypoint_reached"
     reset: null
 
-  t2los_to_cruise:cruise_to_t2los_1:
+  heading_aligned:
+    origin_modes: 
+      - "t2los"
+    origin_priorities:
+      - 0
+    target_mode: "cruise"
     guard: "is_heading_within_tolerance"
     reset: null
 
-  t2los_to_fallback:
-    guard: "is_unsafe_conditions"
-    reset: null
-
-  t2los_to_waypoint_reached:
-    guard: "is_waypoint_reached"
-    reset: null
-
-  waypoint_reached_to_cruise:
+  proceed_to_next_waypoint:
+    origin_modes: 
+      - "waypoint_reached"
+    origin_priorities:
+      - 0
+    target_mode: "cruise"
     guard: "is_virtual_waypoints"
     reset: "remove_first_waypoint"
 
@@ -232,7 +258,7 @@ dynamics:
   dynamic_classes:
     cruise_pid_controller:
       module: colav_hybrid_automaton.automaton.dynamics
-      class_name: PIDYawVelocityController
+      class_name: PIDControllerDynamics
       state_inputs:
         - "agent_state"
         - "waypoints_state"
@@ -249,7 +275,7 @@ dynamics:
 
     t2los_pid_controller:
       module: colav_hybrid_automaton.automaton.dynamics
-      class_name: PIDYawVelocityController
+      class_name: NoOpControllerDynamics
       state_inputs:
         - "agent_state"
         - "waypoints_state"
@@ -266,7 +292,7 @@ dynamics:
 
     no_op_controller:
       module: colav_hybrid_automaton.automaton.dynamics
-      class_name: NoOpController
+      class_name: NoOpControllerDynamics
       state_inputs: []
       configuration: []
 
@@ -280,13 +306,13 @@ modes:
     dynamics: "proportional_velocity_controller"
     invariants: trivial_invariant
     transitions:
-      cruise_to_fallback:
+      enter_emergency_fallback:
         priority: 0
-      cruise_to_waypoint_reached:
+      waypoint_arrival:
         priority: 1
-      cruise_to_t2los_1:
+      plan_evasive_maneuver:
         priority: 2
-      cruise_to_t2los_2:
+      correct_heading:
         priority: 3
 
   t2los:
@@ -294,11 +320,11 @@ modes:
     dynamics: "proportional_yaw_rate_controller"
     invariants: trivial_invariant
     transitions:
-      t2los_to_fallback:
+      enter_emergency_fallback:
         priority: 0
-      t2los_to_cruise:
+      heading_aligned:
         priority: 1
-      t2los_to_waypoint_reached:
+      waypoint_arrival:
         priority: 2
 
   waypoint_reached:
@@ -306,7 +332,7 @@ modes:
     dynamics: "no_op_controller"
     invariants: is_at_final_waypoint
     transitions:
-      waypoint_reached_to_cruise:
+      waypoint_arrival:
         priority: 0
 
   fallback:
