@@ -456,7 +456,7 @@ The framework is designed for extensibility through:
 
 in the current implementation we have implemented a famd for utilization for colav. 
 
-<img src=".github/assets/diagrams/colav_hybrid_automaton.famd.png" alt="colav Hybrid automaton famd state diagram" width="1000"/>
+<img src="./_internal/.github/assets/diagrams/colav_hybrid_automaton.famd.png" alt="colav Hybrid automaton famd state diagram" width="1000"/>
 
 
 # Contributing
