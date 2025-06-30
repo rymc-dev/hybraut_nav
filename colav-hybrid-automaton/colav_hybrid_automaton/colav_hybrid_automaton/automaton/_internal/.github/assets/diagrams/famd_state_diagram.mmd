@@ -46,13 +46,13 @@ stateDiagram-v2
     end note
 
     %% Transitions
-    cruise --> t2los : 2.plan_evasive_maneuver_g:is_los_clear_to_waypoint_r:generate_virtual_waypoint
-    cruise --> t2los : 3.correct_heading_g:is_heading_not_within_tolerance_r:None
-    cruise --> fallback : 0.enter_emergency_fallback_g:is_unsafe_conditions_r:None
-    t2los --> fallback : 0.enter_emergency_fallback_g:is_unsafe_conditions_r:None
-    cruise --> waypoint_reached : 1.waypoint_arrival_g:is_waypoint_reached_r:None
-    t2los --> waypoint_reached : 2.waypoint_arrival_g:is_waypoint_reached_r:None
-    t2los --> cruise : 0.heading_aligned_g:is_heading_within_tolerance_r:None
-    waypoint_reached --> cruise : 0.proceed_to_next_waypoint_g:is_virtual_waypoints_r:remove_first_waypoint
+    cruise --> t2los : <b>2.plan_evasive_maneuver</b>  [<b>guard</b> = is_los_clear_to_waypoint, <b>reset</b> = generate_virtual_waypoint]
+    cruise --> t2los : <b>3.correct_heading</b>  [<b>guard</b> = is_heading_not_within_tolerance, <b>reset</b> = None]
+    cruise --> fallback : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = is_unsafe_conditions, <b>reset</b> = None]
+    t2los --> fallback : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = is_unsafe_conditions, <b>reset</b> = None]
+    cruise --> waypoint_reached : <b>1.waypoint_arrival</b>  [<b>guard</b> = is_waypoint_reached, <b>reset</b> = None]
+    t2los --> waypoint_reached : <b>2.waypoint_arrival</b>  [<b>guard</b> = is_waypoint_reached, <b>reset</b> = None]
+    t2los --> cruise : <b>0.heading_aligned</b>  [<b>guard</b> = is_heading_within_tolerance, <b>reset</b> = None]
+    waypoint_reached --> cruise : <b>0.proceed_to_next_waypoint</b>  [<b>guard</b> = is_virtual_waypoints, <b>reset</b> = remove_first_waypoint]
     %% Goal Modes
     waypoint_reached --> [*]

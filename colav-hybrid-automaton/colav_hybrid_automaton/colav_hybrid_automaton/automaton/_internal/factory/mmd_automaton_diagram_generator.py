@@ -2,6 +2,7 @@ import os
 from colav_hybrid_automaton.automaton._internal.utils import load_yml
 from ament_index_python.packages import get_package_share_directory
 
+state_diagram_save_path = os.path.join(os.path.dirname(__file__), '..', '.github', 'assets', 'diagrams')
 
 def generate_mermaid_automaton_chart(automaton_name, automaton_data):
     """
@@ -103,7 +104,7 @@ def save_mermaid_diagram(mermaid_lines, filename="famd_state_diagram.mmd"):
     """
     try:
         # Get absolute path for clarity
-        abs_path = os.path.abspath(filename)
+        abs_path = os.path.join(state_diagram_save_path, filename)
         
         with open(abs_path, "w", encoding="utf-8") as file:
             file.write("\n".join(mermaid_lines))
