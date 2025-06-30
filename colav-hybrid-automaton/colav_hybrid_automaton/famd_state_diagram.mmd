@@ -1,41 +1,58 @@
 stateDiagram-v2
-# colav famd FAMD State Diagram
+    %% COLAV FAMD State Diagram
+
     %% Initial Mode
-    [*] --> cruise: initial_mode
+    [*] --> cruise
+
     %% Modes
-    cruise: 0.cruise
-
+    cruise : 0.cruise
     note left of cruise
-      invariant: trivial_invariant
-      dynamics: proportional_velocity_controller
+        =====================
+        <b>0.cruise</b>
+        =====================
+        <b>description</b>: Cruise mode with proportional velocity control
+        <b>invariant</b>: trivial_invariant
+        <b>dynamics</b>: proportional_velocity_controller
     end note
-    t2los: 1.t2los
 
+    t2los : 1.t2los
     note left of t2los
-      invariant: trivial_invariant
-      dynamics: proportional_yaw_rate_controller
+        =====================
+        <b>1.t2los</b>
+        =====================
+        <b>description</b>: Transition to Line of Sight (T2LOS) mode with proportional yaw rate control
+        <b>invariant</b>: trivial_invariant
+        <b>dynamics</b>: proportional_yaw_rate_controller
     end note
-    waypoint_reached: 2.waypoint_reached
 
+    waypoint_reached : 2.waypoint_reached
     note left of waypoint_reached
-      invariant: is_at_final_waypoint
-      dynamics: no_op_controller
+        =====================
+        <b>2.waypoint_reached</b>
+        =====================
+        <b>description</b>: Waypoint reached mode, indicating successful navigation to a waypoint
+        <b>invariant</b>: is_at_final_waypoint
+        <b>dynamics</b>: no_op_controller
     end note
-    fallback: 3.fallback
 
+    fallback : 3.fallback
     note left of fallback
-      invariant: failing_invariant
-      dynamics: no_op_controller
+        =====================
+        <b>3.fallback</b>
+        =====================
+        <b>description</b>: Fallback mode for emergency conditions, no active control
+        <b>invariant</b>: failing_invariant
+        <b>dynamics</b>: no_op_controller
     end note
+
     %% Transitions
-    cruise --> t2los: 2.plan_evasive_maneuver
-    cruise --> t2los: 3.correct_heading
-    cruise --> fallback: 0.enter_emergency_fallback
-    t2los --> fallback: 0.enter_emergency_fallback
-    cruise --> waypoint_reached: 1.waypoint_arrival
-    t2los --> waypoint_reached: 2.waypoint_arrival
-    t2los --> cruise: 0.heading_aligned
-    waypoint_reached --> cruise: 0.proceed_to_next_waypoint
-    # Goal Modes
-    waypoint_reached --> [*]: goal_reached
-    # Transitions
+    cruise --> t2los : 2.plan_evasive_maneuver_g:is_los_clear_to_waypoint_r:generate_virtual_waypoint
+    cruise --> t2los : 3.correct_heading_g:is_heading_not_within_tolerance_r:None
+    cruise --> fallback : 0.enter_emergency_fallback_g:is_unsafe_conditions_r:None
+    t2los --> fallback : 0.enter_emergency_fallback_g:is_unsafe_conditions_r:None
+    cruise --> waypoint_reached : 1.waypoint_arrival_g:is_waypoint_reached_r:None
+    t2los --> waypoint_reached : 2.waypoint_arrival_g:is_waypoint_reached_r:None
+    t2los --> cruise : 0.heading_aligned_g:is_heading_within_tolerance_r:None
+    waypoint_reached --> cruise : 0.proceed_to_next_waypoint_g:is_virtual_waypoints_r:remove_first_waypoint
+    %% Goal Modes
+    waypoint_reached --> [*]

@@ -1,4 +1,4 @@
-# Formal Automaton Model Definition (FAMD)
+# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD)
 # ============================================================================
 # ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
 # ============================================================================
@@ -303,6 +303,7 @@ dynamics:
 modes:
   cruise:
     index: 0
+    description: "Cruise mode with proportional velocity control"
     dynamics: "proportional_velocity_controller"
     invariants: trivial_invariant
     transitions:
@@ -317,6 +318,7 @@ modes:
 
   t2los:
     index: 1
+    description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
     dynamics: "proportional_yaw_rate_controller"
     invariants: trivial_invariant
     transitions:
@@ -329,6 +331,7 @@ modes:
 
   waypoint_reached:
     index: 2
+    description: "Waypoint reached mode, indicating successful navigation to a waypoint"
     dynamics: "no_op_controller"
     invariants: is_at_final_waypoint
     transitions:
@@ -337,6 +340,7 @@ modes:
 
   fallback:
     index: 3
+    description: "Fallback mode for emergency conditions, no active control"
     dynamics: "no_op_controller"
     invariants: failing_invariant
     transitions: []
@@ -370,3 +374,5 @@ parameters:
 
   control_frequency:
     type: float
+
+automaton_name: "colav_hybrid_automaton"
