@@ -18,10 +18,10 @@ class GenerateVirtualWaypointReset(Reset):
     to the left or right depending on colregs.
     """
 
-    RESET_TARGETS = {
-        'waypoints_state': ROSWaypointsState
-    }
-
+    RESET_TARGETS = [{
+        'name': 'waypoints_state',
+        'type': ROSWaypointsState
+    }]
 
 
     def __init__(self, **init_kwargs):
@@ -61,13 +61,13 @@ class GenerateVirtualWaypointReset(Reset):
 
         vertices = np.array(unsafe_set_state.convex_hull_vertices.data)
         if vertices.size == 0:
-            raise ValueError(
-                'Unsafe set does not contain any vertices, Guard with reset should not have occurred.')
+            raise RuntimeError(
+                'Unsafe set does not contain any vertices, Guard must have activated invalidely.')
 
         vertices_reshaped = vertices.reshape(-1, 2)
         polygon = Polygon(vertices_reshaped)
         if not polygon.is_valid:
-            raise ValueError('Unsafe set polygon is invalid.')
+            raise RuntimeError('Unsafe set polygon is invalid.')
 
         visible_vertices = []
 
@@ -126,10 +126,10 @@ class GenerateVirtualWaypointReset(Reset):
         
         return self._validate_reset_output(reset_output={'waypoints_state': waypoints_state})
 
-    def _validate_initialization(self, **init_kwargs) -> None:
+    def _validate_initialization(self, reset_targets, **init_kwargs) -> None:
         """Validate initialization params"""
         
-        super()._validate_initialization(**init_kwargs)
+        super()._validate_initialization(reset_targets, **init_kwargs)
         
         try: 
             # Validate longitudinal_offset_distance
@@ -161,9 +161,9 @@ class GenerateVirtualWaypointReset(Reset):
         total_offset_distance = (init_kwargs['longitudinal_offset_distance']**2 + init_kwargs['lateral_offset_distance']**2)**0.5
         
         # Ensure acceptance radius is not greater than the offset distance
-        if total_offset_distance > 0 and self.virtual_waypoint_acceptance_radius > total_offset_distance:
+        if total_offset_distance > 0 and init_kwargs['virtual_waypoint_acceptance_radius'] > total_offset_distance:
             raise ValueError(
-                f"virtual_waypoint_acceptance_radius ({self.virtual_waypoint_acceptance_radius}) "
+                f"virtual_waypoint_acceptance_radius ({init_kwargs['virtual_waypoint_acceptance_radius']}) "
                 f"cannot be greater than the total offset distance ({total_offset_distance:.2f}). "
                 f"This would make the waypoint acceptance zone overlap with the origin point."
             )
@@ -207,7 +207,7 @@ class GenerateVirtualWaypointReset(Reset):
                 raise ValueError('current_waypoint is not set in waypoints_state')
             
             if not isinstance(state_kwargs['waypoints_state'].current_waypoint, ROSWaypoint):
-                raise TypeError(f'current_waypoint must be of type Waypoint, got {type(waypoints_state.current_waypoint)}')
+                raise TypeError(f'current_waypoint must be of type Waypoint, got {type(state_kwargs['waypoints_state'].current_waypoint)}')
         
         except KeyError:
             raise KeyError()

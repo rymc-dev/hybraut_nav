@@ -1,7 +1,7 @@
 from .reset import Reset
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 
-class RemoveFirstWaypoint(Reset):
+class RemoveVirtualWaypointReset(Reset):
     """
     Reset utilized on the transition from waypoint reached back to cruise
     this reset removes the current virtual waypoint in the list and assigns the 
@@ -9,17 +9,20 @@ class RemoveFirstWaypoint(Reset):
     goal waypoint.
     """
 
+    RESET_TARGET = [{
+        'name': 'waypoints_state',
+        'type': ROSWaypointsState
+    }]
+
     def __init__(self, **init_kwargs):
         # Call parent constructor to properly initialize the reset
-        reset_targets = {
-            'waypoints_state': ROSWaypointsState
-        }
-        super().__init__(reset_targets, **init_kwargs)
+
+        super().__init__(self.RESET_TARGET, **init_kwargs)
     
     def __call__(self, **state_kwargs):
         """Pops the first virtual waypoint and sets the new current waypoint in waypoints state"""
         # Validate input - this calls the parent's validation method
-        self._validate_states(waypoints_state)
+        self._validate_states(**state_kwargs)
         
         waypoints_state: ROSWaypointsState = state_kwargs.get('waypoints_state')
         # Remove the first virtual waypoint
@@ -31,7 +34,9 @@ class RemoveFirstWaypoint(Reset):
         else:
             waypoints_state.current_waypoint = waypoints_state.goal_waypoint
         
-        return super()._validate_reset_output({'waypoints_state': waypoints_state})
+        output = {'waypoints_state': waypoints_state}
+        super()._validate_reset_output(output)
+        return output
     
     def _validate_states(self, **state_kwargs) -> None:
         """Validate the state inputs for the callback"""
