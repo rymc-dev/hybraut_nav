@@ -14,4 +14,5 @@ jsonschema
 
 # External system dependencies (install seperately)
 # cd ~/ros2_ws/src && git clone git+https://github.com/Artemis-QUB-COLAV/colav-interfaces && cd .. && colcon build --package-select colav-interfaces
+# cd ~/ros2_ws/src && git clone git@github.com:Artemis-QUB-COLAV/hybrid-automaton-interfaces.git && cd .. && colcon build --packages-select hybrid_automaton_interfaces
 # sudo apt install npm && npm install -g @mermaid-js/mermaid-cli
