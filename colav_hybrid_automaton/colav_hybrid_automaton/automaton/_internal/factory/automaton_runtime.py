@@ -9,28 +9,6 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 from typing import Tuple
 from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
 
-def initialize_guards(guards_configuration: dict) -> dict:
-    print ('hello world')
-    for guard_key in guards_configuration:
-        guard = guards_configuration[guard_key]
-        init_inputs = guard["configuration"]
-        obj = guard["class_name"](*init_inputs)
-        del guard["configuration"]
-        del guard["class_name"]
-        guard['obj'] = obj
-        guards_configuration[guard_key] = guard
-
-
-    return guards_configuration
-
-def initialize_dynamics(dynamics_configuration: dict) -> dict:
-    pass
-
-def initialize_resets(resets_configuration: dict) -> dict:
-    pass
-
-def initialize_invariants(invariants_configuration: dict) -> dict:
-    pass
 
 def create_state_subscriptions(node: Node, state_configuration: dict) -> dict: 
 
