@@ -1,13 +1,13 @@
 from rclpy.node import Node
 from functools import partial
-from colav_hybrid_automaton.automaton.constants import QOS_PROFILE
+from colav_hybrid_automaton.automaton._internal.constants import QOS_PROFILE
 from rclpy.callback_groups import ReentrantCallbackGroup
 from threading import Lock
 from std_msgs.msg import String
 from rclpy.publisher import Publisher
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from typing import Tuple
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
 
 def initialize_guards(guards_configuration: dict) -> dict:
     print ('hello world')

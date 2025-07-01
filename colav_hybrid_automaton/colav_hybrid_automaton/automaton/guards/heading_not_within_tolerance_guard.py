@@ -5,7 +5,7 @@ from colav_interfaces.msg import (
     Waypoint as ROSWaypoint
 )
 import math
-from colav_hybrid_automaton.automaton.utils import (
+from colav_hybrid_automaton.automaton._internal.utils import (
     delta_heading,
     quaternion_to_heading,
 )

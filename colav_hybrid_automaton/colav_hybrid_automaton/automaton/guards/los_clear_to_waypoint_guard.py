@@ -6,7 +6,7 @@ from colav_interfaces.msg import (
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
-from colav_hybrid_automaton.automaton.utils import euclidean_distance
+from colav_hybrid_automaton.automaton._internal.utils import euclidean_distance
 from shapely.geometry import Polygon, LineString
 
 
