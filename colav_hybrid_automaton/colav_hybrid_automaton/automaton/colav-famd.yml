@@ -82,7 +82,7 @@ resets:
     description: "Remove the first virtual waypoint from the waypoints state and update the current waypoint."
     state_inputs:
       - "waypoints_state"
-    state_outputs:
+    reset_targets:
       - "waypoints_state"
     configuration: []
 
@@ -95,7 +95,7 @@ resets:
       - "obstacles_state"
       - "unsafe_set_state"
       - "waypoints_state"
-    state_outputs:
+    reset_targets:
       - "waypoints_state"
     configuration:
       longitudinal_offset_distance: 30.0
@@ -261,60 +261,78 @@ transitions:
 # Controllers used for continuous evolution within each mode.
 # ============================================================================
 dynamics:
-  dynamic_parameters:
-    dynamic_parameter_names:
-      - "velocity"
-      - "yaw_rate"
-    dynamic_parameter_value_types:
-      - float
-      - float
-    dynamic_parameter_metrics:
-      - "m/s"
-      - "rad/s"
+  cruise_pid_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: PIDControllerDynamics
+    description: "pid controller tuned for cruise mode."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    dynamic_outputs: 
+      dynamic_parameter_names:
+        - "velocity"
+        - "yaw_rate"
+      dynamic_parameter_value_types:
+        - float
+        - float
+      dynamic_parameter_metrics:
+        - "m/s"
+        - "rad/s"
+    configuration:
+      target_velocity: 25.0 # updated cruise speed
+      yaw_kp: 0.3 # gentle heading proportional gain
+      yaw_ki: 0.01 # small integral for smooth correction
+      yaw_kd: 0.05 # small derivative gain to damp oscillations
+      vel_kp: 0.5 # moderate velocity proportional gain
+      vel_ki: 0.05 # small integral to avoid windup
+      vel_kd: 0.05 # small derivative for smooth velocity changes
+      error_tolerance: 0.01 # precision in heading error
+      max_yaw_rate: 0.1 # limit yaw rate to gentle turns
 
-  dynamic_classes:
-    cruise_pid_controller:
-      module: colav_hybrid_automaton.automaton.dynamics
-      class_name: PIDControllerDynamics
-      description: "pid controller tuned for cruise mode."
-      state_inputs:
-        - "agent_state"
-        - "waypoints_state"
-      configuration:
-        target_velocity: 25.0 # updated cruise speed
-        yaw_kp: 0.3 # gentle heading proportional gain
-        yaw_ki: 0.01 # small integral for smooth correction
-        yaw_kd: 0.05 # small derivative gain to damp oscillations
-        vel_kp: 0.5 # moderate velocity proportional gain
-        vel_ki: 0.05 # small integral to avoid windup
-        vel_kd: 0.05 # small derivative for smooth velocity changes
-        error_tolerance: 0.01 # precision in heading error
-        max_yaw_rate: 0.1 # limit yaw rate to gentle turns
+  t2los_pid_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: NoOpControllerDynamics
+    description: "pid controller tuned for transition to line of sight (T2LOS) mode."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    dynamic_outputs: 
+      dynamic_parameter_names:
+        - "velocity"
+        - "yaw_rate"
+      dynamic_parameter_value_types:
+        - float
+        - float
+      dynamic_parameter_metrics:
+        - "m/s"
+        - "rad/s"
+    configuration:
+      target_velocity: 25.0 # updated cruise speed
+      yaw_kp: 0.3 # gentle heading proportional gain
+      yaw_ki: 0.01 # small integral for smooth correction
+      yaw_kd: 0.05 # small derivative gain to damp oscillations
+      vel_kp: 0.5 # moderate velocity proportional gain
+      vel_ki: 0.05 # small integral to avoid windup
+      vel_kd: 0.05 # small derivative for smooth velocity changes
+      error_tolerance: 0.01 # precision in heading error
+      max_yaw_rate: 0.1 # limit yaw rate to gentle turns
 
-    t2los_pid_controller:
-      module: colav_hybrid_automaton.automaton.dynamics
-      class_name: NoOpControllerDynamics
-      description: "pid controller tuned for transition to line of sight (T2LOS) mode."
-      state_inputs:
-        - "agent_state"
-        - "waypoints_state"
-      configuration:
-        target_velocity: 25.0 # updated cruise speed
-        yaw_kp: 0.3 # gentle heading proportional gain
-        yaw_ki: 0.01 # small integral for smooth correction
-        yaw_kd: 0.05 # small derivative gain to damp oscillations
-        vel_kp: 0.5 # moderate velocity proportional gain
-        vel_ki: 0.05 # small integral to avoid windup
-        vel_kd: 0.05 # small derivative for smooth velocity changes
-        error_tolerance: 0.01 # precision in heading error
-        max_yaw_rate: 0.1 # limit yaw rate to gentle turns
-
-    no_op_controller:
-      module: colav_hybrid_automaton.automaton.dynamics
-      class_name: NoOpControllerDynamics
-      description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
-      state_inputs: []
-      configuration: []
+  no_op_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: NoOpControllerDynamics
+    description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
+    state_inputs: []
+    dynamic_outputs: 
+      dynamic_parameter_names:
+        - "velocity"
+        - "yaw_rate"
+      dynamic_parameter_value_types:
+        - float
+        - float
+      dynamic_parameter_metrics:
+        - "m/s"
+        - "rad/s"
+    configuration: []
 
 # ============================================================================
 # Modes (Q)

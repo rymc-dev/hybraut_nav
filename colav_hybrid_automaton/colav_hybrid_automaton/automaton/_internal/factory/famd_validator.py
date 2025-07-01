@@ -19,22 +19,26 @@ class FAMDValidator:
 
     def validate(self) -> Tuple[bool, List[str], List[str]]:
         """Run complete validation and return results."""
-        self.errors = []
-        self.warnings = []
-        
-        # Core validation checks
-        self._validate_structure()
-        self._validate_modes()
-        self._validate_transitions()
-        self._validate_guards()
-        self._validate_resets()
-        self._validate_invariants()
-        # self._validate_dynamics()
-        self._validate_states()
-        self._validate_references()
-        
-        is_valid = len(self.errors) == 0
-        return is_valid, self.errors, self.warnings
+        try:
+            self.errors = []
+            self.warnings = []
+            
+            # Core validation checks
+            self._validate_structure()
+            self._validate_modes()
+            self._validate_transitions()
+            self._validate_guards()
+            self._validate_resets()
+            self._validate_invariants()
+            self._validate_dynamics()
+            self._validate_states()
+            self._validate_references()
+            
+            is_valid = len(self.errors) == 0
+            return is_valid, self.errors, self.warnings
+        except yaml.YAMLError as e:
+            self.errors.append(f"YAML parsing error: {str(e)}")
+            return False, self.errors, self.warnings
 
     def _validate_structure(self):
         """Validate basic FAMD structure."""
@@ -162,7 +166,7 @@ class FAMDValidator:
         
         for reset_name, reset_def in resets.items():
             # Check required fields
-            required_fields = ['module', 'class_name', 'description', 'state_inputs', 'state_outputs', 'configuration']
+            required_fields = ['module', 'class_name', 'description', 'state_inputs', 'reset_targets', 'configuration']
             for field in required_fields:
                 if field not in reset_def:
                     self.errors.append(f"Reset '{reset_name}' missing required field: {field}")
@@ -191,35 +195,37 @@ class FAMDValidator:
             if 'state_inputs' in inv_def:
                 self._validate_state_references(inv_name, inv_def['state_inputs'], 'invariant')
 
-    # def _validate_dynamics(self):
-    #     """Validate dynamics definitions."""
-    #     if 'dynamics' not in self.famd:
-    #         return
-            
-    #     dynamics = self.famd['dynamics']
+    def _validate_dynamics(self):
+        """Validate dynamics definitions."""
+        if 'dynamics' not in self.famd:
+            return
+
+        dynamics = self.famd['dynamics']
         
-    #     # Check dynamic_parameters structure
-    #     if 'dynamic_parameters' in dynamics:
-    #         dp = dynamics['dynamic_parameters']
-    #         if 'dynamic_parameter_names' in dp and 'dynamic_parameter_value_types' in dp:
-    #             names = dp['dynamic_parameter_names']
-    #             types = dp['dynamic_parameter_value_types']
-    #             if len(names) != len(types):
-    #                 self.errors.append(
-    #                     "dynamic_parameter_names and dynamic_parameter_value_types must have same length"
-    #                 )
-        
-    #     # Validate dynamic_classes
-    #     if 'dynamic_classes' in dynamics:
-    #         for dyn_name, dyn_def in dynamics['dynamic_classes'].items():
-    #             required_fields = ['module', 'class_name']
-    #             for field in required_fields:
-    #                 if field not in dyn_def:
-    #                     self.errors.append(f"Dynamic '{dyn_name}' missing required field: {field}")
-                
-    #             # Validate state_inputs
-    #             if 'state_inputs' in dyn_def:
-    #                 self._validate_state_references(dyn_name, dyn_def['state_inputs'], 'dynamic')
+        for dyn_name, dyn_def in dynamics.items():
+            # Required top-level fields
+            required_fields = ['module', 'class_name', 'state_inputs', 'dynamic_outputs']
+            for field in required_fields:
+                if field not in dyn_def:
+                    self.errors.append(f"Dynamics '{dyn_name}' missing required field: '{field}'")
+
+            # Validate state_inputs
+            if 'state_inputs' in dyn_def:
+                self._validate_state_references(dyn_name, dyn_def['state_inputs'], 'dynamic')
+
+            # Validate dynamic_outputs
+            if 'dynamic_outputs' in dyn_def:
+                dyn_out = dyn_def['dynamic_outputs']
+                names = dyn_out.get('dynamic_parameter_names', [])
+                types = dyn_out.get('dynamic_parameter_value_types', [])
+                metrics = dyn_out.get('dynamic_parameter_metrics', [])
+
+                if not (len(names) == len(types) == len(metrics)):
+                    self.errors.append(
+                        f"Dynamics '{dyn_name}' has mismatched lengths in dynamic_outputs: "
+                        f"{len(names)} names, {len(types)} types, {len(metrics)} metrics"
+                    )
+
 
 
     def _validate_states(self):
@@ -437,7 +443,7 @@ if __name__ == "__main__":
             description: "Remove the first virtual waypoint from the waypoints state and update the current waypoint."
             state_inputs:
             - "waypoints_state"
-            state_outputs:
+            reset_targets:
             - "waypoints_state"
             configuration: []
 
@@ -450,7 +456,7 @@ if __name__ == "__main__":
             - "obstacles_state"
             - "unsafe_set_state"
             - "waypoints_state"
-            state_outputs:
+            reset_targets:
             - "waypoints_state"
             configuration:
             longitudinal_offset_distance: 30.0
@@ -616,24 +622,23 @@ if __name__ == "__main__":
     # Controllers used for continuous evolution within each mode.
     # ============================================================================
     dynamics:
-        dynamic_parameters:
-            dynamic_parameter_names:
-            - "velocity"
-            - "yaw_rate"
-            dynamic_parameter_value_types:
-            - float
-            - float
-            dynamic_parameter_metrics:
-            - "m/s"
-            - "rad/s"
-
-        dynamic_classes:
-            cruise_pid_controller:
+        cruise_pid_controller:
             module: colav_hybrid_automaton.automaton.dynamics
             class_name: PIDControllerDynamics
+            description: "pid controller tuned for cruise mode."
             state_inputs:
-                - "agent_state"
-                - "waypoints_state"
+            - "agent_state"
+            - "waypoints_state"
+            dynamic_outputs: 
+                dynamic_parameter_names:
+                    - "velocity"
+                    - "yaw_rate"
+                dynamic_parameter_value_types:
+                    - float
+                    - float
+                dynamic_parameter_metrics:
+                    - "m/s"
+                    - "rad/s"
             configuration:
                 target_velocity: 25.0 # updated cruise speed
                 yaw_kp: 0.3 # gentle heading proportional gain
@@ -645,28 +650,50 @@ if __name__ == "__main__":
                 error_tolerance: 0.01 # precision in heading error
                 max_yaw_rate: 0.1 # limit yaw rate to gentle turns
 
-            t2los_pid_controller:
-                module: colav_hybrid_automaton.automaton.dynamics
-                class_name: NoOpControllerDynamics
-                state_inputs:
-                    - "agent_state"
-                    - "waypoints_state"
-                configuration:
-                    target_velocity: 25.0 # updated cruise speed
-                    yaw_kp: 0.3 # gentle heading proportional gain
-                    yaw_ki: 0.01 # small integral for smooth correction
-                    yaw_kd: 0.05 # small derivative gain to damp oscillations
-                    vel_kp: 0.5 # moderate velocity proportional gain
-                    vel_ki: 0.05 # small integral to avoid windup
-                    vel_kd: 0.05 # small derivative for smooth velocity changes
-                    error_tolerance: 0.01 # precision in heading error
-                    max_yaw_rate: 0.1 # limit yaw rate to gentle turns
+        t2los_pid_controller:
+            module: colav_hybrid_automaton.automaton.dynamics
+            class_name: NoOpControllerDynamics
+            description: "pid controller tuned for transition to line of sight (T2LOS) mode."
+            state_inputs:
+            - "agent_state"
+            - "waypoints_state"
+            dynamic_outputs: 
+                dynamic_parameter_names:
+                    - "velocity"
+                    - "yaw_rate"
+                dynamic_parameter_value_types:
+                    - float
+                    - float
+                dynamic_parameter_metrics:
+                    - "m/s"
+                    - "rad/s"
+            configuration:
+                target_velocity: 25.0 # updated cruise speed
+                yaw_kp: 0.3 # gentle heading proportional gain
+                yaw_ki: 0.01 # small integral for smooth correction
+                yaw_kd: 0.05 # small derivative gain to damp oscillations
+                vel_kp: 0.5 # moderate velocity proportional gain
+                vel_ki: 0.05 # small integral to avoid windup
+                vel_kd: 0.05 # small derivative for smooth velocity changes
+                error_tolerance: 0.01 # precision in heading error
+                max_yaw_rate: 0.1 # limit yaw rate to gentle turns
 
-            no_op_controller:
-                module: colav_hybrid_automaton.automaton.dynamics
-                class_name: NoOpControllerDynamics
-                state_inputs: []
-                configuration: []
+        no_op_controller:
+            module: colav_hybrid_automaton.automaton.dynamics
+            class_name: NoOpControllerDynamics
+            description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
+            state_inputs: []
+            dynamic_outputs: 
+                dynamic_parameter_names:
+                    - "velocity"
+                    - "yaw_rate"
+                dynamic_parameter_value_types:
+                    - float
+                    - float
+                dynamic_parameter_metrics:
+                    - "m/s"
+                    - "rad/s"
+            configuration: []
 
     # ============================================================================
     # Modes (Q)
