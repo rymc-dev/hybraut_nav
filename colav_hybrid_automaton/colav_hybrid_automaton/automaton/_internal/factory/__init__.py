@@ -1,4 +1,4 @@
-from .hybrid_automaton_factory import hybrid_automaton_registry
+from .famd_factory import hybrid_automaton_registry
 from .automaton_runtime import create_state_publishers, create_state_subscriptions, generate_mode_profile
 from .automaton_runtime import (
     initialize_dynamics,

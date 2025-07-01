@@ -35,6 +35,7 @@
 states:
   agent_state:
     topic: "/state/agent"
+    description: "State of the agent including position, velocity and heading."
     type:
       pkg: "colav_interfaces.msg"
       msg: "AgentState"
@@ -45,6 +46,7 @@ states:
 
   obstacles_state:
     topic: "/state/obstacles"
+    description: "State of the obstacles in the environment."
     type:
       pkg: "colav_interfaces.msg"
       msg: "ObstaclesState"
@@ -54,6 +56,7 @@ states:
 
   unsafe_set_state:
     topic: "/state/unsafe_set"
+    description: "State of the unsafe set, indicating unsafe conditions for the agent."
     type:
       pkg: "colav_interfaces.msg"
       msg: "UnsafeSetState"
@@ -63,6 +66,7 @@ states:
 
   waypoints_state:
     topic: "/state/waypoints"
+    description: "State of the waypoints including current waypoint and virtual waypoints."
     type:
       pkg: "colav_interfaces.msg"
       msg: WaypointsState
@@ -75,6 +79,7 @@ resets:
   remove_virtual_waypoint_reset:
     module: colav_hybrid_automaton.automaton.resets
     class_name: RemoveVirtualWaypointReset
+    description: "Remove the first virtual waypoint from the waypoints state and update the current waypoint."
     state_inputs:
       - "waypoints_state"
     state_outputs:
@@ -84,6 +89,7 @@ resets:
   generate_virtual_waypoint_reset:
     module: colav_hybrid_automaton.automaton.resets
     class_name: GenerateVirtualWaypointReset
+    description: "Generate a virtual waypoint based on the agent's position and obstacles, and add it to the waypoints state updating the current waypoint to it."
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -104,6 +110,7 @@ guards:
   los_clear_to_waypoint_guard:
     module: colav_hybrid_automaton.automaton.guards
     class_name: LOSClearToWaypointGuard
+    description: "Checks if the line of sight from agent position to the current waypoint is clear."
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -115,15 +122,17 @@ guards:
   heading_within_tolerance_guard:
     module: colav_hybrid_automaton.automaton.guards
     class_name: HeadingWithinToleranceGuard
+    description: "Checks if the agent's heading is within a specified tolerance of the waypoint direction."
     state_inputs:
       - "agent_state"
       - "waypoints_state"
     configuration:
-      - heading_tolerace: 0.2
+      - heading_tolerance: 0.2
 
   heading_not_within_tolerance_guard:
     module: colav_hybrid_automaton.automaton.guards
     class_name: HeadingNotWithinToleranceGuard
+    description: "Checks if the agent's heading is not within a specified tolerance of the waypoint direction."
     state_inputs:
       - "agent_state"
       - "waypoints_state"
@@ -133,6 +142,7 @@ guards:
   virtual_waypoints_guard:
     module: colav_hybrid_automaton.automaton.guards
     class_name: VirtualWaypointsGuard
+    description: "Checks if there are virtual waypoints available in the waypoints state."
     state_inputs:
       - "waypoints_state"
     configuration: []
@@ -140,6 +150,7 @@ guards:
   unsafe_conditions_guard:
     module: colav_hybrid_automaton.automaton.guards
     class_name: UnsafeConditionsGuard
+    description: "Checks if the agent is in unsafe conditions based on obstacles and unsafe set."
     state_inputs:
       - "agent_state"
       - "obstacles_state"
@@ -149,6 +160,7 @@ guards:
   waypoint_reached_guard:
     module: colav_hybrid_automaton.automaton.guards
     class_name: WaypointReachedGuard
+    description: "Checks if the agent has reached the current waypoint."
     state_inputs:
       - "agent_state"
       - "waypoints_state"
@@ -162,6 +174,7 @@ invariants:
   is_goal_waypoint_invariant:
     module: colav_hybrid_automaton.automaton.invariants
     class_name: IsGoalWaypointInvariant
+    description: "Checks if the current waypoint is the goal waypoint."
     state_inputs:
       - "waypoints_state"
     configuration: []
@@ -169,11 +182,15 @@ invariants:
   trivial_invariant:
     module: colav_hybrid_automaton.automaton.invariants
     class_name: TrivialInvariant
+    description: "A trivial invariant that always holds true."
+    state_inputs: []
     configuration: []
 
   failing_invariant:
     module: colav_hybrid_automaton.automaton.invariants
     class_name: FailingInvariant
+    description: "An invariant that always fails, used for fallback mode."
+    state_inputs: []
     configuration: []
 
 # ============================================================================
@@ -187,8 +204,8 @@ transitions:
     origin_priorities:
       - 2
     target_mode: "t2los"
-    guard: "is_los_clear_to_waypoint"
-    reset: "generate_virtual_waypoint"
+    guard: "los_clear_to_waypoint_guard"
+    reset: "generate_virtual_waypoint_reset"
 
   correct_heading:
     origin_modes: 
@@ -196,7 +213,7 @@ transitions:
     origin_priorities:
       - 3
     target_mode: "t2los"
-    guard: "is_heading_not_within_tolerance"
+    guard: "heading_not_within_tolerance_guard"
     reset: null
 
   enter_emergency_fallback:
@@ -207,7 +224,7 @@ transitions:
       - 0
       - 0
     target_mode: "fallback"
-    guard: "is_unsafe_conditions"
+    guard: "unsafe_conditions_guard"
     reset: null
 
   waypoint_arrival:
@@ -218,7 +235,7 @@ transitions:
       - 1
       - 2
     target_mode: "waypoint_reached"
-    guard: "is_waypoint_reached"
+    guard: "waypoint_reached_guard"
     reset: null
 
   heading_aligned:
@@ -227,7 +244,7 @@ transitions:
     origin_priorities:
       - 0
     target_mode: "cruise"
-    guard: "is_heading_within_tolerance"
+    guard: "heading_within_tolerance_guard"
     reset: null
 
   proceed_to_next_waypoint:
@@ -236,8 +253,8 @@ transitions:
     origin_priorities:
       - 0
     target_mode: "cruise"
-    guard: "is_virtual_waypoints"
-    reset: "remove_first_waypoint"
+    guard: "virtual_waypoints_guard"
+    reset: "remove_virtual_waypoint_reset"
 
 # ============================================================================
 # Dynamics (F)
@@ -259,6 +276,7 @@ dynamics:
     cruise_pid_controller:
       module: colav_hybrid_automaton.automaton.dynamics
       class_name: PIDControllerDynamics
+      description: "pid controller tuned for cruise mode."
       state_inputs:
         - "agent_state"
         - "waypoints_state"
@@ -276,6 +294,7 @@ dynamics:
     t2los_pid_controller:
       module: colav_hybrid_automaton.automaton.dynamics
       class_name: NoOpControllerDynamics
+      description: "pid controller tuned for transition to line of sight (T2LOS) mode."
       state_inputs:
         - "agent_state"
         - "waypoints_state"
@@ -293,6 +312,7 @@ dynamics:
     no_op_controller:
       module: colav_hybrid_automaton.automaton.dynamics
       class_name: NoOpControllerDynamics
+      description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
       state_inputs: []
       configuration: []
 
@@ -303,8 +323,8 @@ dynamics:
 modes:
   cruise:
     index: 0
-    description: "Cruise mode with proportional velocity control"
-    dynamics: "proportional_velocity_controller"
+    description: "Cruise mode with pid controller tuned for cruise mode."
+    dynamics: cruise_pid_controller
     invariants: trivial_invariant
     transitions:
       enter_emergency_fallback:
@@ -319,7 +339,7 @@ modes:
   t2los:
     index: 1
     description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
-    dynamics: "proportional_yaw_rate_controller"
+    dynamics: t2los_pid_controller
     invariants: trivial_invariant
     transitions:
       enter_emergency_fallback:
@@ -332,8 +352,8 @@ modes:
   waypoint_reached:
     index: 2
     description: "Waypoint reached mode, indicating successful navigation to a waypoint"
-    dynamics: "no_op_controller"
-    invariants: is_at_final_waypoint
+    dynamics: no_op_controller
+    invariants: is_goal_waypoint_invariant
     transitions:
       waypoint_arrival:
         priority: 0
@@ -341,7 +361,7 @@ modes:
   fallback:
     index: 3
     description: "Fallback mode for emergency conditions, no active control"
-    dynamics: "no_op_controller"
+    dynamics: no_op_controller
     invariants: failing_invariant
     transitions: []
 
