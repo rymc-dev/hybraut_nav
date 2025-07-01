@@ -24,7 +24,7 @@ class PIDControllerDynamics(Dynamics):
 
         # static PID controller configuration
         self.target_velocity = init_kwargs.get('target_velocity')
-        self.dt = init_kwargs.get('dt')
+        # self.dt = init_kwargs.get('dt')
         self.error_tolerance = init_kwargs.get('error_tolerance')
         self.max_yaw_rate = init_kwargs.get('max_yaw_rate')
 
@@ -59,13 +59,13 @@ class PIDControllerDynamics(Dynamics):
             raise KeyError()
         
         # dt: this will by used for validation of agent states in buffer rather than for dynamics calculation
-        try: 
-            if not isinstance(init_kwargs['dt'], float):
-                raise TypeError()
-            if init_kwargs['dt'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
+        # try: 
+        #     if not isinstance(init_kwargs['dt'], float):
+        #         raise TypeError()
+        #     if init_kwargs['dt'] < 0.0:
+        #         raise ValueError()
+        # except KeyError as e:
+        #     raise KeyError()
         
         # error_tolerance
         try: 

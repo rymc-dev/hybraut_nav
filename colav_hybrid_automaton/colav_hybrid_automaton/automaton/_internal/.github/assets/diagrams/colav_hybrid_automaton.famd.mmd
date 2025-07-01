@@ -12,7 +12,7 @@ stateDiagram-v2
         =====================
         <b>description</b>: Cruise mode with proportional velocity control
         <b>invariant</b>: trivial_invariant
-        <b>dynamics</b>: proportional_velocity_controller
+        <b>dynamics</b>: cruise_pid_controller
     end note
 
     t2los : 1.t2los
@@ -22,7 +22,7 @@ stateDiagram-v2
         =====================
         <b>description</b>: Transition to Line of Sight (T2LOS) mode with proportional yaw rate control
         <b>invariant</b>: trivial_invariant
-        <b>dynamics</b>: proportional_yaw_rate_controller
+        <b>dynamics</b>: t2los_pid_controller
     end note
 
     waypoint_reached : 2.waypoint_reached
@@ -31,7 +31,7 @@ stateDiagram-v2
         <b>2.waypoint_reached</b>
         =====================
         <b>description</b>: Waypoint reached mode, indicating successful navigation to a waypoint
-        <b>invariant</b>: is_at_final_waypoint
+        <b>invariant</b>: is_goal_waypoint_invariant
         <b>dynamics</b>: no_op_controller
     end note
 
@@ -46,13 +46,13 @@ stateDiagram-v2
     end note
 
     %% Transitions
-    cruise --> t2los : <b>2.plan_evasive_maneuver</b>  [<b>guard</b> = is_los_clear_to_waypoint, <b>reset</b> = generate_virtual_waypoint]
-    cruise --> t2los : <b>3.correct_heading</b>  [<b>guard</b> = is_heading_not_within_tolerance, <b>reset</b> = None]
-    cruise --> fallback : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = is_unsafe_conditions, <b>reset</b> = None]
-    t2los --> fallback : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = is_unsafe_conditions, <b>reset</b> = None]
-    cruise --> waypoint_reached : <b>1.waypoint_arrival</b>  [<b>guard</b> = is_waypoint_reached, <b>reset</b> = None]
-    t2los --> waypoint_reached : <b>2.waypoint_arrival</b>  [<b>guard</b> = is_waypoint_reached, <b>reset</b> = None]
-    t2los --> cruise : <b>0.heading_aligned</b>  [<b>guard</b> = is_heading_within_tolerance, <b>reset</b> = None]
-    waypoint_reached --> cruise : <b>0.proceed_to_next_waypoint</b>  [<b>guard</b> = is_virtual_waypoints, <b>reset</b> = remove_first_waypoint]
+    cruise --> t2los : <b>2.plan_evasive_maneuver</b>  [<b>guard</b> = los_clear_to_waypoint_guard, <b>reset</b> = generate_virtual_waypoint_reset]
+    cruise --> t2los : <b>3.correct_heading</b>  [<b>guard</b> = heading_not_within_tolerance_guard, <b>reset</b> = None]
+    cruise --> fallback : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = unsafe_conditions_guard, <b>reset</b> = None]
+    t2los --> fallback : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = unsafe_conditions_guard, <b>reset</b> = None]
+    cruise --> waypoint_reached : <b>1.waypoint_arrival</b>  [<b>guard</b> = waypoint_reached_guard, <b>reset</b> = None]
+    t2los --> waypoint_reached : <b>2.waypoint_arrival</b>  [<b>guard</b> = waypoint_reached_guard, <b>reset</b> = None]
+    t2los --> cruise : <b>0.heading_aligned</b>  [<b>guard</b> = heading_within_tolerance_guard, <b>reset</b> = None]
+    waypoint_reached --> cruise : <b>0.proceed_to_next_waypoint</b>  [<b>guard</b> = virtual_waypoints_guard, <b>reset</b> = remove_virtual_waypoint_reset]
     %% Goal Modes
     waypoint_reached --> [*]

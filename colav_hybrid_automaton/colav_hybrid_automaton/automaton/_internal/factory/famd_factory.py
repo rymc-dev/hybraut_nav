@@ -8,8 +8,50 @@ which can be utilized within the hybrid automaton lifecyle framework.
 
 import yaml
 import importlib
-from typing import Dict, Any, List, Set, Tuple
+from typing import Dict, Any, List, Set, Tuple, Optional
 from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
+import logging
+import subprocess
+from pathlib import Path
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class OutputFormat(Enum):
+    """Supported output formats for diagrams."""
+    SVG = "svg"
+    PNG = "png"
+
+class Theme(Enum):
+    """Available Mermaid themes."""
+    DEFAULT = "default"
+    NEUTRAL = "neutral"
+    DARK = "dark"
+    FOREST = "forest"
+    BASE = "base"
+
+class Backgroud(Enum):
+    """Available background options for diagrams."""
+    TRANSPARENT = "transparent"
+    WHITE = "white"
+    BLACK = "black"
+
+@dataclass
+class DiagramConfig:
+    """Configuration for diagram generation."""
+    theme: Theme = Theme.FOREST
+    background: Backgroud = Backgroud.WHITE
+    scale: int = 2
+    output_format: OutputFormat = OutputFormat.SVG
+
+class MermaidDiagramGeneratorError(Exception):
+    """Custom exception for diagram generation errors."""
+    pass
+
 
 class HybridAutomatonFactory:
     """
@@ -232,8 +274,6 @@ class HybridAutomatonFactory:
                             f"{len(names)} names, {len(types)} types, {len(metrics)} metrics"
                         )
 
-
-
         def _validate_states(self):
             """Validate state definitions."""
             if 'states' not in self.famd:
@@ -332,7 +372,7 @@ class HybridAutomatonFactory:
         def print_validation_report(self):
             """Print a formatted validation report."""
             print("=" * 60)
-            print("COLAV Hybrid Automaton FAMD Validation Report")
+            print("COLAV Hybrid Automaton FAMD Structure Validation Report")
             print("=" * 60)
             
             if not self.errors and not self.warnings:
@@ -353,9 +393,328 @@ class HybridAutomatonFactory:
             
             print("\n" + "=" * 60)
             if self.errors:
-                print("❌ VALIDATION FAILED - Please fix the errors above")
+                print("❌ STRUCTURE VALIDATION FAILED - Please fix the errors above")
             else:
-                print("✅ VALIDATION PASSED - Only warnings found")
+                print("✅ STRUCTURE VALIDATION PASSED - Only warnings found")
+
+    class FAMDDiagramGenerator:
+        """
+        Generator for Mermaid state diagrams from hybrid automaton data.
+        
+        This class handles the complete workflow of generating Mermaid diagrams
+        from automaton configuration data and converting them to various formats.
+        """
+        
+        def __init__(self, output_directory: Optional[str] = None):
+            """
+            Initialize the diagram generator.
+            
+            Args:
+                output_directory: Directory to save generated diagrams.
+                                If None, uses default relative path.
+            """
+            self._output_dir = self._setup_output_directory(output_directory)
+            self._ensure_mermaid_cli()
+        
+        def generate_mermaid_diagrams(
+            self, 
+            automaton_data: Dict, 
+            config: Optional[DiagramConfig] = None
+        ) -> Tuple[str, str]:
+            """
+            Generate Mermaid diagrams from automaton data.
+            
+            Args:
+                automaton_data: Dictionary containing automaton configuration
+                config: Diagram configuration options
+                
+            Returns:
+                Tuple of (mmd_file_path, output_file_path)
+                
+            Raises:
+                MermaidDiagramGeneratorError: If generation fails
+            """
+            if config is None:
+                config = DiagramConfig()
+                
+            try:
+                automaton_name = automaton_data.get('automaton_name', 'Automaton')
+                
+                # Generate Mermaid diagram content
+                mermaid_lines = self._generate_mermaid_content(automaton_name, automaton_data)
+                
+                # Save .mmd file
+                mmd_path = self._save_mermaid_file(mermaid_lines, automaton_name)
+                
+                # Convert to desired format
+                output_path = self._convert_diagram(mmd_path, automaton_name, config)
+                
+                logger.info(f"Successfully generated diagram: {output_path}")
+                return mmd_path, output_path
+                
+            except Exception as e:
+                raise MermaidDiagramGeneratorError(f"Failed to generate diagram: {str(e)}") from e
+        
+        def _setup_output_directory(self, output_directory: Optional[str]) -> Path:
+            """Setup and validate output directory."""
+            if output_directory:
+                output_dir = Path(output_directory)
+            else:
+                # Default to relative path from current file
+                current_file = Path(__file__).parent
+                output_dir = current_file / '..' / '.github' / 'assets' / 'diagrams'
+            
+            output_dir = output_dir.resolve()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            logger.info(f"Output directory: {output_dir}")
+            return output_dir
+        
+        def _ensure_mermaid_cli(self) -> None:
+            """Ensure Mermaid CLI is available."""
+            try:
+                result = subprocess.run(
+                    ['mmdc', '--version'], 
+                    capture_output=True, 
+                    check=True,
+                    timeout=10
+                )
+                logger.info("Mermaid CLI is available")
+            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+                error_msg = (
+                    "Mermaid CLI not found or not working. "
+                    "Please install with: npm install -g @mermaid-js/mermaid-cli"
+                )
+                logger.error(error_msg)
+                raise MermaidDiagramGeneratorError(error_msg) from e
+        
+        def _generate_mermaid_content(self, automaton_name: str, automaton_data: Dict) -> List[str]:
+            """
+            Generate Mermaid state diagram content from automaton data.
+            
+            Args:
+                automaton_name: Name of the automaton
+                automaton_data: Automaton configuration data
+                
+            Returns:
+                List of Mermaid diagram lines
+            """
+            mermaid = []
+            
+            # Header
+            mermaid.extend([
+                "stateDiagram-v2",
+                f"    %% {automaton_name} State Diagram",
+                ""
+            ])
+            
+            # Extract data with defaults
+            init_mode = automaton_data.get('initial_mode', '')
+            goal_modes = automaton_data.get('goal_modes', [])
+            modes = automaton_data.get('modes', {})
+            transitions = automaton_data.get('transitions', {})
+            
+            # Generate diagram sections
+            self._add_initial_state(mermaid, init_mode)
+            self._add_modes(mermaid, modes)
+            self._add_transitions(mermaid, transitions)
+            self._add_goal_states(mermaid, goal_modes)
+            
+            return mermaid
+        
+        def _add_initial_state(self, mermaid: List[str], init_mode: str) -> None:
+            """Add initial state to diagram."""
+            if init_mode:
+                mermaid.extend([
+                    "    %% Initial Mode",
+                    f"    [*] --> {init_mode}",
+                    ""
+                ])
+        
+        def _add_modes(self, mermaid: List[str], modes: Dict) -> None:
+            """Add modes with detailed information to diagram."""
+            if not modes:
+                return
+                
+            mermaid.append("    %% Modes")
+            
+            for mode_key, mode_data in modes.items():
+                mode_index = mode_data.get('index', '')
+                invariants = mode_data.get('invariants', '')
+                dynamics = mode_data.get('dynamics', '')
+                description = mode_data.get('description', '')
+                
+                # State definition
+                mermaid.append(f"    {mode_key} : {mode_index}.{mode_key}")
+                
+                # Add detailed note if additional info exists
+                if any([invariants, dynamics, description]):
+                    self._add_mode_note(mermaid, mode_key, mode_index, description, invariants, dynamics)
+                
+                mermaid.append("")
+        
+        def _add_mode_note(
+            self, 
+            mermaid: List[str], 
+            mode_key: str, 
+            mode_index: str, 
+            description: str, 
+            invariants: str, 
+            dynamics: str
+        ) -> None:
+            """Add detailed note for a mode."""
+            mermaid.extend([
+                f"    note left of {mode_key}",
+                "        =====================",
+                f"        <b>{mode_index}.{mode_key}</b>",
+                "        ====================="
+            ])
+            
+            if description:
+                mermaid.append(f"        <b>description</b>: {description}")
+            if invariants:
+                mermaid.append(f"        <b>invariant</b>: {invariants}")
+            if dynamics:
+                mermaid.append(f"        <b>dynamics</b>: {dynamics}")
+                
+            mermaid.append("    end note")
+        
+        def _add_transitions(self, mermaid: List[str], transitions: Dict) -> None:
+            """Add transitions to diagram."""
+            if not transitions:
+                return
+                
+            mermaid.append("    %% Transitions")
+            
+            for transition_key, transition_data in transitions.items():
+                origin_modes = transition_data.get('origin_modes', [])
+                origin_priorities = transition_data.get('origin_priorities', [])
+                target_mode = transition_data.get('target_mode', '')
+                guard = transition_data.get('guard', '')
+                reset = transition_data.get('reset', 'null')
+                
+                if not target_mode:
+                    logger.warning(f"Skipping transition {transition_key}: no target mode")
+                    continue
+                
+                self._add_transition_edges(
+                    mermaid, transition_key, origin_modes, origin_priorities, 
+                    target_mode, guard, reset
+                )
+        
+        def _add_transition_edges(
+            self, 
+            mermaid: List[str], 
+            transition_key: str, 
+            origin_modes: List[str], 
+            origin_priorities: List[int], 
+            target_mode: str, 
+            guard: str, 
+            reset: str
+        ) -> None:
+            """Add individual transition edges."""
+            for idx, origin_mode in enumerate(origin_modes):
+                priority = origin_priorities[idx] if idx < len(origin_priorities) else 0
+                
+                transition_label = (
+                    f"<b>{priority}.{transition_key}</b>  "
+                    f"[<b>guard</b> = {guard}, <b>reset</b> = {reset}]"
+                )
+                
+                mermaid.append(f"    {origin_mode} --> {target_mode} : {transition_label}")
+        
+        def _add_goal_states(self, mermaid: List[str], goal_modes: List[str]) -> None:
+            """Add goal states to diagram."""
+            if goal_modes:
+                mermaid.extend([
+                    "    %% Goal Modes"
+                ])
+                for goal_mode in goal_modes:
+                    mermaid.append(f"    {goal_mode} --> [*]")
+                mermaid.append("")
+        
+        def _save_mermaid_file(self, mermaid_lines: List[str], automaton_name: str) -> str:
+            """
+            Save Mermaid diagram to .mmd file.
+            
+            Args:
+                mermaid_lines: Lines of Mermaid diagram code
+                automaton_name: Name for the output file
+                
+            Returns:
+                Path to saved .mmd file
+                
+            Raises:
+                MermaidDiagramGeneratorError: If saving fails
+            """
+            filename = f"{automaton_name}.famd.mmd"
+            file_path = self._output_dir / filename
+            
+            try:
+                with open(file_path, "w", encoding="utf-8") as file:
+                    file.write("\n".join(mermaid_lines))
+                
+                logger.info(f"Mermaid diagram saved to: {file_path}")
+                return str(file_path)
+                
+            except IOError as e:
+                raise MermaidDiagramGeneratorError(f"Failed to save .mmd file: {e}") from e
+        
+        def _convert_diagram(
+            self, 
+            mmd_path: str, 
+            automaton_name: str, 
+            config: DiagramConfig
+        ) -> str:
+            """
+            Convert .mmd file to specified output format.
+            
+            Args:
+                mmd_path: Path to .mmd file
+                automaton_name: Name for output file
+                config: Diagram configuration
+                
+            Returns:
+                Path to converted diagram file
+                
+            Raises:
+                MermaidDiagramGeneratorError: If conversion fails
+            """
+            output_filename = f"{automaton_name}.famd.{config.output_format.value}"
+            output_path = self._output_dir / output_filename
+            
+            try:
+                cmd = [
+                    'mmdc',
+                    '-i', mmd_path,
+                    '-o', str(output_path),
+                    '-t', config.theme.value,
+                    '-b', config.background.value,
+                    '--scale', str(config.scale)
+                ]
+                
+                result = subprocess.run(
+                    cmd, 
+                    capture_output=True, 
+                    text=True, 
+                    check=True,
+                    timeout=30
+                )
+                
+                logger.info(f"Successfully converted to {config.output_format.value}: {output_path}")
+                if result.stdout:
+                    logger.debug(f"mmdc output: {result.stdout}")
+                    
+                return str(output_path)
+                
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Failed to convert diagram: {e.stderr}"
+                logger.error(error_msg)
+                raise MermaidDiagramGeneratorError(error_msg) from e
+            except subprocess.TimeoutExpired:
+                error_msg = "Diagram conversion timed out"
+                logger.error(error_msg)
+                raise MermaidDiagramGeneratorError(error_msg)
 
     def __init__(self):
         raise NotImplementedError("This class is a factory and should not be instantiated directly.")
@@ -366,8 +725,10 @@ class HybridAutomatonFactory:
         if len(components) > 0:
             for key, value in components.items():
                 module = importlib.import_module(value[key_module])
+                class_name = value[key_class]
                 del components[key][key_module]
-                components[key][key_class] = getattr(module, value[key_class])
+                del components[key][key_class]
+                components[key]['class'] = getattr(module, class_name)
         return components
 
     @staticmethod
@@ -386,6 +747,39 @@ class HybridAutomatonFactory:
         is_valid, errors, warnings = validator.validate()
         validator.print_validation_report()
         return is_valid, errors, warnings
+    
+    @staticmethod
+    def _generate_automaton_diagrams(
+        automaton_data: Dict, 
+        output_directory: Optional[str] = None,
+        config: Optional[DiagramConfig] = None
+    ) -> Tuple[str, str]:
+        """
+        Public interface for generating Mermaid diagrams.
+        
+        Args:
+            automaton_data: Dictionary containing automaton configuration
+            output_directory: Directory to save diagrams (optional)
+            config: Diagram configuration (optional)
+            
+        Returns:
+            Tuple of (mmd_file_path, output_file_path)
+            
+        Raises:
+            MermaidDiagramGeneratorError: If generation fails
+        """
+        generator = HybridAutomatonFactory.FAMDDiagramGenerator(output_directory)
+        return generator.generate_mermaid_diagrams(automaton_data, config)
+
+    def _initialize_automaton(automaton_famd: yaml, component_type: str):
+        for component_name, component_def in automaton_famd[component_type].items():
+            automaton_famd[component_type][component_name]['instance'] = component_def['class'](
+                **component_def.get('configuration', {})
+            )
+            del automaton_famd[component_type][component_name]['class']
+            del automaton_famd[component_type][component_name]['configuration']
+        
+        return automaton_famd
 
     @staticmethod
     def hybrid_automaton_registry(automaton_famd: yaml, generate_mmd_diagrams: bool = True) -> Dict[str, Any]:
@@ -394,21 +788,45 @@ class HybridAutomatonFactory:
         1. Validates against schema.
         2. Validates internal references.
         3. Dynamically binds Python functions/classes for states, resets, guards, etc.
-        
+    
         :param config: Parsed YAML configuration as dictionary
         :return: Processed configuration with dynamically bound components
         :raises SchemaError, ValidationError, ImportError
         """
+        # Phase 1: Validation
+        print("🔍 [1/4] Validating FAMD file structure...")
         HybridAutomatonFactory._validate_famd_content(automaton_famd)
-
-        # dynamically import the classes
+        
+        
+        # Phase 2: Dynamic imports
+        print("⚡ [2/4] Dynamically importing components...")
+        print("  ├─ Loading state classes...")
         automaton_famd['states'] = HybridAutomatonFactory._dynamic_state_import_binds(automaton_famd['states'])
+        print("  ├─ Loading reset functions...")
         automaton_famd['resets'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['resets'])
+        print("  ├─ Loading guard conditions...")
         automaton_famd['guards'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['guards'])
-        automaton_famd['dynamics'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['dynamics']["dynamic_classes"])
+        print("  ├─ Loading dynamics...")
+        automaton_famd['dynamics'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['dynamics'])
+        print("  └─ Loading invariants...")
         automaton_famd['invariants'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['invariants'])
+        print("✅ [2/4] Component imports completed!")
+        
+        # Phase 3: Intialize the automaton components with the static configurations
+        print("🔧 [3/4] Initializing automaton components...")
+        component_types = ['guards', 'resets', 'dynamics', 'invariants']
+        for component_type in component_types:
+            automaton_famd = HybridAutomatonFactory._initialize_automaton(automaton_famd, component_type)
 
-        # dynamically initialize the classes with the configuration settings set in teh famd
+        print("✅ [3/4] automaton components initialized.")
+
+        # Phase 4: Diagram generation
+        print("📊 [4/4] Generating FAMD automaton diagram...")
+        HybridAutomatonFactory._generate_automaton_diagrams(automaton_famd)
+        print("✅ [4/4] Diagram generation completed!")
+        
+        print("🎉 FAMD factory process completed successfully!")
+        
         return automaton_famd
     
 
@@ -497,7 +915,7 @@ if __name__ == "__main__":
             - "waypoints_state"
             reset_targets:
             - "waypoints_state"
-            configuration: []
+            configuration: {}
 
         generate_virtual_waypoint_reset:
             module: colav_hybrid_automaton.automaton.resets
@@ -511,9 +929,9 @@ if __name__ == "__main__":
             reset_targets:
             - "waypoints_state"
             configuration:
-            longitudinal_offset_distance: 30.0
-            lateral_offset_distance: 5.0
-            virtual_waypoint_acceptance_radius: 20.0
+                longitudinal_offset_distance: 30.0
+                lateral_offset_distance: 5.0
+                virtual_waypoint_acceptance_radius: 20.0
 
     # ============================================================================
     # Guard Conditions (G)
@@ -530,7 +948,7 @@ if __name__ == "__main__":
             - "unsafe_set_state"
             - "waypoints_state"
             configuration:
-            - los_distance_threshold: 100.0
+                los_distance_threshold: 100.0
 
         heading_within_tolerance_guard:
             module: colav_hybrid_automaton.automaton.guards
@@ -540,7 +958,7 @@ if __name__ == "__main__":
             - "agent_state"
             - "waypoints_state"
             configuration:
-            - heading_tolerace: 0.2
+                heading_tolerance: 0.2
 
         heading_not_within_tolerance_guard:
             module: colav_hybrid_automaton.automaton.guards
@@ -550,7 +968,7 @@ if __name__ == "__main__":
             - "agent_state"
             - "waypoints_state"
             configuration:
-            - heading_tolerance: 0.2
+              heading_tolerance: 0.2
 
         virtual_waypoints_guard:
             module: colav_hybrid_automaton.automaton.guards
@@ -558,7 +976,7 @@ if __name__ == "__main__":
             description: "Checks if there are virtual waypoints available in the waypoints state."
             state_inputs:
             - "waypoints_state"
-            configuration: []
+            configuration: {}
 
         unsafe_conditions_guard:
             module: colav_hybrid_automaton.automaton.guards
@@ -568,7 +986,7 @@ if __name__ == "__main__":
             - "agent_state"
             - "obstacles_state"
             - "unsafe_set_state"
-            configuration: []
+            configuration: {}
 
         waypoint_reached_guard:
             module: colav_hybrid_automaton.automaton.guards
@@ -577,7 +995,7 @@ if __name__ == "__main__":
             state_inputs:
             - "agent_state"
             - "waypoints_state"
-            configuration: []
+            configuration: {}
 
     # ============================================================================
     # Invariants (Inv)
@@ -590,20 +1008,20 @@ if __name__ == "__main__":
             description: "Checks if the current waypoint is the goal waypoint."
             state_inputs:
             - "waypoints_state"
-            configuration: []
+            configuration: {}
 
         trivial_invariant:
             module: colav_hybrid_automaton.automaton.invariants
             class_name: TrivialInvariant
             description: "A trivial invariant that always holds true."
-            configuration: []
+            configuration: {}
             state_inputs: []
 
         failing_invariant:
             module: colav_hybrid_automaton.automaton.invariants
             class_name: FailingInvariant
             description: "An invariant that always fails, used for fallback mode."
-            configuration: []
+            configuration: {}
             state_inputs: []
 
     # ============================================================================
@@ -704,7 +1122,7 @@ if __name__ == "__main__":
 
         t2los_pid_controller:
             module: colav_hybrid_automaton.automaton.dynamics
-            class_name: NoOpControllerDynamics
+            class_name: PIDControllerDynamics
             description: "pid controller tuned for transition to line of sight (T2LOS) mode."
             state_inputs:
             - "agent_state"
@@ -745,7 +1163,7 @@ if __name__ == "__main__":
                 dynamic_parameter_metrics:
                     - "m/s"
                     - "rad/s"
-            configuration: []
+            configuration: {}
 
     # ============================================================================
     # Modes (Q)
@@ -830,5 +1248,4 @@ if __name__ == "__main__":
     '''
     
     automaton = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd=yaml.safe_load(famd_content))
-    print (automaton)
 

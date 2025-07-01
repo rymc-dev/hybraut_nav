@@ -1,11 +1,11 @@
 from .dynamics import Dynamics
 from typing import NamedTuple
 
-def NoOpControllerDynamics(Dynamics):
-        
-    class PIDDynamicsOutput(NamedTuple):
-        velocity: float
-        yaw_rate: float
+class PIDDynamicsOutput(NamedTuple):
+    velocity: float
+    yaw_rate: float
+
+class NoOpControllerDynamics(Dynamics):
 
     def __init__(self, **init_kwargs):
         super().__init__(PIDDynamicsOutput, **init_kwargs)

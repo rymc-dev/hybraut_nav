@@ -84,7 +84,7 @@ resets:
       - "waypoints_state"
     reset_targets:
       - "waypoints_state"
-    configuration: []
+    configuration: {}
 
   generate_virtual_waypoint_reset:
     module: colav_hybrid_automaton.automaton.resets
@@ -117,7 +117,7 @@ guards:
       - "unsafe_set_state"
       - "waypoints_state"
     configuration:
-      - los_distance_threshold: 100.0
+      los_distance_threshold: 100.0
 
   heading_within_tolerance_guard:
     module: colav_hybrid_automaton.automaton.guards
@@ -127,7 +127,7 @@ guards:
       - "agent_state"
       - "waypoints_state"
     configuration:
-      - heading_tolerance: 0.2
+      heading_tolerance: 0.2
 
   heading_not_within_tolerance_guard:
     module: colav_hybrid_automaton.automaton.guards
@@ -137,7 +137,7 @@ guards:
       - "agent_state"
       - "waypoints_state"
     configuration:
-      - heading_tolerance: 0.2
+      heading_tolerance: 0.2
 
   virtual_waypoints_guard:
     module: colav_hybrid_automaton.automaton.guards
@@ -145,7 +145,7 @@ guards:
     description: "Checks if there are virtual waypoints available in the waypoints state."
     state_inputs:
       - "waypoints_state"
-    configuration: []
+    configuration: {}
 
   unsafe_conditions_guard:
     module: colav_hybrid_automaton.automaton.guards
@@ -155,7 +155,7 @@ guards:
       - "agent_state"
       - "obstacles_state"
       - "unsafe_set_state"
-    configuration: []
+    configuration: {}
 
   waypoint_reached_guard:
     module: colav_hybrid_automaton.automaton.guards
@@ -164,7 +164,7 @@ guards:
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    configuration: []
+    configuration: {}
 
 # ============================================================================
 # Invariants (Inv)
@@ -177,21 +177,21 @@ invariants:
     description: "Checks if the current waypoint is the goal waypoint."
     state_inputs:
       - "waypoints_state"
-    configuration: []
+    configuration: {}
 
   trivial_invariant:
     module: colav_hybrid_automaton.automaton.invariants
     class_name: TrivialInvariant
     description: "A trivial invariant that always holds true."
     state_inputs: []
-    configuration: []
+    configuration: {}
 
   failing_invariant:
     module: colav_hybrid_automaton.automaton.invariants
     class_name: FailingInvariant
     description: "An invariant that always fails, used for fallback mode."
     state_inputs: []
-    configuration: []
+    configuration: {}
 
 # ============================================================================
 # Transitions (E)
@@ -291,7 +291,7 @@ dynamics:
 
   t2los_pid_controller:
     module: colav_hybrid_automaton.automaton.dynamics
-    class_name: NoOpControllerDynamics
+    class_name: PIDControllerDynamics
     description: "pid controller tuned for transition to line of sight (T2LOS) mode."
     state_inputs:
       - "agent_state"
@@ -332,7 +332,7 @@ dynamics:
       dynamic_parameter_metrics:
         - "m/s"
         - "rad/s"
-    configuration: []
+    configuration: {}
 
 # ============================================================================
 # Modes (Q)
