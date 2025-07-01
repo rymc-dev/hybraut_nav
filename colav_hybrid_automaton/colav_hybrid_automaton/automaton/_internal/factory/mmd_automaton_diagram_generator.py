@@ -1,6 +1,7 @@
 import os
 from colav_hybrid_automaton.automaton._internal.utils import load_yml
 from ament_index_python.packages import get_package_share_directory
+import subprocess
 
 state_diagram_save_path = os.path.join(os.path.dirname(__file__), '..', '.github', 'assets', 'diagrams')
 
@@ -114,6 +115,26 @@ def save_mermaid_diagram(mermaid_lines, filename="famd_state_diagram.mmd"):
         
     except IOError as e:
         print(f"Error saving file: {e}")
+
+def mermaid_to_png(mmd_file, output_file):
+    """Convert Mermaid file to PNG using mermaid-cli"""
+    try:
+        # Requires @mermaid-js/mermaid-cli to be installed globally
+        # npm install -g @mermaid-js/mermaid-cli
+        result = subprocess.run([
+            'mmdc', 
+            '-i', mmd_file, 
+            '-o', output_file,
+            '-t', 'neutral',  # theme
+            '-b', 'white'     # background color
+        ], capture_output=True, text=True, check=True)
+        
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e.stderr}")
+        return False
+
+
         
 def main():
     """Main execution function."""
@@ -137,7 +158,7 @@ def main():
         print("-" * 40)
         
         # Save to file (you can specify a full path here)
-        output_filename = "famd_state_diagram.mmd"  # or "/path/to/your/desired/location/famd_state_diagram.mmd"
+        output_filename = f"{automaton_data['automaton_name']}.famd.mmd"  # or "/path/to/your/desired/location/famd_state_diagram.mmd"
         save_mermaid_diagram(mermaid_lines, output_filename)
         
     except Exception as e:

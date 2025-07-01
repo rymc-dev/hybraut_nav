@@ -11,4 +11,7 @@ pytest-ordering
 pytest-dependency 
 PyYAML
 jsonschema
-git+https://github.com/Artemis-QUB-COLAV/colav-interfaces
+
+# External system dependencies (install seperately)
+# cd ~/ros2_ws/src && git clone git+https://github.com/Artemis-QUB-COLAV/colav-interfaces && cd .. && colcon build --package-select colav-interfaces
+# sudo apt install npm && npm install -g @mermaid-js/mermaid-cli
