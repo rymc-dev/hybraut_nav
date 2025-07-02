@@ -97,7 +97,7 @@ class HybridAutomatonFactory:
                 if section not in self.famd:
                     self.errors.append(f"Missing required section: {section}")
 
-        def validate_modes(self):
+        def _validate_modes(self):
             """Validate mode definitions."""
             if 'modes' not in self.famd:
                 return
