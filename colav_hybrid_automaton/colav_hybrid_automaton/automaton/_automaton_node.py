@@ -54,10 +54,10 @@ from colav_hybrid_automaton.automaton._internal.callbacks import (
     handle_invariant_timeout_guard
 )
 from colav_hybrid_automaton.automaton._internal.factory import (
-    initialize_dynamics,
-    initialize_guards,
-    initialize_invariants,
-    initialize_resets
+    create_state_publishers,
+    create_state_subscriptions,
+    generate_mode_profile,
+    HybridAutomatonFactory
 )
 from hybrid_automaton_interfaces.msg import HybridAutomatonInvariant
 
@@ -201,15 +201,17 @@ class HybridAutomatonNode(LifecycleNode):
             
             self._evaluation_frequency = _evaluation_frequency
             self._control_frequency = _control_frequency
-            self._configuration = create_hybrid_automaton_config(
-                config=load_yml(
+            automaton_famd=load_yml(
                     yml_path=_configuration_file_path
-            ))
+            )
+            self._configuration = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd)
+            # self._configuration = create_hybrid_automaton_config(
+            #     )
 
-            self._configuration["guards"] = initialize_guards(guards_configuration=self._configuration["guards"])
-            self._configuration["dynamics"] = initialize_dynamics(dynamics_configuration=self._configuration["dynamics"])
-            self._configuration["resets"] = initialize_resets(resets_configuration=self._configuration["resets"])
-            self._configuration["invariants"] = initialize_invariants(invariants_configuration=self._configuration["invariants"])
+            # self._configuration["guards"] = initialize_guards(guards_configuration=self._configuration["guards"])
+            # self._configuration["dynamics"] = initialize_dynamics(dynamics_configuration=self._configuration["dynamics"])
+            # self._configuration["resets"] = initialize_resets(resets_configuration=self._configuration["resets"])
+            # self._configuration["invariants"] = initialize_invariants(invariants_configuration=self._configuration["invariants"])
 
             self._states = create_state_subscriptions(node=self, state_configuration=self._configuration['states'])
             

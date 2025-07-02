@@ -1,12 +1,12 @@
 from threading import Lock
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
 from typing import List
 from rclpy.publisher import Publisher
 from builtin_interfaces.msg import Time
 from hybrid_automaton_interfaces.msg import HybridAutomatonGuardEvaluations
 from rclpy.logging import RcutilsLogger
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus
-from colav_hybrid_automaton.automaton.utils import validate_mode
+from colav_hybrid_automaton.automaton._internal.utils import validate_mode
 
 def evaluate_guards_timer_callback(
     lock: Lock,

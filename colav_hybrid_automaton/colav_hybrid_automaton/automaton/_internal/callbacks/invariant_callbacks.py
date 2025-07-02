@@ -1,5 +1,5 @@
 from std_msgs.msg import Bool, String
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
 from rclpy.node import Node
 from typing import Optional, List, Any
 from threading import Lock
@@ -7,7 +7,7 @@ from rclpy.publisher import Publisher
 from hybrid_automaton_interfaces.msg import HybridAutomatonInvariant
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from builtin_interfaces.msg import Time
-from colav_hybrid_automaton.automaton.utils import validate_mode
+from colav_hybrid_automaton.automaton._internal.utils import validate_mode
 
 def evaluate_invariants_timer_callback(
     lock: Lock,

@@ -2,7 +2,7 @@ from hybrid_automaton_interfaces.msg import HybridAutomatonDynamics
 from rclpy.node import Node
 from typing import List, Any, Dict, Callable
 from threading import Lock
-from colav_hybrid_automaton.automaton.utils import validate_mode
+from colav_hybrid_automaton.automaton._internal.utils import validate_mode
 from builtin_interfaces.msg import Time
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.publisher import Publisher

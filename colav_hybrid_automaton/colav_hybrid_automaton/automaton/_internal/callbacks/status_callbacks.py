@@ -3,8 +3,8 @@ from lifecycle_msgs.srv import ChangeState
 from lifecycle_msgs.msg import Transition as LifecycleTransition
 from hybrid_automaton_interfaces.msg import HybridAutomatonGuardEvaluations
 from rclpy.node import Node
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
-from colav_hybrid_automaton.automaton.utils import select_highest_priority_transition
+from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.utils import select_highest_priority_transition
 from std_msgs.msg import String
 from time import time
 

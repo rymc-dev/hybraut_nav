@@ -1,14 +1,14 @@
 from std_msgs.msg import String
 from rclpy.node import Node
-from colav_hybrid_automaton.automaton.constants import  HybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.constants import  HybridAutomatonStatusEnum
 from threading import Lock
 from rclpy.publisher import Publisher
-from colav_hybrid_automaton.automaton.factory import generate_mode_profile
+from colav_hybrid_automaton.automaton._internal.factory import generate_mode_profile
 
 from typing import Tuple
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
-from colav_hybrid_automaton.automaton.utils import validate_mode
+from colav_hybrid_automaton.automaton._internal.utils import validate_mode
 from typing import List
 from hybrid_automaton_interfaces.msg import HybridAutomatonMode
 

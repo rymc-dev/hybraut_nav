@@ -1,8 +1,8 @@
 from rclpy.node import Node
 from std_msgs.msg import String
 from hybrid_automaton_interfaces.msg import HybridAutomatonGuardEvaluations as GuardsEvaluation
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum
-from colav_hybrid_automaton.automaton.utils import validate_mode
+from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.utils import validate_mode
 from threading import Lock
 from builtin_interfaces.msg import Time
 from rclpy.impl.rcutils_logger import RcutilsLogger
@@ -10,7 +10,7 @@ from rclpy.publisher import Publisher
 from typing import List
 from rclpy.guard_condition import GuardCondition
 from rclpy.node import Node
-from colav_hybrid_automaton.automaton.utils import parse_transition
+from colav_hybrid_automaton.automaton._internal.utils import parse_transition
 from typing import Any
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus
 

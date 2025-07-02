@@ -5,7 +5,7 @@ from .invariant_callbacks import (
     on_invariant_received_callback,
     handle_invariant_timeout_guard
 )
-from .mode_callbacks import on_mode_callback
+from .mode_callback import on_mode_callback
 from .reset_callbacks import reset_callback
 from .status_callbacks import on_status_received_callback
 from .guards_callback import evaluate_guards_timer_callback
