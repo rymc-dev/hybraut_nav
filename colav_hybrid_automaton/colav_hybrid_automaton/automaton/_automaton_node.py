@@ -182,14 +182,14 @@ class HybridAutomatonNode(LifecycleNode):
                 )
             )
 
-        self.get_logger().info(f"{name}: managed node initialized")
+        self.get_logger().info(f"🤖 hybrid_automaton: managed node initialized")
 
 
     """ === LifeCycle Transition Functions === """
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         """on configuration state initializes node attributes like subscribers and publishers"""
-        self.get_logger().info(f"Node '{self.get_name()}' is in state '{state.label}'. Transitioning to 'configure'")
+        self.get_logger().info(f"🔄 Node '{self.get_name()}' 📍 '{state.label}' ➡️ configure")
 
         try:
             # retrieve configuration params
@@ -292,14 +292,14 @@ class HybridAutomatonNode(LifecycleNode):
             self.get_logger().error(f"unexpected exception occured during transition from '{state.label}' to 'configured': {str(e)}")
             return TransitionCallbackReturn.FAILURE
         
-        self.get_logger().info(f"Node '{self.get_name()}' configured!")
+        self.get_logger().info(f"✅ Node '{self.get_name()}' configured!")
         return super().on_configure(state)
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         """
         activates the hybrid automaton
         """
-        self.get_logger().info(f"Node '{self.get_name()}' is in state '{state.label}'. Transitioning to 'activate'")
+        self.get_logger().info(f"🔌 {self.get_name()}: {state.label} ➡️ activating")
 
         try:
             # initialize transition trigger client
@@ -438,7 +438,7 @@ class HybridAutomatonNode(LifecycleNode):
             
             # start timers
             # self._guards_evaluation_timer.reset()
-            # self._dynamics_timer.reset()
+            self._dynamics_timer.reset()
             # self._invariant_evaluation_timer.reset()
     
             for param_key in self._ACTIVATION_PARAMS:
@@ -448,7 +448,7 @@ class HybridAutomatonNode(LifecycleNode):
             self.get_logger().error(f"unexpected exception occured during transition from '{state.label}' to 'activate': {str(e)}")
             return TransitionCallbackReturn.FAILURE
 
-        self.get_logger().info(f"Node '{self.get_name()}' activated!")
+        self.get_logger().info(f"🚀 {self.get_name()}: activation complete!")
         return super().on_activate(state)
     
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
