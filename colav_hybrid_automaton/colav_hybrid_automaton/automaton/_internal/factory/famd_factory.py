@@ -97,30 +97,30 @@ class HybridAutomatonFactory:
                 if section not in self.famd:
                     self.errors.append(f"Missing required section: {section}")
 
-        def _validate_modes(self):
+        def validate_modes(self):
             """Validate mode definitions."""
             if 'modes' not in self.famd:
                 return
-                
-            modes = self.famd['modes']
-            mode_indices = set()
             
-            for mode_name, mode_def in modes.items():
+            modes = self.famd['modes']
+            mode_names = set()
+            
+            for mode_index, mode_def in modes.items():
                 # Check required fields
-                required_fields = ['index', 'description', 'dynamics', 'invariants', 'transitions']
+                required_fields = ['name', 'description', 'dynamics', 'invariants', 'transitions']
                 for field in required_fields:
                     if field not in mode_def:
-                        self.errors.append(f"Mode '{mode_name}' missing required field: {field}")
+                        self.errors.append(f"Mode with index '{mode_index}' missing required field: {field}")
                 
-                # Check for duplicate indices
-                if 'index' in mode_def:
-                    index = mode_def['index']
-                    if index in mode_indices:
-                        self.errors.append(f"Duplicate mode index {index} found in mode '{mode_name}'")
-                    mode_indices.add(index)
+                # Check for duplicate names
+                if 'name' in mode_def:
+                    name = mode_def['name']
+                    if name in mode_names:
+                        self.errors.append(f"Duplicate mode name '{name}' found in mode with index '{mode_index}'")
+                    mode_names.add(name)
                 
                 # Validate transition priorities within each mode
-                self._validate_mode_transition_priorities(mode_name, mode_def)
+                self._validate_mode_transition_priorities(mode_index, mode_def)
 
         def _validate_mode_transition_priorities(self, mode_name: str, mode_def: Dict):
             """Validate transition priorities within a mode."""
@@ -796,7 +796,7 @@ class HybridAutomatonFactory:
         # Phase 1: Validation
         print("🔍 [1/4] Validating FAMD file structure...")
         HybridAutomatonFactory._validate_famd_content(automaton_famd)
-        
+        print("")
         
         # Phase 2: Dynamic imports
         print("⚡ [2/4] Dynamically importing components...")
