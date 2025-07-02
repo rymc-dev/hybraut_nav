@@ -243,7 +243,7 @@ transitions:
       - 1
     origin_priorities:
       - 0
-    target_mode: "cruise"
+    target_mode: 0
     guard: "heading_within_tolerance_guard"
     reset: null
 

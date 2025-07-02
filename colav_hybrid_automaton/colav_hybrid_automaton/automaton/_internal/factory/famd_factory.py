@@ -509,7 +509,7 @@ class HybridAutomatonFactory:
             ])
             
             # Extract data with defaults
-            init_mode = automaton_data.get('initial_mode', '')
+            init_mode = automaton_data.get('initial_mode', -1)
             goal_modes = automaton_data.get('goal_modes', [])
             modes = automaton_data.get('modes', {})
             transitions = automaton_data.get('transitions', {})
@@ -524,7 +524,7 @@ class HybridAutomatonFactory:
         
         def _add_initial_state(self, mermaid: List[str], init_mode: str) -> None:
             """Add initial state to diagram."""
-            if init_mode:
+            if isinstance(init_mode, int):
                 mermaid.extend([
                     "    %% Initial Mode",
                     f"    [*] --> {init_mode}",
@@ -546,7 +546,7 @@ class HybridAutomatonFactory:
                 description = mode_data.get('description', '')
                 
                 # State definition
-                mermaid.append(f"    {mode_name} : {mode_index}.{mode_name}")
+                mermaid.append(f"    {mode_index} : {mode_index}.{mode_name}")
                 
                 # Add detailed note if additional info exists
                 if any([invariants, dynamics, description]):
@@ -565,7 +565,7 @@ class HybridAutomatonFactory:
         ) -> None:
             """Add detailed note for a mode."""
             mermaid.extend([
-                f"    note left of {mode_name}",
+                f"    note left of {mode_index}",
                 "        =====================",
                 f"        <b>{mode_index}.{mode_name}</b>",
                 "        ====================="
@@ -835,417 +835,422 @@ class HybridAutomatonFactory:
 if __name__ == "__main__":
     # Your FAMD content from the document
     famd_content = '''# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD)
-    # ============================================================================
-    # ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
-    # ============================================================================
-    # This defines the configuration for the Hybrid Automaton used in ROS2.
-    # It includes mode declarations, transitions, guards, resets, invariants,
-    # initial states, and parameter settings in a structured and interpretable format.
-    #
-    # IMPORTANT:
-    # - Python function links (guards/resets) must point to valid, importable symbols.
-    # - Functions must be exposed via __init__.py with __all__ to enable automatic access.
-    # - Module paths must be within the Python build path (not direct file paths).
-    #
-    # Hybrid Automaton formalism:
-    #   HA = (Q, Q_goal, X, F, Init, Inv, E, G, R)
-    #
-    #   Q      = modes
-    #   Q_goal = goal_modes # Optional
-    #   X      = states
-    #   F      = dynamics
-    #   Init   = init_mode
-    #   Inv    = invariants
-    #   E      = transitions
-    #   G      = guards
-    #   R      = resets
-    #
-    # additional param:
-    # params: This provides metatdata related to the hybrid automaton
+# ============================================================================
+# ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
+# ============================================================================
+# This defines the configuration for the Hybrid Automaton used in ROS2.
+# It includes mode declarations, transitions, guards, resets, invariants,
+# initial states, and parameter settings in a structured and interpretable format.
+#
+# IMPORTANT:
+# - Python function links (guards/resets) must point to valid, importable symbols.
+# - Functions must be exposed via __init__.py with __all__ to enable automatic access.
+# - Module paths must be within the Python build path (not direct file paths).
+#
+# Hybrid Automaton formalism:
+#   HA = (Q, Q_goal, X, F, Init, Inv, E, G, R)
+#
+#   Q      = modes
+#   Q_goal = goal_modes # Optional
+#   X      = states
+#   F      = dynamics
+#   Init   = init_mode
+#   Inv    = invariants
+#   E      = transitions
+#   G      = guards
+#   R      = resets
+#
+# additional param:
+# params: This provides metatdata related to the hybrid automaton
 
-    # ============================================================================
-    # Continuous States (X)
-    # These are received via ROS2 topics. Metadata is included per state.
-    # Each of these states have buffers associated with buffer_size set in params
-    # ============================================================================
-    states:
-        agent_state:
-            topic: "/state/agent"
-            type:
-                pkg: "colav_interfaces.msg"
-                msg: "AgentState"
-            params:
-            - update_hz: 10.0
-            - timeout_sec: 0.5
-            - buffer_size: 100
+# ============================================================================
+# Continuous States (X)
+# These are received via ROS2 topics. Metadata is included per state.
+# Each of these states have buffers associated with buffer_size set in params
+# ============================================================================
+states:
+  agent_state:
+    topic: "/state/agent"
+    description: "State of the agent including position, velocity and heading."
+    type:
+      pkg: "colav_interfaces.msg"
+      msg: "AgentState"
+    params:
+      - update_hz: 10.0
+      - timeout_sec: 0.5
+      - buffer_size: 100
 
-        obstacles_state:
-            topic: "/state/obstacles"
-            type:
-                pkg: "colav_interfaces.msg"
-                msg: "ObstaclesState"
-            params:
-            - update_hz: 4.0
-            - timeout_sec: 1.0
+  obstacles_state:
+    topic: "/state/obstacles"
+    description: "State of the obstacles in the environment."
+    type:
+      pkg: "colav_interfaces.msg"
+      msg: "ObstaclesState"
+    params:
+      - update_hz: 4.0
+      - timeout_sec: 1.0
 
-        unsafe_set_state:
-            topic: "/state/unsafe_set"
-            type:
-                pkg: "colav_interfaces.msg"
-                msg: "UnsafeSetState"
-            params:
-            - update_hz: 2.0
-            - timeout_sec: 1.5
+  unsafe_set_state:
+    topic: "/state/unsafe_set"
+    description: "State of the unsafe set, indicating unsafe conditions for the agent."
+    type:
+      pkg: "colav_interfaces.msg"
+      msg: "UnsafeSetState"
+    params:
+      - update_hz: 2.0
+      - timeout_sec: 1.5
 
-        waypoints_state:
-            topic: "/state/waypoints"
-            type:
-                pkg: "colav_interfaces.msg"
-                msg: WaypointsState
+  waypoints_state:
+    topic: "/state/waypoints"
+    description: "State of the waypoints including current waypoint and virtual waypoints."
+    type:
+      pkg: "colav_interfaces.msg"
+      msg: WaypointsState
 
-    # ============================================================================
-    # Reset Functions (R)
-    # Executed during transitions to modify continuous state.
-    # ============================================================================
-    resets:
-        remove_virtual_waypoint_reset:
-            module: colav_hybrid_automaton.automaton.resets
-            class_name: RemoveVirtualWaypointReset
-            description: "Remove the first virtual waypoint from the waypoints state and update the current waypoint."
-            state_inputs:
-            - "waypoints_state"
-            reset_targets:
-            - "waypoints_state"
-            configuration: {}
+# ============================================================================
+# Reset Functions (R)
+# Executed during transitions to modify continuous state.
+# ============================================================================
+resets:
+  remove_virtual_waypoint_reset:
+    module: colav_hybrid_automaton.automaton.resets
+    class_name: RemoveVirtualWaypointReset
+    description: "Remove the first virtual waypoint from the waypoints state and update the current waypoint."
+    state_inputs:
+      - "waypoints_state"
+    reset_targets:
+      - "waypoints_state"
+    configuration: {}
 
-        generate_virtual_waypoint_reset:
-            module: colav_hybrid_automaton.automaton.resets
-            class_name: GenerateVirtualWaypointReset
-            description: "Generate a virtual waypoint based on the agent's position and obstacles, and add it to the waypoints state updating the current waypoint to it."
-            state_inputs:
-            - "agent_state"
-            - "obstacles_state"
-            - "unsafe_set_state"
-            - "waypoints_state"
-            reset_targets:
-            - "waypoints_state"
-            configuration:
-                longitudinal_offset_distance: 30.0
-                lateral_offset_distance: 5.0
-                virtual_waypoint_acceptance_radius: 20.0
+  generate_virtual_waypoint_reset:
+    module: colav_hybrid_automaton.automaton.resets
+    class_name: GenerateVirtualWaypointReset
+    description: "Generate a virtual waypoint based on the agent's position and obstacles, and add it to the waypoints state updating the current waypoint to it."
+    state_inputs:
+      - "agent_state"
+      - "obstacles_state"
+      - "unsafe_set_state"
+      - "waypoints_state"
+    reset_targets:
+      - "waypoints_state"
+    configuration:
+      longitudinal_offset_distance: 30.0
+      lateral_offset_distance: 5.0
+      virtual_waypoint_acceptance_radius: 20.0
 
-    # ============================================================================
-    # Guard Conditions (G)
-    # Boolean functions checked during transition evaluation.
-    # ============================================================================
-    guards:
-        los_clear_to_waypoint_guard:
-            module: colav_hybrid_automaton.automaton.guards
-            class_name: LOSClearToWaypointGuard
-            description: "Checks if the line of sight from agent position to the current waypoint is clear."
-            state_inputs:
-            - "agent_state"
-            - "obstacles_state"
-            - "unsafe_set_state"
-            - "waypoints_state"
-            configuration:
-                los_distance_threshold: 100.0
+# ============================================================================
+# Guard Conditions (G)
+# Boolean functions checked during transition evaluation.
+# ============================================================================
+guards:
+  los_clear_to_waypoint_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: LOSClearToWaypointGuard
+    description: "Checks if the line of sight from agent position to the current waypoint is clear."
+    state_inputs:
+      - "agent_state"
+      - "obstacles_state"
+      - "unsafe_set_state"
+      - "waypoints_state"
+    configuration:
+      los_distance_threshold: 100.0
 
-        heading_within_tolerance_guard:
-            module: colav_hybrid_automaton.automaton.guards
-            class_name: HeadingWithinToleranceGuard
-            description: "Checks if the agent's heading is within a specified tolerance of the waypoint direction."
-            state_inputs:
-            - "agent_state"
-            - "waypoints_state"
-            configuration:
-                heading_tolerance: 0.2
+  heading_within_tolerance_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: HeadingWithinToleranceGuard
+    description: "Checks if the agent's heading is within a specified tolerance of the waypoint direction."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    configuration:
+      heading_tolerance: 0.2
 
-        heading_not_within_tolerance_guard:
-            module: colav_hybrid_automaton.automaton.guards
-            class_name: HeadingNotWithinToleranceGuard
-            description: "Checks if the agent's heading is not within a specified tolerance of the waypoint direction."
-            state_inputs:
-            - "agent_state"
-            - "waypoints_state"
-            configuration:
-              heading_tolerance: 0.2
+  heading_not_within_tolerance_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: HeadingNotWithinToleranceGuard
+    description: "Checks if the agent's heading is not within a specified tolerance of the waypoint direction."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    configuration:
+      heading_tolerance: 0.2
 
-        virtual_waypoints_guard:
-            module: colav_hybrid_automaton.automaton.guards
-            class_name: VirtualWaypointsGuard
-            description: "Checks if there are virtual waypoints available in the waypoints state."
-            state_inputs:
-            - "waypoints_state"
-            configuration: {}
+  virtual_waypoints_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: VirtualWaypointsGuard
+    description: "Checks if there are virtual waypoints available in the waypoints state."
+    state_inputs:
+      - "waypoints_state"
+    configuration: {}
 
-        unsafe_conditions_guard:
-            module: colav_hybrid_automaton.automaton.guards
-            class_name: UnsafeConditionsGuard
-            description: "Checks if the agent is in unsafe conditions based on obstacles and unsafe set."
-            state_inputs:
-            - "agent_state"
-            - "obstacles_state"
-            - "unsafe_set_state"
-            configuration: {}
+  unsafe_conditions_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: UnsafeConditionsGuard
+    description: "Checks if the agent is in unsafe conditions based on obstacles and unsafe set."
+    state_inputs:
+      - "agent_state"
+      - "obstacles_state"
+      - "unsafe_set_state"
+    configuration: {}
 
-        waypoint_reached_guard:
-            module: colav_hybrid_automaton.automaton.guards
-            class_name: WaypointReachedGuard
-            description: "Checks if the agent has reached the current waypoint."
-            state_inputs:
-            - "agent_state"
-            - "waypoints_state"
-            configuration: {}
+  waypoint_reached_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: WaypointReachedGuard
+    description: "Checks if the agent has reached the current waypoint."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    configuration: {}
 
-    # ============================================================================
-    # Invariants (Inv)
-    # Leave empty if no mode constraints exist.
-    # ============================================================================
-    invariants:
-        is_goal_waypoint_invariant:
-            module: colav_hybrid_automaton.automaton.invariants
-            class_name: IsGoalWaypointInvariant
-            description: "Checks if the current waypoint is the goal waypoint."
-            state_inputs:
-            - "waypoints_state"
-            configuration: {}
+# ============================================================================
+# Invariants (Inv)
+# Leave empty if no mode constraints exist.
+# ============================================================================
+invariants:
+  is_goal_waypoint_invariant:
+    module: colav_hybrid_automaton.automaton.invariants
+    class_name: IsGoalWaypointInvariant
+    description: "Checks if the current waypoint is the goal waypoint."
+    state_inputs:
+      - "waypoints_state"
+    configuration: {}
 
-        trivial_invariant:
-            module: colav_hybrid_automaton.automaton.invariants
-            class_name: TrivialInvariant
-            description: "A trivial invariant that always holds true."
-            configuration: {}
-            state_inputs: []
+  trivial_invariant:
+    module: colav_hybrid_automaton.automaton.invariants
+    class_name: TrivialInvariant
+    description: "A trivial invariant that always holds true."
+    state_inputs: []
+    configuration: {}
 
-        failing_invariant:
-            module: colav_hybrid_automaton.automaton.invariants
-            class_name: FailingInvariant
-            description: "An invariant that always fails, used for fallback mode."
-            configuration: {}
-            state_inputs: []
+  failing_invariant:
+    module: colav_hybrid_automaton.automaton.invariants
+    class_name: FailingInvariant
+    description: "An invariant that always fails, used for fallback mode."
+    state_inputs: []
+    configuration: {}
 
-    # ============================================================================
-    # Transitions (E)
-    # Mapping of transition names to guard and reset functions.
-    # ============================================================================
+# ============================================================================
+# Transitions (E)
+# Mapping of transition names to guard and reset functions.
+# ============================================================================
+transitions:
+  plan_evasive_maneuver:
+    origin_modes:
+      - 0
+    origin_priorities:
+      - 2
+    target_mode: 1
+    guard: "los_clear_to_waypoint_guard"
+    reset: "generate_virtual_waypoint_reset"
+
+  correct_heading:
+    origin_modes:
+      - 0
+    origin_priorities:
+      - 3
+    target_mode: 1
+    guard: "heading_not_within_tolerance_guard"
+    reset: null
+
+  enter_emergency_fallback:
+    origin_modes:
+      - 0
+      - 1
+    origin_priorities:
+      - 0
+      - 0
+    target_mode: 3
+    guard: "unsafe_conditions_guard"
+    reset: null
+
+  waypoint_arrival:
+    origin_modes:
+      - 0
+      - 1
+    origin_priorities:
+      - 1
+      - 2
+    target_mode: 2
+    guard: "waypoint_reached_guard"
+    reset: null
+
+  heading_aligned:
+    origin_modes:
+      - 1
+    origin_priorities:
+      - 0
+    target_mode: 0
+    guard: "heading_within_tolerance_guard"
+    reset: null
+
+  proceed_to_next_waypoint:
+    origin_modes:
+      - 2
+    origin_priorities:
+      - 0
+    target_mode: 0
+    guard: "virtual_waypoints_guard"
+    reset: "remove_virtual_waypoint_reset"
+
+# ============================================================================
+# Dynamics (F)
+# Controllers used for continuous evolution within each mode.
+# ============================================================================
+dynamics:
+  cruise_pid_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: PIDControllerDynamics
+    description: "pid controller tuned for cruise mode."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    dynamic_outputs:
+      dynamic_parameter_names:
+        - "velocity"
+        - "yaw_rate"
+      dynamic_parameter_value_types:
+        - float
+        - float
+      dynamic_parameter_metrics:
+        - "m/s"
+        - "rad/s"
+    configuration:
+      target_velocity: 25.0 # updated cruise speed
+      yaw_kp: 0.3 # gentle heading proportional gain
+      yaw_ki: 0.01 # small integral for smooth correction
+      yaw_kd: 0.05 # small derivative gain to damp oscillations
+      vel_kp: 0.5 # moderate velocity proportional gain
+      vel_ki: 0.05 # small integral to avoid windup
+      vel_kd: 0.05 # small derivative for smooth velocity changes
+      error_tolerance: 0.01 # precision in heading error
+      max_yaw_rate: 0.1 # limit yaw rate to gentle turns
+
+  t2los_pid_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: PIDControllerDynamics
+    description: "pid controller tuned for transition to line of sight (T2LOS) mode."
+    state_inputs:
+      - "agent_state"
+      - "waypoints_state"
+    dynamic_outputs:
+      dynamic_parameter_names:
+        - "velocity"
+        - "yaw_rate"
+      dynamic_parameter_value_types:
+        - float
+        - float
+      dynamic_parameter_metrics:
+        - "m/s"
+        - "rad/s"
+    configuration:
+      target_velocity: 25.0 # updated cruise speed
+      yaw_kp: 0.3 # gentle heading proportional gain
+      yaw_ki: 0.01 # small integral for smooth correction
+      yaw_kd: 0.05 # small derivative gain to damp oscillations
+      vel_kp: 0.5 # moderate velocity proportional gain
+      vel_ki: 0.05 # small integral to avoid windup
+      vel_kd: 0.05 # small derivative for smooth velocity changes
+      error_tolerance: 0.01 # precision in heading error
+      max_yaw_rate: 0.1 # limit yaw rate to gentle turns
+
+  no_op_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: NoOpControllerDynamics
+    description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
+    state_inputs: []
+    dynamic_outputs:
+      dynamic_parameter_names:
+        - "velocity"
+        - "yaw_rate"
+      dynamic_parameter_value_types:
+        - float
+        - float
+      dynamic_parameter_metrics:
+        - "m/s"
+        - "rad/s"
+    configuration: {}
+
+# ============================================================================
+# Modes (Q)
+# Discrete states, each associated with dynamics, invariants, and transitions.
+# ============================================================================
+modes:
+  0:
+    name: cruise
+    description: "Cruise mode with pid controller tuned for cruise mode."
+    dynamics: cruise_pid_controller
+    invariants: trivial_invariant
     transitions:
-        plan_evasive_maneuver:
-            origin_modes: 
-            - "cruise"
-            origin_priorities:
-            - 2
-            target_mode: "t2los"
-            guard: "los_clear_to_waypoint_guard"
-            reset: "generate_virtual_waypoint_reset"
+      enter_emergency_fallback:
+        priority: 0
+      waypoint_arrival:
+        priority: 1
+      plan_evasive_maneuver:
+        priority: 2
+      correct_heading:
+        priority: 3
 
-        correct_heading:
-            origin_modes: 
-            - "cruise"
-            origin_priorities:
-            - 3
-            target_mode: "t2los"
-            guard: "heading_not_within_tolerance_guard"
-            reset: null
+  1:
+    name: t2los
+    description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
+    dynamics: t2los_pid_controller
+    invariants: trivial_invariant
+    transitions:
+      enter_emergency_fallback:
+        priority: 0
+      heading_aligned:
+        priority: 1
+      waypoint_arrival:
+        priority: 2
 
-        enter_emergency_fallback:
-            origin_modes: 
-            - "cruise"
-            - "t2los"
-            origin_priorities:
-            - 0
-            - 0
-            target_mode: "fallback"
-            guard: "unsafe_conditions_guard"
-            reset: null
+  2:
+    name: waypoint_reached
+    description: "Waypoint reached mode, indicating successful navigation to a waypoint"
+    dynamics: no_op_controller
+    invariants: is_goal_waypoint_invariant
+    transitions:
+      waypoint_arrival:
+        priority: 0
 
-        waypoint_arrival:
-            origin_modes: 
-            - "cruise"
-            - "t2los"
-            origin_priorities:
-            - 1
-            - 2
-            target_mode: "waypoint_reached"
-            guard: "waypoint_reached_guard"
-            reset: null
+  3:
+    name: fallback
+    description: "Fallback mode for emergency conditions, no active control"
+    dynamics: no_op_controller
+    invariants: failing_invariant
+    transitions: []
 
-        heading_aligned:
-            origin_modes: 
-            - "t2los"
-            origin_priorities:
-            - 0
-            target_mode: "cruise"
-            guard: "heading_within_tolerance_guard"
-            reset: null
+# ============================================================================
+# Goal Modes (Q_goal)
+# ============================================================================
+goal_modes:
+  - 2
 
-        proceed_to_next_waypoint:
-            origin_modes: 
-            - "waypoint_reached"
-            origin_priorities:
-            - 0
-            target_mode: "cruise"
-            guard: "virtual_waypoints_guard"
-            reset: "remove_virtual_waypoint_reset"
+# ============================================================================
+# Initial Mode (Init)
+# This is the mode the hybrid automaton will initially enter on
+# automaton activation
+# ============================================================================
+initial_mode: 0
 
-    # ============================================================================
-    # Dynamics (F)
-    # Controllers used for continuous evolution within each mode.
-    # ============================================================================
-    dynamics:
-        cruise_pid_controller:
-            module: colav_hybrid_automaton.automaton.dynamics
-            class_name: PIDControllerDynamics
-            description: "pid controller tuned for cruise mode."
-            state_inputs:
-            - "agent_state"
-            - "waypoints_state"
-            dynamic_outputs: 
-                dynamic_parameter_names:
-                    - "velocity"
-                    - "yaw_rate"
-                dynamic_parameter_value_types:
-                    - float
-                    - float
-                dynamic_parameter_metrics:
-                    - "m/s"
-                    - "rad/s"
-            configuration:
-                target_velocity: 25.0 # updated cruise speed
-                yaw_kp: 0.3 # gentle heading proportional gain
-                yaw_ki: 0.01 # small integral for smooth correction
-                yaw_kd: 0.05 # small derivative gain to damp oscillations
-                vel_kp: 0.5 # moderate velocity proportional gain
-                vel_ki: 0.05 # small integral to avoid windup
-                vel_kd: 0.05 # small derivative for smooth velocity changes
-                error_tolerance: 0.01 # precision in heading error
-                max_yaw_rate: 0.1 # limit yaw rate to gentle turns
+# ============================================================================
+# Parameters
+# these are parameters of the hybrid automaton set on
+# activation
+# ============================================================================
+parameters:
+  goal_waypoint:
+    type:
+      pkg: "colav_interfaces.msg"
+      msg: "Waypoint"
 
-        t2los_pid_controller:
-            module: colav_hybrid_automaton.automaton.dynamics
-            class_name: PIDControllerDynamics
-            description: "pid controller tuned for transition to line of sight (T2LOS) mode."
-            state_inputs:
-            - "agent_state"
-            - "waypoints_state"
-            dynamic_outputs: 
-                dynamic_parameter_names:
-                    - "velocity"
-                    - "yaw_rate"
-                dynamic_parameter_value_types:
-                    - float
-                    - float
-                dynamic_parameter_metrics:
-                    - "m/s"
-                    - "rad/s"
-            configuration:
-                target_velocity: 25.0 # updated cruise speed
-                yaw_kp: 0.3 # gentle heading proportional gain
-                yaw_ki: 0.01 # small integral for smooth correction
-                yaw_kd: 0.05 # small derivative gain to damp oscillations
-                vel_kp: 0.5 # moderate velocity proportional gain
-                vel_ki: 0.05 # small integral to avoid windup
-                vel_kd: 0.05 # small derivative for smooth velocity changes
-                error_tolerance: 0.01 # precision in heading error
-                max_yaw_rate: 0.1 # limit yaw rate to gentle turns
+  evaluation_frequency:
+    type: float
 
-        no_op_controller:
-            module: colav_hybrid_automaton.automaton.dynamics
-            class_name: NoOpControllerDynamics
-            description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
-            state_inputs: []
-            dynamic_outputs: 
-                dynamic_parameter_names:
-                    - "velocity"
-                    - "yaw_rate"
-                dynamic_parameter_value_types:
-                    - float
-                    - float
-                dynamic_parameter_metrics:
-                    - "m/s"
-                    - "rad/s"
-            configuration: {}
+  control_frequency:
+    type: float
 
-    # ============================================================================
-    # Modes (Q)
-    # Discrete states, each associated with dynamics, invariants, and transitions.
-    # ============================================================================
-    modes:
-        cruise:
-            index: 0
-            description: "Cruise mode with proportional velocity control"
-            dynamics: cruise_pid_controller
-            invariants: trivial_invariant
-            transitions:
-                enter_emergency_fallback:
-                    priority: 0
-                waypoint_arrival:
-                    priority: 1
-                plan_evasive_maneuver:
-                    priority: 2
-                correct_heading:
-                    priority: 3
+automaton_name: "colav_hybrid_automaton"
 
-        t2los:
-            index: 1
-            description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
-            dynamics: t2los_pid_controller
-            invariants: trivial_invariant
-            transitions:
-                enter_emergency_fallback:
-                    priority: 0
-                heading_aligned:
-                    priority: 1
-                waypoint_arrival:
-                    priority: 2
-
-        waypoint_reached:
-            index: 2
-            description: "Waypoint reached mode, indicating successful navigation to a waypoint"
-            dynamics: no_op_controller
-            invariants: is_goal_waypoint_invariant
-            transitions:
-                waypoint_arrival:
-                    priority: 0
-
-        fallback:
-            index: 3
-            description: "Fallback mode for emergency conditions, no active control"
-            dynamics: no_op_controller
-            invariants: failing_invariant
-            transitions: []
-
-    # ============================================================================
-    # Goal Modes (Q_goal)
-    # ============================================================================
-    goal_modes:
-    - waypoint_reached
-
-    # ============================================================================
-    # Initial Mode (Init)
-    # This is the mode the hybrid automaton will initially enter on
-    # automaton activation
-    # ============================================================================
-    initial_mode: "cruise"
-
-    # ============================================================================
-    # Parameters
-    # these are parameters of the hybrid automaton set on
-    # activation
-    # ============================================================================
-    parameters:
-        goal_waypoint:
-            type:
-            pkg: "colav_interfaces.msg"
-            msg: "Waypoint"
-
-        evaluation_frequency:
-            type: float
-
-        control_frequency:
-            type: float
-
-    automaton_name: "colav_hybrid_automaton"
     '''
     
     automaton = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd=yaml.safe_load(famd_content))
