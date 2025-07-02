@@ -199,48 +199,48 @@ invariants:
 # ============================================================================
 transitions:
   plan_evasive_maneuver:
-    origin_modes: 
-      - "cruise"
+    origin_modes:
+      - 0
     origin_priorities:
       - 2
-    target_mode: "t2los"
+    target_mode: 1
     guard: "los_clear_to_waypoint_guard"
     reset: "generate_virtual_waypoint_reset"
 
   correct_heading:
-    origin_modes: 
-      - "cruise"
+    origin_modes:
+      - 0
     origin_priorities:
       - 3
-    target_mode: "t2los"
+    target_mode: 1
     guard: "heading_not_within_tolerance_guard"
     reset: null
 
   enter_emergency_fallback:
-    origin_modes: 
-      - "cruise"
-      - "t2los"
+    origin_modes:
+      - 0
+      - 1
     origin_priorities:
       - 0
       - 0
-    target_mode: "fallback"
+    target_mode: 3
     guard: "unsafe_conditions_guard"
     reset: null
 
   waypoint_arrival:
-    origin_modes: 
-      - "cruise"
-      - "t2los"
+    origin_modes:
+      - 0
+      - 1
     origin_priorities:
       - 1
       - 2
-    target_mode: "waypoint_reached"
+    target_mode: 2
     guard: "waypoint_reached_guard"
     reset: null
 
   heading_aligned:
-    origin_modes: 
-      - "t2los"
+    origin_modes:
+      - 1
     origin_priorities:
       - 0
     target_mode: "cruise"
@@ -248,11 +248,11 @@ transitions:
     reset: null
 
   proceed_to_next_waypoint:
-    origin_modes: 
-      - "waypoint_reached"
+    origin_modes:
+      - 2
     origin_priorities:
       - 0
-    target_mode: "cruise"
+    target_mode: 0
     guard: "virtual_waypoints_guard"
     reset: "remove_virtual_waypoint_reset"
 
@@ -268,7 +268,7 @@ dynamics:
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    dynamic_outputs: 
+    dynamic_outputs:
       dynamic_parameter_names:
         - "velocity"
         - "yaw_rate"
@@ -296,7 +296,7 @@ dynamics:
     state_inputs:
       - "agent_state"
       - "waypoints_state"
-    dynamic_outputs: 
+    dynamic_outputs:
       dynamic_parameter_names:
         - "velocity"
         - "yaw_rate"
@@ -322,7 +322,7 @@ dynamics:
     class_name: NoOpControllerDynamics
     description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
     state_inputs: []
-    dynamic_outputs: 
+    dynamic_outputs:
       dynamic_parameter_names:
         - "velocity"
         - "yaw_rate"
@@ -339,8 +339,8 @@ dynamics:
 # Discrete states, each associated with dynamics, invariants, and transitions.
 # ============================================================================
 modes:
-  cruise:
-    index: 0
+  0:
+    name: cruise
     description: "Cruise mode with pid controller tuned for cruise mode."
     dynamics: cruise_pid_controller
     invariants: trivial_invariant
@@ -354,8 +354,8 @@ modes:
       correct_heading:
         priority: 3
 
-  t2los:
-    index: 1
+  1:
+    name: t2los
     description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
     dynamics: t2los_pid_controller
     invariants: trivial_invariant
@@ -367,8 +367,8 @@ modes:
       waypoint_arrival:
         priority: 2
 
-  waypoint_reached:
-    index: 2
+  2:
+    name: waypoint_reached
     description: "Waypoint reached mode, indicating successful navigation to a waypoint"
     dynamics: no_op_controller
     invariants: is_goal_waypoint_invariant
@@ -376,8 +376,8 @@ modes:
       waypoint_arrival:
         priority: 0
 
-  fallback:
-    index: 3
+  3:
+    name: fallback
     description: "Fallback mode for emergency conditions, no active control"
     dynamics: no_op_controller
     invariants: failing_invariant
@@ -387,14 +387,14 @@ modes:
 # Goal Modes (Q_goal)
 # ============================================================================
 goal_modes:
-  - waypoint_reached
+  - 2
 
 # ============================================================================
 # Initial Mode (Init)
 # This is the mode the hybrid automaton will initially enter on
 # automaton activation
 # ============================================================================
-initial_mode: "cruise"
+initial_mode: 0
 
 # ============================================================================
 # Parameters

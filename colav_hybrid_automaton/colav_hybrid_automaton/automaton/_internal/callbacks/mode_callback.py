@@ -11,11 +11,13 @@ from rclpy.node import Node
 from colav_hybrid_automaton.automaton._internal.utils import validate_mode
 from typing import List
 from hybrid_automaton_interfaces.msg import HybridAutomatonMode
+from typing import Dict
+
 
 def on_mode_callback(
     lock: Lock,
     node: Node,
-    available_modes: List[str],
+    available_modes: Dict[int, float],
     current_mode: HybridAutomatonMode,
     mode: HybridAutomatonMode,
     mode_configuration: dict,
@@ -29,10 +31,10 @@ def on_mode_callback(
 ):
     try:
         with lock:
-            if mode.data == current_mode:
+            if mode.type == current_mode.type:
                 return
             
-            mode.mode = validate_mode(available_modes, mode.mode)
+            validate_mode(available_modes, mode)
             
             (
                 mode, 

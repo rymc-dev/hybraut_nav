@@ -99,6 +99,12 @@ class HybridAutomatonNode(LifecycleNode):
             "COLAV Hybrid Automaton State for goal waypoints 'acceptance radius' (m)."
         ]
     }
+
+    _MODE_ENUM_MAP = {
+        value: name
+        for name, value in vars(HybridAutomatonMode).items()
+        if name.isupper() and isinstance(value, int)
+    }
             
     def __init__(
         self, 
@@ -108,7 +114,7 @@ class HybridAutomatonNode(LifecycleNode):
         super().__init__(name)
 
         # Internal states
-        self._mode:str = ""
+        self._mode:HybridAutomatonMode = HybridAutomatonMode(type=HybridAutomatonMode.MODE_INACTIVE, stamp=self.get_clock().now().to_msg())
         self._states:dict = {}
         self._mode_dynamics = None
         self._mode_invariant = None 
@@ -157,7 +163,7 @@ class HybridAutomatonNode(LifecycleNode):
         # Internal Continuous states
         self._goal_waypoint:Waypoint = None
 
-        self._available_modes:List[str] = None
+        # self._available_modes:List[str] = None
         self._configuration: dict = None
 
         self._control_frequency:int = 100
@@ -215,14 +221,14 @@ class HybridAutomatonNode(LifecycleNode):
 
             self._states = create_state_subscriptions(node=self, state_configuration=self._configuration['states'])
             
-            self._available_modes = list(self._configuration['modes'].keys())
+            # self._available_modes = list(self._configuration['modes'].keys())
 
             self._guards_evaluation_timer = self.create_timer(
                 timer_period_sec=1/self._evaluation_frequency, 
                 callback=lambda: evaluate_guards_timer_callback(
                     lock= self._transition_eval_lock,
                     mode = self._mode,
-                    available_modes = self._available_modes,
+                    available_modes = self._MODE_ENUM_MAP,
                     status = self._status,
                     states=self._states,
                     stamp = self.get_clock().now().to_msg(),
@@ -241,7 +247,7 @@ class HybridAutomatonNode(LifecycleNode):
                 callback=lambda: evaluate_dynamics_timer_callback(
                     lock=self._dynamics_timer_callback_lock,
                     mode=self._mode,
-                    available_modes=self._available_modes,
+                    available_modes=self._MODE_ENUM_MAP,
                     mode_dynamics=self._mode_dynamics,
                     states=self._states,
                     stamp=self.get_clock().now().to_msg(),
@@ -258,7 +264,7 @@ class HybridAutomatonNode(LifecycleNode):
                 callback=lambda: evaluate_invariants_timer_callback(
                     lock=self._invariant_evaluation_lock,
                     mode=self._mode,
-                    available_modes=self._available_modes,
+                    available_modes=self._MODE_ENUM_MAP,
                     stamp=self.get_clock().now().to_msg(),
                     invariant_config=self._mode_invariant,
                     states = self._states,
@@ -367,7 +373,7 @@ class HybridAutomatonNode(LifecycleNode):
                     states=self._states,
                     transition_config=self._mode_transitions,
                     status=self._status,
-                    available_modes=self._available_modes,
+                    available_modes=self._MODE_ENUM_MAP,
                     transition_evaluation=msg,
                     mode_publisher=self._mode_publisher,
                     status_publisher=self._status_publisher,
@@ -395,7 +401,7 @@ class HybridAutomatonNode(LifecycleNode):
                 callback=lambda msg: on_mode_callback(
                     lock=self._mode_callback_lock,
                     node=self,
-                    available_modes=self._available_modes,
+                    available_modes=self._MODE_ENUM_MAP,
                     current_mode=self._mode,
                     mode=msg,
                     mode_configuration=self._configuration['modes'],
@@ -427,12 +433,12 @@ class HybridAutomatonNode(LifecycleNode):
             )
 
             self._waypoints_publisher.publish(WaypointsState(waypoints=[self._goal_waypoint]))
-            self._mode_publisher.publish(String(data=str(self._configuration['init']['mode']))) # TODO: Need to add some validation to ensure init is given validly.
+            self._mode_publisher.publish(HybridAutomatonMode(type=self._configuration['modes'][self._configuration['initial_mode']]['index'], stamp=self.get_clock().now().to_msg())) # TODO: Need to add some validation to ensure init is given validly.
             
             # start timers
-            self._guards_evaluation_timer.reset()
-            self._dynamics_timer.reset()
-            self._invariant_evaluation_timer.reset()
+            # self._guards_evaluation_timer.reset()
+            # self._dynamics_timer.reset()
+            # self._invariant_evaluation_timer.reset()
     
             for param_key in self._ACTIVATION_PARAMS:
                 self.undeclare_parameter(param_key)
