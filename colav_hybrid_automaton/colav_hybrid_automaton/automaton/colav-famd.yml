@@ -18,7 +18,7 @@
 #   Q_goal = goal_modes # Optional
 #   X      = states
 #   F      = dynamics
-#   Init   = init_mode
+#   Init   = initial_mode
 #   Inv    = invariants
 #   E      = transitions
 #   G      = guards
@@ -242,7 +242,7 @@ transitions:
     origin_modes:
       - 1
     origin_priorities:
-      - 0
+      - 1
     target_mode: 0
     guard: "heading_within_tolerance_guard"
     reset: null
@@ -252,7 +252,7 @@ transitions:
       - 2
     origin_priorities:
       - 0
-    target_mode: 0
+    target_mode: 2
     guard: "virtual_waypoints_guard"
     reset: "remove_virtual_waypoint_reset"
 
@@ -373,7 +373,7 @@ modes:
     dynamics: no_op_controller
     invariants: is_goal_waypoint_invariant
     transitions:
-      waypoint_arrival:
+      proceed_to_next_waypoint:
         priority: 0
 
   3:

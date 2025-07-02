@@ -594,7 +594,7 @@ class HybridAutomatonFactory:
                 guard = transition_data.get('guard', '')
                 reset = transition_data.get('reset', 'null')
                 
-                if not target_mode:
+                if target_mode is None:
                     logger.warning(f"Skipping transition {transition_key}: no target mode")
                     continue
                 
@@ -854,7 +854,7 @@ if __name__ == "__main__":
 #   Q_goal = goal_modes # Optional
 #   X      = states
 #   F      = dynamics
-#   Init   = init_mode
+#   Init   = initial_mode
 #   Inv    = invariants
 #   E      = transitions
 #   G      = guards
@@ -1209,7 +1209,7 @@ modes:
     dynamics: no_op_controller
     invariants: is_goal_waypoint_invariant
     transitions:
-      waypoint_arrival:
+      proceed_to_next_waypoint:
         priority: 0
 
   3:
@@ -1250,7 +1250,6 @@ parameters:
     type: float
 
 automaton_name: "colav_hybrid_automaton"
-
     '''
     
     automaton = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd=yaml.safe_load(famd_content))

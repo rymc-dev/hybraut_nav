@@ -52,5 +52,7 @@ stateDiagram-v2
     1 --> 3 : <b>0.enter_emergency_fallback</b>  [<b>guard</b> = unsafe_conditions_guard, <b>reset</b> = None]
     0 --> 2 : <b>1.waypoint_arrival</b>  [<b>guard</b> = waypoint_reached_guard, <b>reset</b> = None]
     1 --> 2 : <b>2.waypoint_arrival</b>  [<b>guard</b> = waypoint_reached_guard, <b>reset</b> = None]
+    1 --> 0 : <b>1.heading_aligned</b>  [<b>guard</b> = heading_within_tolerance_guard, <b>reset</b> = None]
+    2 --> 2 : <b>0.proceed_to_next_waypoint</b>  [<b>guard</b> = virtual_waypoints_guard, <b>reset</b> = remove_virtual_waypoint_reset]
     %% Goal Modes
     2 --> [*]
