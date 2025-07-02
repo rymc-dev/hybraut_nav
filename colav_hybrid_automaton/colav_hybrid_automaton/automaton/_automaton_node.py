@@ -226,7 +226,7 @@ class HybridAutomatonNode(LifecycleNode):
             self._guards_evaluation_timer = self.create_timer(
                 timer_period_sec=1/self._evaluation_frequency, 
                 callback=lambda: evaluate_guards_timer_callback(
-                    lock= self._transition_eval_lock,
+                    lock = threading.Lock(),
                     mode = self._mode,
                     available_modes = self._MODE_ENUM_MAP,
                     status = self._status,
@@ -437,7 +437,7 @@ class HybridAutomatonNode(LifecycleNode):
             self._mode_publisher.publish(HybridAutomatonMode(type=self._configuration['initial_mode'], stamp=self.get_clock().now().to_msg())) # TODO: Need to add some validation to ensure init is given validly.
             
             # start timers
-            # self._guards_evaluation_timer.reset()
+            self._guards_evaluation_timer.reset()
             self._dynamics_timer.reset()
             # self._invariant_evaluation_timer.reset()
     

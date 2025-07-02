@@ -1,21 +1,23 @@
 from threading import Lock
 from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
-from typing import List
+from typing import List, Dict
 from rclpy.publisher import Publisher
 from builtin_interfaces.msg import Time
 from hybrid_automaton_interfaces.msg import HybridAutomatonGuardEvaluations
 from rclpy.logging import RcutilsLogger
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus
 from colav_hybrid_automaton.automaton._internal.utils import validate_mode
+from hybrid_automaton_interfaces.msg import HybridAutomatonMode
+
 
 def evaluate_guards_timer_callback(
     lock: Lock,
-    mode: str, 
+    mode: HybridAutomatonMode, 
     available_modes: List[str],
     status: HybridAutomatonStatusEnum,
-    mode_transitions: dict,
     states: dict,
     stamp: Time,
+    mode_transitions: Dict[int, str],
     status_publisher: Publisher,
     guards_evaluation_publisher: Publisher,
     logger: RcutilsLogger
