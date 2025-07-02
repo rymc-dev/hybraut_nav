@@ -539,24 +539,25 @@ class HybridAutomatonFactory:
             mermaid.append("    %% Modes")
             
             for mode_key, mode_data in modes.items():
-                mode_index = mode_data.get('index', '')
+                mode_index = mode_key
+                mode_name = mode_data.get('name', '')
                 invariants = mode_data.get('invariants', '')
                 dynamics = mode_data.get('dynamics', '')
                 description = mode_data.get('description', '')
                 
                 # State definition
-                mermaid.append(f"    {mode_key} : {mode_index}.{mode_key}")
+                mermaid.append(f"    {mode_name} : {mode_index}.{mode_name}")
                 
                 # Add detailed note if additional info exists
                 if any([invariants, dynamics, description]):
-                    self._add_mode_note(mermaid, mode_key, mode_index, description, invariants, dynamics)
+                    self._add_mode_note(mermaid, mode_name, mode_index, description, invariants, dynamics)
                 
                 mermaid.append("")
         
         def _add_mode_note(
             self, 
             mermaid: List[str], 
-            mode_key: str, 
+            mode_name: str, 
             mode_index: str, 
             description: str, 
             invariants: str, 
@@ -564,9 +565,9 @@ class HybridAutomatonFactory:
         ) -> None:
             """Add detailed note for a mode."""
             mermaid.extend([
-                f"    note left of {mode_key}",
+                f"    note left of {mode_name}",
                 "        =====================",
-                f"        <b>{mode_index}.{mode_key}</b>",
+                f"        <b>{mode_index}.{mode_name}</b>",
                 "        ====================="
             ])
             
