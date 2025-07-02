@@ -117,7 +117,7 @@ class HybridAutomatonNode(LifecycleNode):
         self._mode:HybridAutomatonMode = HybridAutomatonMode(type=HybridAutomatonMode.MODE_INACTIVE, stamp=self.get_clock().now().to_msg())
         self._states:dict = {}
         self._mode_dynamics = None
-        self._mode_invariant = None 
+        self._mode_invariants = None 
         self._mode_transitions = None
         self._status:HybridAutomatonStatusEnum
         self._invariant:bool
@@ -266,7 +266,7 @@ class HybridAutomatonNode(LifecycleNode):
                     mode=self._mode,
                     available_modes=self._MODE_ENUM_MAP,
                     stamp=self.get_clock().now().to_msg(),
-                    invariant_config=self._mode_invariant,
+                    invariant_config=self._mode_invariants,
                     states = self._states,
                     invariant_publisher = self._invariant_publisher,
                     logger=self.get_logger()
@@ -289,9 +289,10 @@ class HybridAutomatonNode(LifecycleNode):
                     )
                 )
         except Exception as e: 
-            self.get_logger().error(f"Configuration failed: {e}")
+            self.get_logger().error(f"unexpected exception occured during transition from '{state.label}' to 'configured': {str(e)}")
             return TransitionCallbackReturn.FAILURE
         
+        self.get_logger().info(f"Node '{self.get_name()}' configured!")
         return super().on_configure(state)
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
@@ -433,7 +434,7 @@ class HybridAutomatonNode(LifecycleNode):
             )
 
             self._waypoints_publisher.publish(WaypointsState(waypoints=[self._goal_waypoint]))
-            self._mode_publisher.publish(HybridAutomatonMode(type=self._configuration['modes'][self._configuration['initial_mode']]['index'], stamp=self.get_clock().now().to_msg())) # TODO: Need to add some validation to ensure init is given validly.
+            self._mode_publisher.publish(HybridAutomatonMode(type=self._configuration['initial_mode'], stamp=self.get_clock().now().to_msg())) # TODO: Need to add some validation to ensure init is given validly.
             
             # start timers
             # self._guards_evaluation_timer.reset()
@@ -447,6 +448,7 @@ class HybridAutomatonNode(LifecycleNode):
             self.get_logger().error(f"unexpected exception occured during transition from '{state.label}' to 'activate': {str(e)}")
             return TransitionCallbackReturn.FAILURE
 
+        self.get_logger().info(f"Node '{self.get_name()}' activated!")
         return super().on_activate(state)
     
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:

@@ -44,7 +44,7 @@ def create_state_publishers(node: Node) -> dict:
         node._configuration['states'][key]['pub'] = state_pub
 
 def generate_mode_profile(
-    mode: String,
+    mode: HybridAutomatonStatusEnum,
     mode_configuration: dict,
     transition_configuration: dict,
     dynamics_configuration: dict,
@@ -63,32 +63,42 @@ def generate_mode_profile(
         mode_invariant = {}     
 
         try:
-            mode = mode.data.lower()
-
-            mode_transitions = mode_configuration[mode].get('transitions', {})
+            mode_transitions = mode_configuration[mode.type].get('transitions', {})
 
             for mode_transition in mode_transitions:
                 mode_transitions_dict[mode_transition] = {
                     'guard':  { 
-                        **guard_configuration[transition_configuration[mode_transition]['guard']], 
+                        'instance': guard_configuration[transition_configuration[mode_transition]['guard']]['instance'],
+                        'state_inputs': guard_configuration[transition_configuration[mode_transition]['guard']]['state_inputs'],
                         'name': transition_configuration[mode_transition]['guard'] 
                     },
                     'reset': None if transition_configuration[mode_transition]['reset'] is None else { 
-                        **reset_configuration[transition_configuration[mode_transition]['reset']],
+                        'instance': reset_configuration[transition_configuration[mode_transition]['reset']]['instance'],
+                        'state_inputs': reset_configuration[transition_configuration[mode_transition]['reset']]['state_inputs'],
+                        'reset_targets': reset_configuration[transition_configuration[mode_transition]['reset']]['reset_targets'],
                         'name': transition_configuration[mode_transition]['reset']
                     },
-                    'priority': mode_configuration[mode]['transitions'][mode_transition]['priority']
+                    'priority': mode_configuration[mode.type]['transitions'][mode_transition]['priority']
                 }
 
-            dynamic_function_name = mode_configuration[mode]['dynamics']
-            mode_dynamics[dynamic_function_name]  = {'function': dynamics_configuration[dynamic_function_name]['function'], 'state_inputs': dynamics_configuration[dynamic_function_name].get('state_inputs', [])}
+            dynamic_function_name = mode_configuration[mode.type]['dynamics']
+            mode_dynamics_dict  = {
+                'instance': dynamics_configuration[dynamic_function_name]['instance'], 
+                'state_inputs': dynamics_configuration[dynamic_function_name].get('state_inputs', []), 
+                'dynamic_outputs': dynamics_configuration[dynamic_function_name].get('dynamic_outputs', []), 
+                'name': dynamic_function_name
+            }
 
-            invariant_name = mode_configuration[mode]['invariants']
-            mode_invariant[invariant_name] = {'function': invariants_configuration[invariant_name]['function'], 'state_inputs': invariants_configuration[invariant_name].get('state_inputs', [])}
+            invariant_name = mode_configuration[mode.type]['invariants']
+            mode_invariants_dict = {
+                'instance': invariants_configuration[invariant_name]['instance'], 
+                'state_inputs': invariants_configuration[invariant_name].get('state_inputs', []),
+                'name': invariant_name    
+            }
 
         except Exception as e: 
             raise ValueError(f'Exception occured _on_mode__received_callback, invalid mode received: {str(e)}')
             
-        return (mode, mode_transitions_dict, mode_dynamics, mode_invariant)
+        return (mode, mode_transitions_dict, mode_dynamics_dict, mode_invariants_dict)
     except Exception as e:
         raise ValueError(f"unexpected error occured in 'colav_hybrid_automaton.automaton.callbacks.on_mode_callback': {str(e)}")

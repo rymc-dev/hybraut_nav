@@ -40,7 +40,7 @@ def on_mode_callback(
                 mode, 
                 mode_transitions,
                 mode_dynamics,
-                mode_invariant
+                mode_invariants
             ) = generate_mode_profile(
                 mode,
                 mode_configuration,
@@ -54,7 +54,7 @@ def on_mode_callback(
             node._mode = mode
             node._mode_transitions = mode_transitions
             node._mode_dynamics = mode_dynamics
-            node._mode_invariant = mode_invariant
+            node._mode_invariants = mode_invariants
             logger.debug(f"Automaton mode successfully changed to '{mode}'.")
     except Exception as e:
         logger.debug(f"Automaton mode change to '{mode}' was rejected due to an error: {e}")
