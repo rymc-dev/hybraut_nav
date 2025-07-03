@@ -1,376 +1,206 @@
+import importlib
+import logging
 from dataclasses import dataclass, field
-from colav_hybrid_automaton.automaton.guards import  GuardABC
-from typing import Any, List
+from typing import Any, Dict, List, Optional, Type
+import yaml
+
+from colav_hybrid_automaton.automaton.guards import GuardABC
 from colav_hybrid_automaton.automaton.resets import ResetABC
 from colav_hybrid_automaton.automaton.invariants import InvariantABC
 from colav_hybrid_automaton.automaton.dynamics import DynamicsABC
-from typing import TypedDict, Dict
-from typing import Optional
-import importlib
-import yaml
-# We utilize data classes to define the hybrid automaton in the automaton lifecycle to simplify the storage
-# instead of always using dicts defined on the fly.
+
+# Set up module logger
+type Logger = logging.Logger
+logger: Logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def import_class(module_path: str, class_name: str) -> Type[Any]:
+    """
+    Dynamically import and return a class from a module.
+    """
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, class_name)
+    except (ImportError, AttributeError) as e:
+        raise ImportError(f"Cannot import '{class_name}' from '{module_path}': {e}")
+
 
 @dataclass
-class State: 
-
-    # details for ros2 state topic
+class State:
     topic: str
     msg_type: Any
-
-    # current runtime state
     current_state: Optional[Any] = None
-    
-    # metadata for states for strict sync checking
-    update_hz: Optional[float] = -1
-    timeout_sec: Optional[float] = -1.0
+    update_hz: float = -1.0
+    timeout_sec: float = -1.0
+
+    def update(self, value: Any) -> None:
+        """Update the current runtime state."""
+        self.current_state = value
+        logger.debug(f"State '{self.topic}' updated: {value}")
 
     @classmethod
-    def update_current_state(cls, current_state):
-        current_state = current_state
-
-    @classmethod
-    def from_famd(cls, state_famd_data: dict):
-        topic = state_famd_data.get('topic', '')
-
-        # Import message class dynamically
-        pkg_path = state_famd_data['type']['pkg']
-        msg_name = state_famd_data['type']['msg']
-        try:
-            module = importlib.import_module(pkg_path)
-            msg_type = getattr(module, msg_name)
-        except (ImportError, AttributeError) as e:
-            raise ImportError(f"Cannot import '{msg_name}' from '{pkg_path}': {e}")
-
+    def from_famd(cls, data: Dict[str, Any]) -> "State":
+        pkg = data['type']['pkg']
+        msg = data['type']['msg']
+        msg_cls = import_class(pkg, msg)
         return cls(
-            current_state=None,
-            topic=topic,
-            msg_type=msg_type,
+            topic=data.get('topic', ''),
+            msg_type=msg_cls,
+            update_hz=data.get('params', {}).get('update_hz', -1.0),
+            timeout_sec=data.get('params', {}).get('timeout_sec', -1.0),
         )
 
 
 @dataclass
 class Transition:
-    """transition between modes"""
     name: str
-    target_mode_key: int
-    guard: 'Transition.Guard'
-    reset: Optional['Transition.Reset'] = None
+    target_mode: int
+    guard: GuardABC
+    reset: Optional[ResetABC]
+    priority: int = 0
 
     @classmethod
-    def from_famd(cls, transition_name, transition_famd, guards_famd, resets_famd):
-        print ('hello world')
-        target_mode_key = transition_famd['target_mode']
-        guard_name = transition_famd['guard']
-        reset_name = transition_famd.get('reset', None)
+    def from_famd(
+        cls,
+        name: str,
+        cfg: Dict[str, Any],
+        guards: Dict[str, Dict[str, Any]],
+        resets: Dict[str, Dict[str, Any]],
+    ) -> "Transition":
+        priority = cfg.get('priority', 0)
+        guard_cfg = guards[cfg['guard']]
+        guard_cls = import_class(guard_cfg['module'], guard_cfg['class_name'])
+        guard_inst: GuardABC = guard_cls(**guard_cfg.get('configuration', {}))
 
-        guard: 'Transition.Guard' = cls.Guard.from_famd(
-            guard_name = guard_name, guard_famd = guards_famd[guard_name]
+        reset_inst: Optional[ResetABC] = None
+        if cfg.get('reset'):
+            rst_cfg = resets[cfg['reset']]
+            rst_cls = import_class(rst_cfg['module'], rst_cfg['class_name'])
+            reset_inst = rst_cls(**rst_cfg.get('configuration', {}))
+
+        logger.debug(
+            f"Loaded Transition '{name}' -> mode {cfg['target_mode']}"
         )
-        if reset_name == None: # just guard for this transition
-            return cls(
-              name = transition_name,
-              target_mode_key = target_mode_key,
-              guard = guard
-          )
-        else: # Guard + reset
-            reset: 'Transition.Reset' = cls.Reset.from_famd(
-                reset_name = reset_name, reset_famd = resets_famd[reset_name]
-            )
-            return cls(
-                name = transition_name,
-                target_mode_key = target_mode_key,
-                guard = guard,
-                reset = reset
-            )
-          
-    @dataclass
-    class Guard: 
-        name: str
-        description: str
-        instance: GuardABC
-        state_inputs: List[State] 
+        return cls(
+            name=name,
+            target_mode=cfg['target_mode'],
+            guard=guard_inst,
+            reset=reset_inst,
+            priority=priority,
+        )
 
-        @classmethod
-        def from_famd(cls, guard_name, guard_famd):
-            module = guard_famd['module']
-            class_name = guard_famd['class_name']
-            
-            try:
-              guard_class = getattr(importlib.import_module(module), class_name)
-            except (ImportError, AttributeError) as e:
-                raise ImportError(f"Cannot import '{class_name}' from '{module}': {e}")
-
-            init_kwargs = guard_famd['configuration']
-            guard_instance:GuardABC = guard_class(**init_kwargs)
-            guard_info = guard_instance.get_guard_info()
-            guard_description = guard_info['description']
-            
-            return cls(
-                name=guard_name,
-                description=guard_description,
-                instance=guard_instance,
-                state_inputs=guard_famd['state_inputs']
-            )
-
-    @dataclass
-    class Reset:
-        name: str   
-        description: str
-        instance: ResetABC
-        state_inputs: dict[str, State] = field(default_factory=dict)
-        reset_targets: dict[str, State] = field(default_factory=dict)
-
-        @classmethod
-        def from_famd(cls, reset_name,  reset_famd):
-            
-            module = reset_famd['module']
-            class_name = reset_famd['class_name']
-            
-            try:
-              guard_class = getattr(importlib.import_module(module), class_name)
-            except (ImportError, AttributeError) as e:
-                raise ImportError(f"Cannot import '{class_name}' from '{module}': {e}")
-
-            init_kwargs = reset_famd['configuration']
-            reset_instance:ResetABC = guard_class(**init_kwargs)
-            reset_info = reset_instance.get_reset_info()
-            reset_description = reset_info['description']
-            
-            return cls(
-                name = reset_name,
-                description = reset_description,
-                instance = reset_instance,
-                state_inputs = reset_famd['state_inputs'],
-                reset_targets = reset_famd['reset_targets']
-            )
 
 @dataclass
-class Invariant:
+class InvariantWrapper:
     instance: InvariantABC
     description: str
-    state_inputs: List[State] = field(default_factory=list)
+    state_inputs: List[str]
 
     @classmethod
-    def from_famd(cls, invariant_famd_data):
-        module = invariant_famd_data['module']
-        class_name = invariant_famd_data['class_name']
-        
-        try:
-            invariant_class = getattr(importlib.import_module(module), class_name)
-        except (ImportError, AttributeError) as e:
-            raise ImportError(f"Cannot import '{class_name}' from '{module}': {e}")
-
-        init_kwargs = invariant_famd_data['configuration']
-        invariant_instance: InvariantABC = invariant_class(**init_kwargs)
-
-        invariant_info = invariant_instance.get_invariant_info()
-        invariant_description = invariant_info['description']
-
+    def from_famd(cls, data: Dict[str, Any]) -> "InvariantWrapper":
+        inv_cls = import_class(data['module'], data['class_name'])
+        inst: InvariantABC = inv_cls(**data.get('configuration', {}))
+        info = inst.get_invariant_info()
         return cls(
-            instance=invariant_instance,
-            description=invariant_description,
-            state_inputs=invariant_famd_data['state_inputs']
+            instance=inst,
+            description=info.get('description', ''),
+            state_inputs=data.get('state_inputs', []),
         )
+
 
 @dataclass
-class Dynamics:
-    """Dynamics/controller for modes"""
+class DynamicsWrapper:
+    instance: DynamicsABC
     name: str
     description: str
-    instance: DynamicsABC
-    state_inputs: List[State] = field(default_factory=list)
+    state_inputs: List[str]
 
     @classmethod
-    def from_famd(cls, dynamic_famd_data):
-        # Import message class dynamically
-        pkg_path = dynamic_famd_data['module']
-        dynamic_class_name = dynamic_famd_data['class_name']
-        try:
-            dynamics_class = getattr(importlib.import_module(pkg_path), dynamic_class_name)
-        except (ImportError, AttributeError) as e:
-            raise ImportError(f"Cannot import '{dynamic_class_name}' from '{pkg_path}': {e}")
-        
-        init_kwargs = dynamic_famd_data['configuration']
-        dynamics_instance:DynamicsABC = dynamics_class(**init_kwargs)
-        
-        instance_details = dynamics_instance.get_dynamics_info()
-        class_name = instance_details['class_name']
-        description = instance_details['description']
-
+    def from_famd(cls, data: Dict[str, Any]) -> "DynamicsWrapper":
+        dyn_cls = import_class(data['module'], data['class_name'])
+        inst: DynamicsABC = dyn_cls(**data.get('configuration', {}))
+        info = inst.get_dynamics_info()
         return cls(
-            name = class_name,
-            description = description,
-            instance = dynamics_instance,
-            state_inputs = dynamic_famd_data['state_inputs']
+            instance=inst,
+            name=info.get('class_name', ''),
+            description=info.get('description', ''),
+            state_inputs=data.get('state_inputs', []),
         )
+
 
 @dataclass
 class Mode:
-    """Mode in the hybrid automaton"""
     description: str
-    transitions: Dict[str, Transition] = field(default_factory=dict)
-    invariants: Dict[str, Invariant] = field(default_factory=dict)
-    dynamics: Optional[Dynamics] = None
+    dynamics: DynamicsWrapper
+    invariants: List[InvariantWrapper]
+    transitions: List[Transition]
 
     @classmethod
-    def from_famd(cls, mode_famd_data, famd_data):
-        description = mode_famd_data.get('description', '')
-        transitions_data = famd_data.get('transitions', {})
-        guards_data = famd_data.get('guards', {})
-        resets_data = famd_data.get('resets', {})
-        invariants_data = famd_data.get('invariants', {})
-        dynamics_data = famd_data.get('dynamics', {})
-
-        # transitions
-        transitions = {}
-        transitions_list = [
-            (list(t.keys())[0], list(t.values())[0]['priority'])
-            for t in mode_famd_data['transitions']
+    def from_famd(cls, data: Dict[str, Any], famd: Dict[str, Any]) -> "Mode":
+        dynamics = DynamicsWrapper.from_famd(
+            famd['dynamics'][data['dynamics']]
+        )
+        invariants = [
+            InvariantWrapper.from_famd(famd['invariants'][k])
+            for k in data.get('invariants', [])
         ]
-
-        # Sort by priority (second item in each tuple)
-        transitions_sorted = sorted(transitions_list, key=lambda x: x[1])
-
-        # Unpack into separate lists
-        keys_sorted = [name for name, _ in transitions_sorted]
-        priorities_sorted = [priority for _, priority in transitions_sorted]
-
-        for idx, transition_key in enumerate(keys_sorted):
-            transitions[priorities_sorted[idx]] = Transition.from_famd(
-                transition_name = transition_key,
-                transition_famd=transitions_data[transition_key],
-                guards_famd=guards_data,
-                resets_famd=resets_data
+        transitions = []
+        for t in data.get('transitions', []):
+            name, details = next(iter(t.items()))
+            # attach priority from inline details
+            famd['transitions'][name]['priority'] = details.get('priority', 0)
+            transitions.append(
+                Transition.from_famd(
+                    name,
+                    famd['transitions'][name],
+                    famd.get('guards', {}),
+                    famd.get('resets', {}),
+                )
             )
-
-
-        # invariants
-        invariants = {}
-        invariant_keys = mode_famd_data['invariants']
-        for invariant_key in invariant_keys:
-          invariant_famd = invariants_data[invariant_key]
-          invariants[invariant_key] = Invariant.from_famd(invariant_famd)
-
-        # get the dynamics dataclass
-        dynamics_key = mode_famd_data['dynamics']
-        dynamic_famd = dynamics_data[dynamics_key]
-        dynamics = Dynamics.from_famd(dynamic_famd)
-
         return cls(
-            description = description,
-            transitions = transitions,
-            invariants = invariants,
-            dynamics = dynamics
+            description=data.get('description', ''),
+            dynamics=dynamics,
+            invariants=invariants,
+            transitions=sorted(transitions, key=lambda tr: tr.priority),
         )
 
-    
-    def get_sorted_transitions(self) -> List[tuple[str, Transition]]:
-        """Get transitions sorted by priority (lowest priority number = highest priority)"""
-        return sorted(self.transitions.items(), key=lambda x: x[1].priority)
-    
-    def add_transition(self, name: str, transition: Transition) -> None:
-        """Add a transition to this mode"""
-        self.transitions[name] = transition
-    
-    def add_invariant(self, name: str, invariant: Invariant) -> None:
-        """Add an invariant to this mode"""
-        self.invariants[name] = invariant
 
 @dataclass
 class HybridAutomaton:
-    """
-    Pythonic dataclass representation of the hybrid automaton 
-    configuration defined in the FAMD TANK file, with instantiated functions
-    """
-    # Metadata
     name: str
-    description: str = ""
-    
-    # Frequencies
-    transition_evaluation_frequency_hz: float = 10.0
-    control_frequency_hz: float = 50.0
-    
-    # Mode configuration
-    goal_modes_keys: List[int] = field(default_factory=list)
-    initial_mode_key: int = 0
-    
-    # Runtime state
-    current_mode_key: int = 0
-    
-    # Automaton components
-    states: Dict[str, State] = field(default_factory=dict)
-    modes: Dict[int, Mode] = field(default_factory=dict)
+    description: str
+    states: Dict[str, State]
+    modes: Dict[int, Mode]
+    initial_mode: int
+    goal_modes: List[int]
+    transition_evaluation_frequency_hz: float
+    control_frequency_hz: float
 
     @classmethod
-    def from_famd(cls, famd_data: yaml):
-        """
-        Initialize HybridAutomaton from FAMD yaml data
-        
-        Args:
-            famd_data: Dictionary containing the complete FAMD configuration
-                      with instantiated components (guards, resets, dynamics, invariants)
-        
-        Returns:
-            HybridAutomaton: Fully initialized hybrid automaton
-        """
-        # Extract metadata
-        name = famd_data.get('automaton_name', 'unnamed automaton')
-        description = famd_data.get('automaton_description', '')
-
-        # Extract frequencies
-        transition_freq = famd_data.get('transition_evaluation_frequency_hz', 10.0)
-        control_freq = famd_data.get('control_frequency_hz', 50.0)
-    
-        # Extract mode configuration
-        goal_modes = famd_data.get('goal_modes', [])
-        initial_mode = famd_data.get('initial_mode', 0)
-        current_mode = initial_mode
-
-        # Intialize States
-        # initialize states
-        states = {}
-        for state_key, state_val in famd_data.get('states').items():
-            states[state_key] = State.from_famd(state_val)
-
-        modes = {}
-        for mode_key, mode_val in famd_data.get('modes').items():
-            modes[mode_key] = Mode.from_famd(mode_val, famd_data)
-
-        print (modes)
-
+    def from_famd(cls, famd: Dict[str, Any]) -> "HybridAutomaton":
+        name = famd.get('automaton_name', '')
+        description = famd.get('automaton_description', '')
+        states = {
+            k: State.from_famd(v) for k, v in famd.get('states', {}).items()
+        }
+        modes = {
+            int(k): Mode.from_famd(v, famd)
+            for k, v in famd.get('modes', {}).items()
+        }
         return cls(
             name=name,
             description=description,
-            transition_evaluation_frequency_hz=transition_freq,
-            control_frequency_hz=control_freq,
-            goal_modes_keys=goal_modes,
-            initial_mode_key=initial_mode,
-            current_mode_key=current_mode,
             states=states,
-            modes=modes
+            modes=modes,
+            initial_mode=famd.get('initial_mode', 0),
+            goal_modes=famd.get('goal_modes', []),
+            transition_evaluation_frequency_hz=famd.get(
+                'transition_evaluation_frequency_hz', 10.0
+            ),
+            control_frequency_hz=famd.get('control_frequency_hz', 50.0),
         )
 
-    @staticmethod
-    def _dynamic_state_import_binds(states: Dict[str, Any]) -> Dict[str, Any]:
-        """Dynamically import ROS2 state types for each state entry."""
-        if len(states) > 0:
-            for key, value in states.items():
-                pkg = importlib.import_module(value['type']['pkg'])
-                states[key]['type'] = getattr(pkg, value['type']['msg'])
-        return states
-
-    @staticmethod
-    def _dynamic_import_binds(components: Dict[str, Dict[str, Any]], key_module='module', key_class='class_name') -> Dict[str, Any]:
-        """Generic dynamic import helper for guards, resets, dynamics, and invariants."""
-        if len(components) > 0:
-            for key, value in components.items():
-                module = importlib.import_module(value[key_module])
-                class_name = value[key_class]
-                del components[key][key_module]
-                del components[key][key_class]
-                components[key]['class'] = getattr(module, class_name)
-        return components
 
 
 if __name__ == '__main__':
