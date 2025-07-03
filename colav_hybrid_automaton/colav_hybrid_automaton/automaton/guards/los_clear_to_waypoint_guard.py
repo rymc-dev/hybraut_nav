@@ -1,4 +1,4 @@
-from .guard import Guard
+from .guard import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
@@ -10,7 +10,7 @@ from colav_hybrid_automaton.automaton._internal.utils import euclidean_distance
 from shapely.geometry import Polygon, LineString
 
 
-class LOSClearToWaypointGuard(Guard):
+class LOSClearToWaypointGuard(GuardABC):
     """
     A guard condition for a hybrid automaton that evaluates whether the agent's line of 
     sight to the current waypoint is clear and not obstructed within a specified threshold.

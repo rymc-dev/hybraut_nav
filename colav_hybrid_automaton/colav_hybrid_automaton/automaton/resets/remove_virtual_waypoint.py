@@ -1,7 +1,7 @@
-from .reset import Reset
+from .reset import ResetABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 
-class RemoveVirtualWaypointReset(Reset):
+class RemoveVirtualWaypointReset(ResetABC):
     """
     Reset utilized on the transition from waypoint reached back to cruise
     this reset removes the current virtual waypoint in the list and assigns the 

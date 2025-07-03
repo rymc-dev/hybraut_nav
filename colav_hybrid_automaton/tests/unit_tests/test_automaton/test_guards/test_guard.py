@@ -1,8 +1,8 @@
 import pytest
-from colav_hybrid_automaton.automaton.guards.guard import Guard
+from colav_hybrid_automaton.automaton.guards.guard import GuardABC
 
 def test_guard_creation_and_calls():
-    class TestGuard(Guard):
+    class TestGuard(GuardABC):
         """
         This is a test of the guard condition abstract class.
         """
@@ -54,7 +54,7 @@ def test_guard_creation_and_calls():
     assert guard.__repr__() == "TestGuard(initialized=True)"
 
 def test_guard_invalid_initialization_missing_param():
-    class TestGuard(Guard):
+    class TestGuard(GuardABC):
         def _validate_initialization(self, **kwargs):
             if 'x' not in kwargs:
                 raise ValueError("Missing required parameter 'x'")
@@ -66,7 +66,7 @@ def test_guard_invalid_initialization_missing_param():
         TestGuard()  # Missing 'x'
 
 def test_guard_invalid_initialization_wrong_type():
-    class TestGuard(Guard):
+    class TestGuard(GuardABC):
         def _validate_initialization(self, **kwargs):
             if not isinstance(kwargs.get('x'), float):
                 raise TypeError('x is not valid type')
@@ -78,7 +78,7 @@ def test_guard_invalid_initialization_wrong_type():
         TestGuard(x="not a float")
 
 def test_guard_call_before_init():
-    class TestGuard(Guard):
+    class TestGuard(GuardABC):
         def __init__(self, **kwargs):
             # Intentionally skip calling super().__init__ to simulate no init
             self.is_initialized = False

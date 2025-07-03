@@ -30,7 +30,7 @@ from typing import Any, Dict, List
 from rclpy.logging import get_logger
 
 
-class Reset(ABC):
+class ResetABC(ABC):
     """
     Abstract base class for hybrid automaton reset functions.
     

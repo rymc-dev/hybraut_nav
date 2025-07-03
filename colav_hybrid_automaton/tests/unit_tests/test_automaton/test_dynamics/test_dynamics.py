@@ -1,9 +1,9 @@
 import pytest
-from colav_hybrid_automaton.automaton.dynamics.dynamics import Dynamics
+from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsABC
 from typing import NamedTuple
 
 def test_dynamic_creation_and_call():
-    class TestDynamic(Dynamics):
+    class TestDynamic(DynamicsABC):
         """
         This is a test of the dynamic condition abstract class.
         """

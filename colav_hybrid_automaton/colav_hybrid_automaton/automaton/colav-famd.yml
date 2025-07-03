@@ -1,4 +1,4 @@
-# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD)
+# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD) TANK Style
 # ============================================================================
 # ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
 # ============================================================================
@@ -343,35 +343,38 @@ modes:
     name: cruise
     description: "Cruise mode with pid controller tuned for cruise mode."
     dynamics: cruise_pid_controller
-    invariants: trivial_invariant
+    invariants:
+      - trivial_invariant
     transitions:
-      enter_emergency_fallback:
-        priority: 0
-      waypoint_arrival:
-        priority: 1
-      plan_evasive_maneuver:
-        priority: 2
-      correct_heading:
-        priority: 3
+      - enter_emergency_fallback:
+          priority: 0
+      - waypoint_arrival:
+          priority: 1
+      - plan_evasive_maneuver:
+          priority: 2
+      - correct_heading:
+          priority: 3
 
   1:
     name: t2los
     description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
     dynamics: t2los_pid_controller
-    invariants: trivial_invariant
+    invariants:
+      - trivial_invariant
     transitions:
-      enter_emergency_fallback:
-        priority: 0
-      heading_aligned:
-        priority: 1
-      waypoint_arrival:
-        priority: 2
+      - enter_emergency_fallback:
+          priority: 0
+      - heading_aligned:
+          priority: 1
+      - waypoint_arrival:
+          priority: 2
 
   2:
     name: waypoint_reached
     description: "Waypoint reached mode, indicating successful navigation to a waypoint"
     dynamics: no_op_controller
-    invariants: is_goal_waypoint_invariant
+    invariants:
+      - is_goal_waypoint_invariant
     transitions:
       proceed_to_next_waypoint:
         priority: 0
@@ -380,7 +383,8 @@ modes:
     name: fallback
     description: "Fallback mode for emergency conditions, no active control"
     dynamics: no_op_controller
-    invariants: failing_invariant
+    invariants:
+      - failing_invariant
     transitions: []
 
 # ============================================================================
@@ -414,3 +418,6 @@ parameters:
     type: float
 
 automaton_name: "colav_hybrid_automaton"
+automaton_description: ""
+transition_evaluation_frequency_hz: 10.0
+control_frequency_hz: 10.0

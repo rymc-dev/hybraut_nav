@@ -1,6 +1,6 @@
 from colav_hybrid_automaton.automaton.resets import (
     GenerateVirtualWaypointReset,
-    Reset
+    ResetABC
 )
 from typing import Dict
 import pytest
@@ -176,7 +176,7 @@ def test_generate_virtual_waypoint_reset_comprehensive(init_kwargs: dict, state_
     print(f"Unsafe set vertices: {unsafe_vertices}")
     
     # Create and test the reset
-    reset: Reset = GenerateVirtualWaypointReset(**init_kwargs)
+    reset: ResetABC = GenerateVirtualWaypointReset(**init_kwargs)
     actual_reset_output: Dict[str, ROSWaypointsState] = reset.__call__(**state_kwargs)
 
     print (f"actual reset output: {actual_reset_output}")

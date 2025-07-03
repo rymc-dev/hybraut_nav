@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.invariants import IsGoalWaypointInvariant, Invariant
+from colav_hybrid_automaton.automaton.invariants import IsGoalWaypointInvariant, InvariantABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 import pytest
 from geometry_msgs.msg import Pose, Point
@@ -86,7 +86,7 @@ def test_is_goal_waypoint_invariant_comprehensive(state_kwargs: dict, expected_i
     2. If no virtual waywaypoints AND current == goal -> return True  
     3. If no virtual waypoints AND current != goal -> raise Exception
     """
-    invariant: Invariant = IsGoalWaypointInvariant()
+    invariant: InvariantABC = IsGoalWaypointInvariant()
     
     if expected_invariant_evaluation == Exception:
         # Test case expects an exception
@@ -112,7 +112,7 @@ def test_virtual_waypoints_guard_invalid_state_kwargs(
     expected_exception: Exception,
     test_description: str
 ):
-    invariant:Invariant = IsGoalWaypointInvariant()
+    invariant:InvariantABC = IsGoalWaypointInvariant()
 
     with pytest.raises(expected_exception):
         invariant.__call__(**state_kwargs)

@@ -1,4 +1,4 @@
-from .reset import Reset
+from .reset import ResetABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
@@ -10,7 +10,7 @@ from shapely import LineString, Polygon, Point
 import numpy as np
 from colav_hybrid_automaton.automaton._internal.utils import quaternion_to_heading
 
-class GenerateVirtualWaypointReset(Reset):
+class GenerateVirtualWaypointReset(ResetABC):
     """
     Reset utilized in reset from cruise to t2los 1. 
     This function resets the waypoints state by generating 

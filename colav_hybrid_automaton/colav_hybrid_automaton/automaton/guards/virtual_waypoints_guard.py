@@ -1,8 +1,8 @@
-from .guard import Guard
+from .guard import GuardABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 from typing import List
 
-class VirtualWaypointsGuard(Guard):
+class VirtualWaypointsGuard(GuardABC):
     """
     guard class on call which check if current waypoints 
     state contains a virtual waypoint

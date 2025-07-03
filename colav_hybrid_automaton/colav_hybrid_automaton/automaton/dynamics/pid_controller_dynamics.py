@@ -1,4 +1,4 @@
-from .dynamics import Dynamics
+from .dynamics import DynamicsABC
 from typing import NamedTuple
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
@@ -8,7 +8,7 @@ from colav_interfaces.msg import (
 from colav_hybrid_automaton.automaton._internal.utils import quaternion_to_heading
 import math
 
-class PIDControllerDynamics(Dynamics):
+class PIDControllerDynamics(DynamicsABC):
     """
     PIDYawVelocityController
     A PID controller for velocity and yaw rate based on heading and position error

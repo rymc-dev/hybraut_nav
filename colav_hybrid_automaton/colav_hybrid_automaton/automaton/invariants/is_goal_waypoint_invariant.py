@@ -1,10 +1,10 @@
-from .invariant import Invariant
+from .invariant import InvariantABC
 from colav_interfaces.msg import (
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
 
-class IsGoalWaypointInvariant(Invariant): 
+class IsGoalWaypointInvariant(InvariantABC): 
 
     def __call__(self, **state_kwargs) -> bool:
         super().__call__(**state_kwargs)

@@ -12,7 +12,7 @@ from typing import Dict, Any
 # Import the classes under test
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 from geometry_msgs.msg import Point
-from colav_hybrid_automaton.automaton.resets import RemoveVirtualWaypointReset, Reset  # Replace with actual import path
+from colav_hybrid_automaton.automaton.resets import RemoveVirtualWaypointReset, ResetABC # Replace with actual import path
 
 
 @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ from colav_hybrid_automaton.automaton.resets import RemoveVirtualWaypointReset, 
     ids=["Test 1: Remove virtual waypoint with specific position", "Test 2: Remove virtual waypoint with duplicate position"]
 )
 def test_remove_virtual_waypoint_reset_comprehensive(state_kwargs: dict, vw_length_post_reset: dict):
-    reset: Reset = RemoveVirtualWaypointReset()
+    reset: ResetABC = RemoveVirtualWaypointReset()
 
     reset_outputs = reset(**state_kwargs)
 

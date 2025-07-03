@@ -20,7 +20,7 @@ from typing import Any, Dict
 from rclpy.logging import get_logger
 
 
-class Invariant(ABC):
+class InvariantABC(ABC):
     """
     Abstract base class for hybrid automaton invariant functions.
     

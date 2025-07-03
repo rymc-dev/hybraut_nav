@@ -24,7 +24,7 @@ from typing import Any, Dict
 from rclpy.logging import get_logger
 
 
-class Guard(ABC):
+class GuardABC(ABC):
     """
     Abstract base class for hybrid automaton guard functions.
     

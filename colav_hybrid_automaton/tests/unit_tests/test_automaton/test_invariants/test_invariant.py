@@ -1,8 +1,8 @@
 import pytest
-from colav_hybrid_automaton.automaton.invariants.invariant import Invariant
+from colav_hybrid_automaton.automaton.invariants.invariant import InvariantABC
 
 def test_invariant_creation_and_calls():
-    class TestInvariant(Invariant):
+    class TestInvariant(InvariantABC):
         """
         This is a test of the invariant condition abstract class.
         """

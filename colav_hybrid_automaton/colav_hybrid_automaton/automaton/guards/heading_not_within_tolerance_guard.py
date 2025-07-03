@@ -1,4 +1,4 @@
-from .guard import Guard
+from .guard import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
@@ -11,7 +11,7 @@ from colav_hybrid_automaton.automaton._internal.utils import (
 )
 
 
-class HeadingNotWithinToleranceGuard(Guard):
+class HeadingNotWithinToleranceGuard(GuardABC):
     """
     A guard condition for a hybrid automaton that evaluates whether the agent's heading 
     is within a specified tolerance of the heading to the current waypoint.

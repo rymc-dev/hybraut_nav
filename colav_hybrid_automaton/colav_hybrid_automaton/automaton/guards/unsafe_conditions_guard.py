@@ -1,4 +1,4 @@
-from .guard import Guard
+from .guard import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
@@ -6,7 +6,7 @@ from colav_interfaces.msg import (
 )
 from shapely.geometry import Polygon, Point
 
-class UnsafeConditionsGuard(Guard):
+class UnsafeConditionsGuard(GuardABC):
     """
     A guard condition for a hybrid automaton that evaluates whether the agent's safety radius 
     is within the unsafe set

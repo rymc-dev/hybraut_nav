@@ -1,4 +1,4 @@
-from .guard import Guard
+from .guard import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
@@ -6,7 +6,7 @@ from colav_interfaces.msg import (
 )
 from math import dist as euclidean_distance
 
-class WaypointReachedGuard(Guard):
+class WaypointReachedGuard(GuardABC):
     """
     Guard condition that evaluates whether the agent has reached the current waypoint.
 

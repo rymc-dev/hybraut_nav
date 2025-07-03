@@ -4,7 +4,7 @@ from collections import namedtuple
 from rclpy.logging import get_logger
 
 
-class Dynamics(ABC):
+class DynamicsABC(ABC):
     """
     Abstract base class for hybrid automaton dynamics functions.
     
