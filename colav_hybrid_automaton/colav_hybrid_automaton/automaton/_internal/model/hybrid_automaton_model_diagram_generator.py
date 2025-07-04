@@ -159,7 +159,6 @@ class HybridAutomatonModelDiagramGenerator:
         # Generate diagram sections
         self._add_initial_state(mermaid, init_mode)
         self._add_modes(mermaid, automaton_model.modes)
-        self._add_transitions(mermaid, automaton_model.transitions)
         self._add_goal_states(mermaid, goal_modes)
         
         return mermaid
@@ -178,7 +177,7 @@ class HybridAutomatonModelDiagramGenerator:
         if not modes:
             return
             
-        mermaid.append("    %% Modes")
+        mermaid.append("\t%% Modes")
         
         for mode_key, mode_data in modes.items():
             mode_index = mode_key
@@ -188,12 +187,30 @@ class HybridAutomatonModelDiagramGenerator:
             description = mode_data.description
             
             # State definition
+            mermaid.append(f"\t%% {mode_name} Mode details")
             mermaid.append(f"    {mode_index} : {mode_index}.{mode_name}")
             
             # Add detailed note if additional info exists
             if any([invariants, dynamics, description]):
                 self._add_mode_note(mermaid, mode_name, mode_index, description, invariants, dynamics)
             
+            mermaid.append("")
+            mermaid.append(f'\t%% {mode_name} transitions.')
+            for transition in mode_data.transitions:
+                origin_mode = mode_key
+                transition_name = transition.name
+                transition_priority = transition.priority
+                transition_target_mode = transition.target_mode
+                guard_name = transition.guard.get_guard_info()['class_name']
+                reset_name = 'Null'
+                if transition.reset is not None:
+                    reset_name = transition.reset.get_reset_info()['class_name']
+
+                self._add_transition_edge(
+                    mermaid, transition_name, origin_mode, transition_priority,
+                    transition_target_mode, guard_name, reset_name
+                )
+
             mermaid.append("")
     
     def _add_mode_note(
@@ -216,56 +233,53 @@ class HybridAutomatonModelDiagramGenerator:
         if description:
             mermaid.append(f"        <b>description</b>: {description}")
         if invariants:
-            mermaid.append(f"        <b>invariant</b>: {invariants}")
+            mermaid.append(f"        <b>invariants</b>: {[f"{invariant.instance.get_invariant_info()['class_name']}, {invariant.description}" for invariant in invariants]}")
         if dynamics:
-            mermaid.append(f"        <b>dynamics</b>: {dynamics}")
+            mermaid.append(f"        <b>dynamics</b>: {f"{dynamics.instance.get_dynamics_info()['class_name']}, {dynamics.description}"}")
             
         mermaid.append("    end note")
     
-    def _add_transitions(self, mermaid: List[str], transitions: Dict) -> None:
-        """Add transitions to diagram."""
-        if not transitions:
-            return
+    # def _add_transitions(self, mermaid: List[str], transitions: Dict) -> None:
+    #     """Add transitions to diagram."""
+    #     if not transitions:
+    #         return
             
-        mermaid.append("    %% Transitions")
+    #     mermaid.append("    %% Transitions")
         
-        for transition_key, transition_data in transitions.items():
-            origin_modes = transition_data.get('origin_modes', [])
-            origin_priorities = transition_data.get('origin_priorities', [])
-            target_mode = transition_data.get('target_mode', '')
-            guard = transition_data.get('guard', '')
-            reset = transition_data.get('reset', 'null')
+    #     for transition_key, transition_data in transitions.items():
+    #         origin_modes = transition_data.get('origin_modes', [])
+    #         origin_priorities = transition_data.get('origin_priorities', [])
+    #         target_mode = transition_data.get('target_mode', '')
+    #         guard = transition_data.get('guard', '')
+    #         reset = transition_data.get('reset', 'null')
             
-            if target_mode is None:
-                logger.warning(f"Skipping transition {transition_key}: no target mode")
-                continue
+    #         if target_mode is None:
+    #             logger.warning(f"Skipping transition {transition_key}: no target mode")
+    #             continue
             
-            self._add_transition_edges(
-                mermaid, transition_key, origin_modes, origin_priorities, 
-                target_mode, guard, reset
-            )
+    #         self._add_transition_edges(
+    #             mermaid, transition_key, origin_modes, origin_priorities, 
+    #             target_mode, guard, reset
+    #         )
     
-    def _add_transition_edges(
-        self, 
-        mermaid: List[str], 
-        transition_key: str, 
-        origin_modes: List[str], 
-        origin_priorities: List[int], 
-        target_mode: str, 
-        guard: str, 
+    def _add_transition_edge(
+        self,
+        mermaid: List[str],
+        transition_key: str,
+        origin_mode: str,
+        priority: int,
+        target_mode: str,
+        guard: str,
         reset: str
     ) -> None:
-        """Add individual transition edges."""
-        for idx, origin_mode in enumerate(origin_modes):
-            priority = origin_priorities[idx] if idx < len(origin_priorities) else 0
-            
-            transition_label = (
-                f"<b>{priority}.{transition_key}</b>  "
-                f"[<b>guard</b> = {guard}, <b>reset</b> = {reset}]"
-            )
-            
-            mermaid.append(f"    {origin_mode} --> {target_mode} : {transition_label}")
-    
+        """Add a single transition edge."""
+        transition_label = (
+            f"<b>{priority}.{transition_key}</b>  "
+            f"[<b>guard</b> = {guard}, <b>reset</b> = {reset}]"
+        )
+        
+        mermaid.append(f"    {origin_mode} --> {target_mode} : {transition_label}")
+        
     def _add_goal_states(self, mermaid: List[str], goal_modes: List[str]) -> None:
         """Add goal states to diagram."""
         if goal_modes:

@@ -160,7 +160,7 @@ class Mode:
                 )
             )
         return cls(
-            name=name,
+            name=data.get('name', ''),
             description=data.get('description', ''),
             dynamics=dynamics,
             invariants=invariants,
