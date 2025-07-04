@@ -269,16 +269,17 @@ class FAMDValidator:
                 # Check invariants reference
                 if 'invariants' in mode_def:
                     inv_ref = mode_def['invariants']
-                    if 'invariants' in self.famd and inv_ref not in self.famd['invariants']:
-                        self.errors.append(
-                            f"Mode '{mode_name}' references non-existent invariant: {inv_ref}"
-                        )
+                    for invariant in mode_def['invariants']:
+                        if invariant not in self.famd['invariants']:
+                            self.errors.append(
+                                f"Mode '{mode_name}' references non-existent invariant: {inv_ref}"
+                            )
                 
                 # Check transition references
                 if 'transitions' in mode_def:
                     if not mode_def['transitions'] == []:
-                        for trans_name in mode_def['transitions'].keys():
-                            if 'transitions' in self.famd and trans_name not in self.famd['transitions']:
+                        for transition in mode_def['transitions']:
+                            if not any(list(transition.keys())[0] in t for t in mode_def['transitions']):
                                 self.errors.append(
                                     f"Mode '{mode_name}' references non-existent transition: {trans_name}"
                                 )
