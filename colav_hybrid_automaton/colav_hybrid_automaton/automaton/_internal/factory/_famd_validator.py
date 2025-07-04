@@ -75,10 +75,11 @@ class FAMDValidator:
         priorities = []
         
         if not transitions == []:
-            for transition_name, transition_info in transitions.items():
-                if 'priority' in transition_info:
-                    priority = transition_info['priority']
-                    priorities.append((priority, transition_name))
+            for idx, transition in enumerate(transitions):
+                transition_key =  next(iter(transition))
+                if 'priority' in transition[transition_key]:
+                    priority = transition[transition_key]['priority']
+                    priorities.append((priority,transition_key))
             
             # Check for duplicate priorities
             priority_counts = defaultdict(list)
