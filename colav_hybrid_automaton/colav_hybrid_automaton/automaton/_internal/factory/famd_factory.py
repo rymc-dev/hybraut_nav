@@ -33,15 +33,6 @@ class HybridAutomatonFactory:
     def __init__(self):
         raise NotImplementedError("This class is a factory and should not be instantiated directly.")
 
-    # @staticmethod
-    # def _validate_famd_content(famd_content: str):
-    #     """Validate FAMD content and return results."""
-    #     validator = HybridAutomatonFactory.FAMDValidator(famd_content)
-    #     is_valid, errors, warnings = validator.validate()
-    #     validator.print_validation_report()
-    #     return is_valid, errors, warnings
-    
-
     @staticmethod
     def hybrid_automaton_registry(automaton_famd: yaml, generate_mmd_diagrams: bool = True) -> Dict[str, Any]:
         """
