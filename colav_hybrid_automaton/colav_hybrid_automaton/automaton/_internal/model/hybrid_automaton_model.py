@@ -631,5 +631,4 @@ transition_evaluation_frequency_hz: 10.0
 control_frequency_hz: 10.0
     ''')
     automaton = HybridAutomaton.from_famd(famd_content)
-
     print (automaton)

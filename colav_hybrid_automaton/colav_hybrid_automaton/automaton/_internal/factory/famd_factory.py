@@ -15,7 +15,9 @@ from enum import Enum
 import logging
 import subprocess
 from pathlib import Path
-from ._famd_validator import FAMDValidator
+from colav_hybrid_automaton.automaton._internal.factory._famd_validator import FAMDValidator
+from colav_hybrid_automaton.automaton._internal.model import HybridAutomaton
+from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model_diagram_generator import HybridAutomatonModelDiagramGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,67 +33,14 @@ class HybridAutomatonFactory:
     def __init__(self):
         raise NotImplementedError("This class is a factory and should not be instantiated directly.")
 
-    @staticmethod
-    def _dynamic_import_binds(components: Dict[str, Dict[str, Any]], key_module='module', key_class='class_name') -> Dict[str, Any]:
-        """Generic dynamic import helper for guards, resets, dynamics, and invariants."""
-        if len(components) > 0:
-            for key, value in components.items():
-                module = importlib.import_module(value[key_module])
-                class_name = value[key_class]
-                del components[key][key_module]
-                del components[key][key_class]
-                components[key]['class'] = getattr(module, class_name)
-        return components
-
-    @staticmethod
-    def _dynamic_state_import_binds(states: Dict[str, Any]) -> Dict[str, Any]:
-        """Dynamically import ROS2 state types for each state entry."""
-        if len(states) > 0:
-            for key, value in states.items():
-                pkg = importlib.import_module(value['type']['pkg'])
-                states[key]['type'] = getattr(pkg, value['type']['msg'])
-        return states
+    # @staticmethod
+    # def _validate_famd_content(famd_content: str):
+    #     """Validate FAMD content and return results."""
+    #     validator = HybridAutomatonFactory.FAMDValidator(famd_content)
+    #     is_valid, errors, warnings = validator.validate()
+    #     validator.print_validation_report()
+    #     return is_valid, errors, warnings
     
-    @staticmethod
-    def _validate_famd_content(famd_content: str):
-        """Validate FAMD content and return results."""
-        validator = HybridAutomatonFactory.FAMDValidator(famd_content)
-        is_valid, errors, warnings = validator.validate()
-        validator.print_validation_report()
-        return is_valid, errors, warnings
-    
-    @staticmethod
-    def _generate_automaton_diagrams(
-        automaton_data: Dict, 
-        output_directory: Optional[str] = None,
-        config: Optional[DiagramConfig] = None
-    ) -> Tuple[str, str]:
-        """
-        Public interface for generating Mermaid diagrams.
-        
-        Args:
-            automaton_data: Dictionary containing automaton configuration
-            output_directory: Directory to save diagrams (optional)
-            config: Diagram configuration (optional)
-            
-        Returns:
-            Tuple of (mmd_file_path, output_file_path)
-            
-        Raises:
-            MermaidDiagramGeneratorError: If generation fails
-        """
-        generator = HybridAutomatonFactory.FAMDDiagramGenerator(output_directory)
-        return generator.generate_mermaid_diagrams(automaton_data, config)
-
-    def _initialize_automaton(automaton_famd: yaml, component_type: str):
-        for component_name, component_def in automaton_famd[component_type].items():
-            automaton_famd[component_type][component_name]['instance'] = component_def['class'](
-                **component_def.get('configuration', {})
-            )
-            del automaton_famd[component_type][component_name]['class']
-            del automaton_famd[component_type][component_name]['configuration']
-        
-        return automaton_famd
 
     @staticmethod
     def hybrid_automaton_registry(automaton_famd: yaml, generate_mmd_diagrams: bool = True) -> Dict[str, Any]:
@@ -107,37 +56,23 @@ class HybridAutomatonFactory:
         """
         # Phase 1: Validation
         print("🔍 [1/4] Validating FAMD file structure...")
-        FAMDValidator.validate(automaton_famd)
-        print("")
+        FAMDValidator(automaton_famd).validate()
+        print("✅ [1/4] FAMD Validated!.")
         
         # Phase 2: Dynamic imports
-        print("⚡ [2/4] Dynamically importing components...")
-        print("  ├─ Loading state classes...")
-        automaton_famd['states'] = HybridAutomatonFactory._dynamic_state_import_binds(automaton_famd['states'])
-        print("  ├─ Loading reset functions...")
-        automaton_famd['resets'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['resets'])
-        print("  ├─ Loading guard conditions...")
-        automaton_famd['guards'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['guards'])
-        print("  ├─ Loading dynamics...")
-        automaton_famd['dynamics'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['dynamics'])
-        print("  └─ Loading invariants...")
-        automaton_famd['invariants'] = HybridAutomatonFactory._dynamic_import_binds(automaton_famd['invariants'])
-        print("✅ [2/4] Component imports completed!")
-        
-        # Phase 3: Intialize the automaton components with the static configurations
-        print("🔧 [3/4] Initializing automaton components...")
-        component_types = ['guards', 'resets', 'dynamics', 'invariants']
-        for component_type in component_types:
-            automaton_famd = HybridAutomatonFactory._initialize_automaton(automaton_famd, component_type)
-
+        print("⚡ [2/4] Parsing FAMD to Hybrid Automaton initialized model...")
+        automaton_model = HybridAutomaton.from_famd(automaton_famd)
         print("✅ [3/4] automaton components initialized.")
 
         # Phase 4: Diagram generation
         print("📊 [4/4] Generating FAMD automaton diagram...")
-        HybridAutomatonFactory._generate_automaton_diagrams(automaton_famd)
-        print("✅ [4/4] Diagram generation completed!")
-        
-        print("🎉 FAMD factory process completed successfully!")
+        if generate_mmd_diagrams:
+          HybridAutomatonModelDiagramGenerator().generate_mermaid_diagrams(automaton_model=automaton_model)
+          print("✅ [4/4] Diagram generation completed!")
+        else: 
+          print("⏭️ [4/4] Skipping diagram generation!")
+       
+        print("🎉 Success! FAMD factory process completed - HybridAutomaton object ready")
         
         return automaton_famd
     
@@ -145,7 +80,7 @@ class HybridAutomatonFactory:
 # Example usage with the provided FAMD content
 if __name__ == "__main__":
     # Your FAMD content from the document
-    famd_content = '''# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD)
+  famd_content = yaml.safe_load('''# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD)
 # ============================================================================
 # ROS2 Hybrid Automaton Framework Configuration (COLAV Hybrid Automaton)
 # ============================================================================
@@ -187,9 +122,9 @@ states:
       pkg: "colav_interfaces.msg"
       msg: "AgentState"
     params:
-      - update_hz: 10.0
-      - timeout_sec: 0.5
-      - buffer_size: 100
+      update_hz: 10.0
+      timeout_sec: 0.5
+      buffer_size: 100
 
   obstacles_state:
     topic: "/state/obstacles"
@@ -198,8 +133,8 @@ states:
       pkg: "colav_interfaces.msg"
       msg: "ObstaclesState"
     params:
-      - update_hz: 4.0
-      - timeout_sec: 1.0
+      update_hz: 4.0
+      timeout_sec: 1.0
 
   unsafe_set_state:
     topic: "/state/unsafe_set"
@@ -208,8 +143,8 @@ states:
       pkg: "colav_interfaces.msg"
       msg: "UnsafeSetState"
     params:
-      - update_hz: 2.0
-      - timeout_sec: 1.5
+      update_hz: 2.0
+      timeout_sec: 1.5
 
   waypoints_state:
     topic: "/state/waypoints"
@@ -490,44 +425,48 @@ modes:
     name: cruise
     description: "Cruise mode with pid controller tuned for cruise mode."
     dynamics: cruise_pid_controller
-    invariants: trivial_invariant
+    invariants:
+      - trivial_invariant
     transitions:
-      enter_emergency_fallback:
-        priority: 0
-      waypoint_arrival:
-        priority: 1
-      plan_evasive_maneuver:
-        priority: 2
-      correct_heading:
-        priority: 3
+      - enter_emergency_fallback:
+          priority: 0
+      - waypoint_arrival:
+          priority: 1
+      - plan_evasive_maneuver:
+          priority: 2
+      - correct_heading:
+          priority: 3
 
   1:
     name: t2los
     description: "Transition to Line of Sight (T2LOS) mode with proportional yaw rate control"
     dynamics: t2los_pid_controller
-    invariants: trivial_invariant
+    invariants:
+      - trivial_invariant
     transitions:
-      enter_emergency_fallback:
-        priority: 0
-      heading_aligned:
-        priority: 1
-      waypoint_arrival:
-        priority: 2
+      - enter_emergency_fallback:
+          priority: 0
+      - heading_aligned:
+          priority: 1
+      - waypoint_arrival:
+          priority: 2
 
   2:
     name: waypoint_reached
     description: "Waypoint reached mode, indicating successful navigation to a waypoint"
     dynamics: no_op_controller
-    invariants: is_goal_waypoint_invariant
+    invariants:
+      - is_goal_waypoint_invariant
     transitions:
-      proceed_to_next_waypoint:
-        priority: 0
+      - proceed_to_next_waypoint:
+          priority: 0
 
   3:
     name: fallback
     description: "Fallback mode for emergency conditions, no active control"
     dynamics: no_op_controller
-    invariants: failing_invariant
+    invariants:
+      - failing_invariant
     transitions: []
 
 # ============================================================================
@@ -561,7 +500,10 @@ parameters:
     type: float
 
 automaton_name: "colav_hybrid_automaton"
-    '''
+automaton_description: "automaton for collision avoidance"
+transition_evaluation_frequency_hz: 10.0
+control_frequency_hz: 10.0
+    ''')
     
-    automaton = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd=yaml.safe_load(famd_content))
+  automaton = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd=famd_content)
 

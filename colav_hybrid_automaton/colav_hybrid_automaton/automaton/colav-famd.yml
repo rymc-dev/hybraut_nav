@@ -199,59 +199,31 @@ invariants:
 # ============================================================================
 transitions:
   plan_evasive_maneuver:
-    origin_modes:
-      - 0
-    origin_priorities:
-      - 2
     target_mode: 1
     guard: "los_clear_to_waypoint_guard"
     reset: "generate_virtual_waypoint_reset"
 
   correct_heading:
-    origin_modes:
-      - 0
-    origin_priorities:
-      - 3
     target_mode: 1
     guard: "heading_not_within_tolerance_guard"
     reset: null
 
   enter_emergency_fallback:
-    origin_modes:
-      - 0
-      - 1
-    origin_priorities:
-      - 0
-      - 0
     target_mode: 3
     guard: "unsafe_conditions_guard"
     reset: null
 
   waypoint_arrival:
-    origin_modes:
-      - 0
-      - 1
-    origin_priorities:
-      - 1
-      - 2
     target_mode: 2
     guard: "waypoint_reached_guard"
     reset: null
 
   heading_aligned:
-    origin_modes:
-      - 1
-    origin_priorities:
-      - 1
     target_mode: 0
     guard: "heading_within_tolerance_guard"
     reset: null
 
   proceed_to_next_waypoint:
-    origin_modes:
-      - 2
-    origin_priorities:
-      - 0
     target_mode: 2
     guard: "virtual_waypoints_guard"
     reset: "remove_virtual_waypoint_reset"
