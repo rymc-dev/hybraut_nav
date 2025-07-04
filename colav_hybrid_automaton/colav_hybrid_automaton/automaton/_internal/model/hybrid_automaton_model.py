@@ -131,6 +131,7 @@ class DynamicsWrapper:
 
 @dataclass
 class Mode:
+    name: str
     description: str
     dynamics: DynamicsWrapper
     invariants: List[InvariantWrapper]
@@ -159,6 +160,7 @@ class Mode:
                 )
             )
         return cls(
+            name=name,
             description=data.get('description', ''),
             dynamics=dynamics,
             invariants=invariants,
