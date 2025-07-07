@@ -16,7 +16,7 @@ Example Usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type, List
+from typing import Any, Dict, Type, List, ClassVar
 from rclpy.logging import get_logger
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
@@ -33,8 +33,8 @@ class InvariantABC(ABC):
         is_initialized: Flag indicating if the invariant has been properly initialized
     """
     
-    _expected_init_inputs: List[InputSpec] = []
-    _expected_state_inputs: List[InputSpec] = []
+    _init_input_spec: ClassVar[List[InputSpec]] = []
+    _state_input_spec: ClassVar[List[InputSpec]] = []
 
     def __init__(self, **init_kwargs):
         """
@@ -54,7 +54,13 @@ class InvariantABC(ABC):
         self.logger = get_logger(self.__class__.__name__)
         self.is_initialized = False
         self._validate_initialization(**init_kwargs)
+        self._set_instance_initialization(**init_kwargs)
         self.is_initialized = True
+
+    def _set_instance_initialization(self, **init_kwargs):
+        """Set instance attributes from initialization kwargs."""
+        for key, value in init_kwargs.items():
+            setattr(self, key, value)
 
     @abstractmethod
     def __call__(self, **state_kwargs) -> bool:
@@ -108,7 +114,14 @@ class InvariantABC(ABC):
             TypeError: If parameters are of wrong type
             KeyError: If required parameters are missing
         """
-        pass
+        for expected_init_input in self._init_input_spec:
+            try:
+                if expected_init_input.name not in init_kwargs:
+                    raise KeyError(f"{expected_init_input.name} arg is not given in initialization args.")
+                if not isinstance(init_kwargs[expected_init_input.name], expected_init_input.type):
+                    raise TypeError(f"{expected_init_input.name} expected type: {expected_init_input.type}, actual type: {type(init_kwargs[expected_init_input.name])}")
+            except Exception as e:
+                raise e
     
     def _validate_states(self, **state_kwargs) -> None:
         """
@@ -129,27 +142,34 @@ class InvariantABC(ABC):
         """
         if not self.is_initialized:
             raise RuntimeError(f'{self.__class__.__name__} invariant is not initialized')
-    
-    @property
-    def expected_init_inputs(self) -> Dict[str, Type]:
-        """Return a list of initialization inputs expected for __init__, names and types"""
-        return self._expected_init_inputs.copy()
+        
+        # Validate expected state inputs
+        for expected_state_input in self._state_input_spec:
+            if expected_state_input.name not in state_kwargs:
+                raise KeyError(f"Required state input '{expected_state_input.name}' is missing")
+            if not isinstance(state_kwargs[expected_state_input.name], expected_state_input.type):
+                raise TypeError(f"State input '{expected_state_input.name}' expected type: {expected_state_input.type}, actual type: {type(state_kwargs[expected_state_input.name])}")   
 
-    @property
-    def required_init_input_names(self) -> List[str]:
-        """return a list of names of initialization args"""
-        return list(self._expected_init_inputs.keys())
+    @classmethod
+    def init_input_spec(cls) -> List[InputSpec]:
+        """Return a list of initialization inputs expected for the __init__, names and types"""
+        return cls._init_input_spec.copy()
+    
+    @classmethod
+    def init_input_names(cls) -> List[str]:
+        """returns a list of initialization input names passed for the __init__"""
+        return [init_input.name for init_input in cls._init_input_spec]
+    
+    @classmethod
+    def state_input_spec(cls) -> List[InputSpec]:
+        """Return a list of state inputs expected for the __call__, names and types"""
+        return cls._state_input_spec.copy()
 
-    @property
-    def expected_state_inputs(self) -> Dict[str, Type]:
-        """Return a list of state inputs expected for the __init__ , names and types"""
-        return self._expected_state_inputs.copy()
-    
-    @property
-    def required_state_input_names(self) -> List[str]: 
-         """return a list of names of state args"""
-         return list(self._expected_state_inputs.keys())    
-    
+    @classmethod
+    def state_input_names(cls) -> List[str]:
+        """Returns a list of state input names required for the __call__, just names"""
+        return [state_input.name for state_input in cls._state_input_spec]
+
     def get_invariant_info(self) -> Dict[str, Any]:
         """
         Get information about this invariant function.
@@ -163,6 +183,8 @@ class InvariantABC(ABC):
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
             'is_initialized': self.is_initialized,
+            'state_input_spec': self._state_input_spec,
+            'init_input_spec': self._init_input_spec,
             'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
         }
     

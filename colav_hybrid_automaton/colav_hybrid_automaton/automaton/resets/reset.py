@@ -9,11 +9,16 @@ Resets are executed during the hybrid automaton's transition to update system st
 based on the current conditions and reset logic.
 
 Example Usage:
-    class WaypointReset(Reset):
-        def __init__(self, reset_targets: List[Dict[str, Any]]):
+    class WaypointReset(ResetABC):
+        _state_input_spec = [
+            InputSpec(name='agent_state', type=AgentState),
+            InputSpec(name='waypoints_state', type=WaypointsState)
+        ]
+        
+        def __init__(self, reset_targets: List[InputSpec]):
             # reset_targets = [
-            #     {'name': 'current_waypoint_index', 'type': int},
-            #     {'name': 'waypoint_position', 'type': Tuple[float, float]}
+            #     InputSpec(name='current_waypoint_index', type=int),
+            #     InputSpec(name='waypoint_position', type=Tuple[float, float])
             # ]
             super().__init__(reset_targets=reset_targets)
             
@@ -45,11 +50,11 @@ class ResetABC(ABC):
         reset_targets: List of objects that will be updated by this reset function
     """
 
-    _expected_init_inputs: List[InputSpec] = []
-    _expected_state_inputs = List[InputSpec] = []
-    _reset_targets = List[InputSpec] = []
+    _init_input_spec: List[InputSpec] = []
+    _state_input_spec: List[InputSpec] = []
+    _reset_targets_spec: List[InputSpec] = []
 
-    def __init__(self, reset_targets: List[Dict[str, Any]], **init_kwargs):
+    def __init__(self, **init_kwargs):
         """
         Initialize the reset function with target objects and configuration parameters.
         
@@ -58,11 +63,11 @@ class ResetABC(ABC):
         and any static parameters or constants.
         
         Args:
-            reset_targets: List of dictionaries defining objects to be reset.
-                         Each dictionary should contain:
-                         - 'name': str - The name/key of the object to update
-                         - 'type': type - The expected type of the object
-                         - 'description': str (optional) - Description of the object
+            reset_targets: List of InputSpec objects defining objects to be reset.
+                         Each InputSpec should contain:
+                         - name: str - The name/key of the object to update
+                         - type: type - The expected type of the object
+                         - description: str (optional) - Description of the object
             **init_kwargs: Variable keyword arguments for reset configuration
             
         Raises:
@@ -71,9 +76,15 @@ class ResetABC(ABC):
         """
         self.logger = get_logger(self.__class__.__name__)
         self.is_initialized = False
-        self.reset_targets = reset_targets
-        self._validate_initialization(reset_targets=reset_targets, **init_kwargs)
+        
+        self._validate_initialization(**init_kwargs)
+        self._set_instance_initialization(**init_kwargs)
         self.is_initialized = True
+
+    def _set_instance_initialization(self, **init_kwargs) -> None:
+        """Set instance attributes from initialization kwargs."""
+        for key, value in init_kwargs.items():
+            setattr(self, key, value)
 
     @abstractmethod
     def __call__(self, **state_kwargs) -> Dict[str, Any]:
@@ -117,16 +128,15 @@ class ResetABC(ABC):
         # Subclasses should implement the actual reset logic after calling super()
         # and return a dictionary of {name: value} pairs
 
-    def _validate_initialization(self, reset_targets: List[Dict[str, Any]], **init_kwargs) -> None:
+    def _validate_initialization(self, **init_kwargs) -> None:
         """
-        Validate initialization parameters including reset targets.
+        Validate initialization parameters.
         
         Override this method in subclasses to implement custom validation
-        of initialization parameters. Always call super()._validate_initialization() 
-        first in your override.
+        of initialization parameters.
         
         Args:
-            reset_targets: List of target objects to be validated
+            reset_targets: List of InputSpec objects defining reset targets
             **init_kwargs: Keyword arguments passed to __init__
             
         Raises:
@@ -134,6 +144,19 @@ class ResetABC(ABC):
             TypeError: If parameters are of wrong type
             KeyError: If required parameters are missing
         """
+        for expected_init_input in self._init_input_spec:
+            try:
+                if expected_init_input.name not in init_kwargs:
+                    raise KeyError(f"{expected_init_input.name} arg is not given in initialization args.")
+                if not isinstance(init_kwargs[expected_init_input.name], expected_init_input.type):
+                    raise TypeError(f"{expected_init_input.name} expected type: {expected_init_input.type}, actual type: {type(init_kwargs[expected_init_input.name])}")
+            except Exception as e:
+                raise e
+            
+        self._validate_reset_targets(reset_targets=self._reset_targets_spec)
+            
+    def _validate_reset_targets(self, reset_targets) -> None:
+        """Validate reset targets specification."""
         if not isinstance(reset_targets, list):
             raise TypeError("reset_targets must be a list")
         
@@ -141,17 +164,14 @@ class ResetABC(ABC):
             raise ValueError("reset_targets cannot be empty")
         
         for i, target in enumerate(reset_targets):
-            if not isinstance(target, dict):
-                raise TypeError(f"reset_targets[{i}] must be a dictionary")
+            if not isinstance(target, InputSpec):
+                raise TypeError(f"reset_targets[{i}] must be an InputSpec object")
             
-            if 'name' not in target:
-                raise KeyError(f"reset_targets[{i}] must contain 'name' key")
+            if not hasattr(target, 'name') or not isinstance(target.name, str):
+                raise TypeError(f"reset_targets[{i}] must have a valid 'name' attribute as string")
             
-            if 'type' not in target:
-                raise KeyError(f"reset_targets[{i}] must contain 'type' key")
-            
-            if not isinstance(target['name'], str):
-                raise TypeError(f"reset_targets[{i}]['name'] must be a string")
+            if not hasattr(target, 'type') or not isinstance(target.type, type):
+                raise TypeError(f"reset_targets[{i}] must have a valid 'type' attribute as type")
     
     def _validate_states(self, **state_kwargs) -> None:
         """
@@ -168,11 +188,18 @@ class ResetABC(ABC):
             ValueError: If state inputs are invalid
             TypeError: If state inputs are of wrong type
             KeyError: If required state inputs are missing
-            RuntimeError: If reset is not initialized
+            RuntimeError: If guard is not initialized
         """
         if not self.is_initialized:
             raise RuntimeError(f'{self.__class__.__name__} reset is not initialized')
-    
+        
+        # Validate expected state inputs
+        for expected_state_input in self._state_input_spec:
+            if expected_state_input.name not in state_kwargs:
+                raise KeyError(f"Required state input '{expected_state_input.name}' is missing")
+            if not isinstance(state_kwargs[expected_state_input.name], expected_state_input.type):
+                raise TypeError(f"State input '{expected_state_input.name}' expected type: {expected_state_input.type}, actual type: {type(state_kwargs[expected_state_input.name])}")   
+
     def _validate_reset_output(self, reset_output: Dict[str, Any]) -> None:
         """
         Validate the output of the reset function against target specifications.
@@ -191,7 +218,7 @@ class ResetABC(ABC):
         if not isinstance(reset_output, dict):
             raise TypeError("Reset function must return a dictionary")
         
-        target_names = {target['name'] for target in self.reset_targets}
+        target_names = {target.name for target in self._reset_targets_spec}
         output_names = set(reset_output.keys())
         
         missing_names = target_names - output_names
@@ -203,42 +230,42 @@ class ResetABC(ABC):
             self.logger.warning(f"Reset output contains unexpected keys: {extra_names}")
         
         # Validate types
-        target_types = {target['name']: target['type'] for target in self.reset_targets}
+        target_types = {target.name: target.type for target in self._reset_targets_spec}
         for name, value in reset_output.items():
             if name in target_types:
                 expected_type = target_types[name]
                 if not isinstance(value, expected_type):
                     raise TypeError(f"Reset output '{name}' expected type {expected_type.__name__}, got {type(value).__name__}")
 
-    @property
-    def expected_init_inputs(self) -> Dict[str, Type]:
-        """Return a list of initialization inputs expected for the __init__ , names and types"""
-        return self._expected_init_inputs.copy()
+    @classmethod
+    def init_input_spec(cls) -> List[InputSpec]:
+        """Return a list of initialization inputs expected for the __init__, names and types"""
+        return cls._init_input_spec.copy()
     
-    @property
-    def required_init_input_names(self) -> List[str]: 
-         """return a list of names of initialization args"""
-         return list(self._expected_init_inputs.keys())
+    @classmethod
+    def init_input_names(cls) -> List[str]: 
+        """Return a list of names of initialization args"""
+        return [spec.name for spec in cls._init_input_spec]
     
-    @property
-    def expected_state_inputs(self) -> Dict[str, Type]:
-        """Return a list of state inputs expected for the __call__ , names and types"""
-        return self._expected_state_inputs.copy()
+    @classmethod
+    def state_input_spec(cls) -> List[InputSpec]:
+        """Return a list of state inputs expected for the __call__, names and types"""
+        return cls._state_input_spec.copy()
     
-    @property
-    def required_state_inputs_names(self) -> List[str]: 
-        """Return a list of state inputs"""
-        return list(self._expected_state_inputs.keys())
+    @classmethod
+    def state_input_names(cls) -> List[str]: 
+        """Return a list of state input names"""
+        return [spec.name for spec in cls._state_input_spec]
 
-    @property
-    def expected_reset_targets(self) -> Dict[str, Type]:
+    @classmethod
+    def reset_targets_spec(cls) -> List[InputSpec]:
         """Return a list of reset target names and types for the __call__"""
-        return self._reset_targets.copy()
+        return cls._reset_targets_spec.copy()
     
-    @property
-    def required_reset_target_names(self) -> List[str]: 
-        """Return a list of state inputs"""
-        return list(self._reset_targets.keys())
+    @classmethod
+    def reset_targets_names(cls) -> List[str]: 
+        """Return a list of reset target names"""
+        return [spec.name for spec in cls._reset_targets_spec]
 
     def get_reset_info(self) -> Dict[str, Any]:
         """
@@ -253,23 +280,23 @@ class ResetABC(ABC):
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
             'is_initialized': self.is_initialized,
-            'required_init_inputs':self.required_init_input_names(),
+            'required_init_inputs': self.init_input_names(),
             'required_init_types': {
-                name: type_.__name__ for name, type_ in self._expected_init_inputs.items()
+                spec.name: spec.type.__name__ for spec in self._init_input_spec
             },
-            'required_state_inputs': self.required_state_inputs_names,
-            'expected_state_types':  {
-                name: type_.__name__ for name, type_ in self._expected_state_inputs.items()
+            'required_state_inputs': self.state_input_names(),
+            'expected_state_types': {
+                spec.name: spec.type.__name__ for spec in self._state_input_spec
             },
-            'reset_targets': self.reset_targets,
+            'reset_targets': [{'name': target.name, 'type': target.type.__name__} for target in self.reset_targets],
             'target_count': len(self.reset_targets),
-            'target_names': [target['name'] for target in self.reset_targets],
+            'target_names': [target.name for target in self.reset_targets],
             'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
         }
     
     def __repr__(self) -> str:
         """String representation of the reset function."""
-        target_names = [target['name'] for target in self.reset_targets] if self.is_initialized else []
+        target_names = [target.name for target in self.reset_targets] if self.is_initialized else []
         return f"{self.__class__.__name__}(initialized={self.is_initialized}, targets={target_names})"
     
     def __str__(self) -> str:

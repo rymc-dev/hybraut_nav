@@ -61,11 +61,12 @@ class GuardABC(ABC):
         self._set_instance_initialization(**init_kwargs)
         self.is_initialized = True
 
-    def _set_instance_initialization(self, **init_kwargs):
+    def _set_instance_initialization(self, **init_kwargs) -> None:
         """Set instance attributes from initialization kwargs."""
         for key, value in init_kwargs.items():
             setattr(self, key, value)
 
+    @abstractmethod
     def __call__(self, **state_kwargs) -> bool:
         """
         Execute the guard function with current state inputs.

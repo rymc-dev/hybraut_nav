@@ -1,5 +1,6 @@
-from .reset import ResetABC
+from colav_hybrid_automaton.automaton.resets import ResetABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class RemoveVirtualWaypointReset(ResetABC):
     """
@@ -9,15 +10,8 @@ class RemoveVirtualWaypointReset(ResetABC):
     goal waypoint.
     """
 
-    _expected_state_inputs = {
-        "waypoints_state": ROSWaypointsState
-    }
-    _reset_targets = {'waypoints_state': ROSWaypointsState}
-
-    def __init__(self, **init_kwargs):
-        # Call parent constructor to properly initialize the reset
-
-        super().__init__(self._reset_targets, **init_kwargs)
+    _state_input_spec = [InputSpec(name='waypoints_state', type=ROSWaypointsState)]
+    _reset_targets_spec = [InputSpec(name='waypoints_state', type=ROSWaypointsState)]
     
     def __call__(self, **state_kwargs):
         """Pops the first virtual waypoint and sets the new current waypoint in waypoints state"""
@@ -43,13 +37,17 @@ class RemoveVirtualWaypointReset(ResetABC):
         # Call parent validation first
         super()._validate_states(**state_kwargs)
 
-        try:
-            try:
-                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
-                    raise TypeError()
-                if len(state_kwargs['waypoints_state'].virtual_waypoints) < 1:
-                    raise AttributeError()
-            except KeyError:
-                raise KeyError()
-        except Exception as e: 
-            raise e
+        if len(state_kwargs['waypoints_state'].virtual_waypoints) < 1:
+            raise AttributeError('invalid reset attempted, there should be more than 0 virtual waypoints for this transition to occur.')
+        
+if __name__ == '__main__':
+    reset:ResetABC = RemoveVirtualWaypointReset()
+    state_kwargs = {
+        'waypoints_state': ROSWaypointsState(virtual_waypoints=[ROSWaypoint()])
+    }
+    try:
+        reset_outputs = reset.__call__(**state_kwargs)
+    except Exception as e:
+        print (e)
+
+    print (reset_outputs)
