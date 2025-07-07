@@ -1,4 +1,4 @@
-from .guard import GuardABC
+from colav_hybrid_automaton.automaton.guards import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
@@ -8,7 +8,7 @@ from colav_interfaces.msg import (
 )
 from colav_hybrid_automaton.automaton._internal.utils import euclidean_distance
 from shapely.geometry import Polygon, LineString
-
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class LOSClearToWaypointGuard(GuardABC):
     """
@@ -31,14 +31,14 @@ class LOSClearToWaypointGuard(GuardABC):
         TypeError: If 'los_distance_threshold' is not a float.
         ValueError: If 'los_distance_threshold' is less than 0.01.
     """
-    def __init__(self, **kwargs):
-        """
-            los_distance_threshold: float: represents the distance which we analyse los 
-                                           to determine if los is clear to the waypoint
-        """
-        super().__init__(**kwargs)
 
-        self.los_distance_threshold = kwargs.get('los_distance_threshold')
+    _init_input_spec = [InputSpec(name='los_distance_threshold', type=float)]
+    _state_input_spec = [
+        InputSpec(name='agent_state', type=ROSAgentState),
+        InputSpec(name='obstacles_state', type=ROSObstaclesState),
+        InputSpec(name='unsafe_set_state', type=ROSUnsafeSetState),
+        InputSpec(name='waypoints_state', type=ROSWaypointsState)
+    ]
     
     def __call__(self, **state_kwargs) -> bool:
         """_summary_
@@ -90,7 +90,7 @@ class LOSClearToWaypointGuard(GuardABC):
             # Calculate distance from the agent to the intersection point.
             intersection_distance = euclidean_distance(
                 agent_position, (intersection.x, intersection.y))
-            if intersection_distance <= self.los_distance_threshold:
+            if intersection_distance <= self.__getattribute__('los_distance_threshold'):
                 return True
 
         return False
@@ -107,43 +107,23 @@ class LOSClearToWaypointGuard(GuardABC):
         """
 
         super()._validate_initialization(**init_kwargs)
-        try:
-            try:
-                if not isinstance(init_kwargs['los_distance_threshold'], float):
-                    raise TypeError('los distance threshold must be type float')
-            except KeyError:
-                raise KeyError('los_distance_threshold not given')
-            
-            if init_kwargs.get('los_distance_threshold') < 0.0: 
-                raise ValueError('los_distance_threshold can not be a negative number')
-        except Exception as e:
-            raise e
+        if init_kwargs.get('los_distance_threshold') < 0.0: 
+            raise ValueError('los_distance_threshold can not be a negative number')
 
-    def _validate_states(self, **state_kwargs):
-        super()._validate_states(**state_kwargs)
-        try:
-            try: 
-                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
-                    raise KeyError('agent state given not current type')
-            except KeyError as e:
-                raise KeyError('agent state not given')
+if __name__ == '__main__':
+    from geometry_msgs.msg import Point 
+    init_kwarg_names = LOSClearToWaypointGuard.init_input_names()
+    init_kwargs = {
+        init_kwarg_names[0]: 100.0
+    }
+    guard: GuardABC = LOSClearToWaypointGuard(**init_kwargs)
 
-            try:
-                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
-                    raise KeyError('waypoints state given not correct type.')
-            except Exception as e:
-                raise KeyError('waypoints_state not given')
-
-            try: 
-                if not isinstance(state_kwargs['unsafe_set_state'], ROSUnsafeSetState):
-                    raise KeyError('unsafe set input not of correct type ROSUnsafeSet')
-            except Exception as e:
-                raise KeyError('unsafe set state not given')
-            
-            try:
-                if not isinstance(state_kwargs['obstacles_state'], ROSObstaclesState):
-                    raise KeyError('obstacles state not of the correct type ROSObstaclesState')
-            except Exception as e:
-                raise KeyError('obstacles state not given')
-        except Exception as e:
-            raise e
+    state_kwarg_names = LOSClearToWaypointGuard.state_input_names()
+    state_kwargs = {
+        state_kwarg_names[0]: ROSAgentState(),
+        state_kwarg_names[1]: ROSObstaclesState(),
+        state_kwarg_names[2]: ROSUnsafeSetState(),
+        state_kwarg_names[3]: ROSWaypointsState(current_waypoint=ROSWaypoint(position=Point(x=10.0, y=100.0)))
+    } 
+    guard_evaluation: bool = guard.__call__(**state_kwargs)
+    print (guard_evaluation)

@@ -6,6 +6,8 @@ from colav_interfaces.msg import (
 
 class IsGoalWaypointInvariant(InvariantABC): 
 
+    _expected_state_inputs = {}
+
     def __call__(self, **state_kwargs) -> bool:
         super().__call__(**state_kwargs)
         

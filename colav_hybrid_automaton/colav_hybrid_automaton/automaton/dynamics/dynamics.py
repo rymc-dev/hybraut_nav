@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, List
 from collections import namedtuple
 from rclpy.logging import get_logger
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 
 class DynamicsABC(ABC):
@@ -13,6 +14,9 @@ class DynamicsABC(ABC):
     
     Subclasses must implement the __call__ method to compute the output.
     """
+
+    _expected_init_inputs: List[InputSpec] = []
+    _expected_state_inputs: List[InputSpec] = []
 
     def __init__(self, output_type: Type[namedtuple], **init_kwargs):
         """

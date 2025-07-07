@@ -13,6 +13,7 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from std_msgs.msg import String, Bool
+from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model import HybridAutomaton
                                            
 from hybrid_automaton_interfaces.msg import HybridAutomatonDynamics, HybridAutomatonGuardEvaluations, HybridAutomatonMode, HybridAutomatonInvariant, HybridAutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
@@ -74,14 +75,6 @@ class HybridAutomatonNode(LifecycleNode):
         'configuration_path': [
             "", 
             "Absolute path to the Hybrid Automaton configuration file (.yml format)."
-        ], 
-        'evaluation_frequency': [ 
-            100,
-            "Frequency (in Hz) at which transition conditions are evaluated."
-        ],
-        'control_frequency': [
-            100,
-            "Frequency (in Hz) at which controller feedback is returned."
         ]
     }
 
@@ -114,60 +107,62 @@ class HybridAutomatonNode(LifecycleNode):
         super().__init__(name)
 
         # Internal states
-        self._mode:HybridAutomatonMode = HybridAutomatonMode(type=HybridAutomatonMode.MODE_INACTIVE, stamp=self.get_clock().now().to_msg())
-        self._states:dict = {}
-        self._mode_dynamics = None
-        self._mode_invariants = None 
-        self._mode_transitions = None
-        self._status:HybridAutomatonStatusEnum
-        self._invariant:bool
-        self._current_transition:str
-        self._current_transition_evaluation:Transition
-        self._reset_event = None
-        self._waiting_after_reset:bool = False
-        self._reset_complete_time = None
-        self._current_invariant_status = None
+        # self._mode:HybridAutomatonMode = HybridAutomatonMode(type=HybridAutomatonMode.MODE_INACTIVE, stamp=self.get_clock().now().to_msg())
+        # self._states:dict = {}
+        # self._mode_dynamics = None
+        # self._mode_invariants = None 
+        # self._mode_transitions = None
+        # self._status:HybridAutomatonStatusEnum
+        # self._invariant:bool
+        # self._current_transition:str
+        # self._current_transition_evaluation:Transition
+        # self._reset_event = None
+        # self._waiting_after_reset:bool = False
+        # self._reset_complete_time = None
+        # self._current_invariant_status = None
 
-        # locks
-        self.transition_lock = threading.Lock()
-        self.error_lock = threading.Lock()
-        self.executing_mode_lock = threading.Lock()
-        self.completed_lock = threading.Lock()
-        self._mode_callback_lock = threading.Lock()
+        # self._automaton_mode = None
 
-        # Publishers
-        self._mode_publisher:Publisher = None
-        self._invariant_publisher: Publisher = None
-        self._status_publisher:Publisher = None
-        self._transition_evaluation_publisher:Publisher = None
-        self._dynamics_publisher:Publisher = None
-        self._waypoints_publisher: Publisher = None
+        # # locks
+        # self.transition_lock = threading.Lock()
+        # self.error_lock = threading.Lock()
+        # self.executing_mode_lock = threading.Lock()
+        # self.completed_lock = threading.Lock()
+        # self._mode_callback_lock = threading.Lock()
 
-        # Subscriptions
-        self._transition_subscription:Subscription = None
-        self._transition_evaluation_subscriber:Subscription = None
-        self._mode_subscription:Subscription = None
-        self._status_subscription:Subscription = None
+        # # Publishers
+        # self._mode_publisher:Publisher = None
+        # self._invariant_publisher: Publisher = None
+        # self._status_publisher:Publisher = None
+        # self._transition_evaluation_publisher:Publisher = None
+        # self._dynamics_publisher:Publisher = None
+        # self._waypoints_publisher: Publisher = None
 
-        # clients: 
-        self._trigger_lifecycle_transition:Client = None
+        # # Subscriptions
+        # self._transition_subscription:Subscription = None
+        # self._transition_evaluation_subscriber:Subscription = None
+        # self._mode_subscription:Subscription = None
+        # self._status_subscription:Subscription = None
 
-        # Timers
-        self._guards_evaluation_timer:Timer = None
-        self._dynamics_timer:Timer = None
-        self._invariant_timer:Timer = None
+        # # clients: 
+        # self._trigger_lifecycle_transition:Client = None
 
-        # Guards
-        self._transition_engine: GuardCondition = None  
+        # # Timers
+        # self._guards_evaluation_timer:Timer = None
+        # self._dynamics_timer:Timer = None
+        # self._invariant_timer:Timer = None
 
-        # Internal Continuous states
-        self._goal_waypoint:Waypoint = None
+        # # Guards
+        # self._transition_engine: GuardCondition = None  
 
-        # self._available_modes:List[str] = None
-        self._configuration: dict = None
+        # # Internal Continuous states
+        # self._goal_waypoint:Waypoint = None
 
-        self._control_frequency:int = 100
-        self._evaluation_frequency:int = 100
+        # # self._available_modes:List[str] = None
+        # self._configuration: dict = None
+
+        # self._control_frequency:int = 100
+        # self._evaluation_frequency:int = 100
 
         self._transition_eval_lock = threading.Lock()
         self._dynamics_timer_callback_lock = threading.Lock()
@@ -193,87 +188,61 @@ class HybridAutomatonNode(LifecycleNode):
 
         try:
             # retrieve configuration params
-            _configuration_file_path = self.get_parameter('configuration_path').value
-            _evaluation_frequency= self.get_parameter('evaluation_frequency').value
-            _control_frequency = self.get_parameter('control_frequency').value
+            _automaton_famd_file_path = self.get_parameter('configuration_path').value
+            self._automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(_automaton_famd_file_path)
+            create_state_subscriptions(node=self, state_configuration=self._automaton_model.states)
 
-            # configure the hybrid automaton
+            # self._transition_evaluator_callback = self.create_timer(
+            #     timer_period_sec=1/self._automaton_model.transition_evaluation_frequency_hz, 
+            #     callback=lambda: evaluate_guards_timer_callback(
+            #         lock = threading.Lock(),
+            #         mode = self._mode,
+            #         available_modes = self._MODE_ENUM_MAP,
+            #         status = self._status,
+            #         states=self._states,
+            #         stamp = self.get_clock().now().to_msg(),
+            #         mode_transitions = self._mode_transitions,
+            #         status_publisher = self._status_publisher,
+            #         transiiton_evaluation_publisher = self._transition_evaluation_publisher,
+            #         logger = self.get_logger()
+            #     ),
+            #     callback_group=ReentrantCallbackGroup(),
+            #     clock=SYSTEM_CLOCK,
+            #     autostart=False
+            # )
 
-            if _evaluation_frequency > 100:
-                raise ValueError("evalaution frequency is too high, can't be over 100 hz")
-            
-            if _control_frequency > 100: 
-                raise ValueError("control frequency too high, can't be over 100 hz")
-            
-            self._evaluation_frequency = _evaluation_frequency
-            self._control_frequency = _control_frequency
-            automaton_famd=load_yml(
-                    yml_path=_configuration_file_path
-            )
-            self._configuration = HybridAutomatonFactory.hybrid_automaton_registry(automaton_famd)
-            # self._configuration = create_hybrid_automaton_config(
-            #     )
+            # self._dynamics_timer = self.create_timer(
+            #     timer_period_sec=1 / self._automaton_model.control_frequency_hz,
+            #     callback=lambda: evaluate_dynamics_timer_callback(
+            #         lock=self._dynamics_timer_callback_lock,
+            #         mode=self._mode,
+            #         available_modes=self._MODE_ENUM_MAP,
+            #         mode_dynamics=self._mode_dynamics,
+            #         states=self._states,
+            #         stamp=self.get_clock().now().to_msg(),
+            #         dynamic_publisher=self._dynamics_publisher,
+            #         logger=self.get_logger()
+            #     ),
+            #     callback_group=ReentrantCallbackGroup(),
+            #     clock=SYSTEM_CLOCK,
+            #     autostart=False
+            # )
 
-            # self._configuration["guards"] = initialize_guards(guards_configuration=self._configuration["guards"])
-            # self._configuration["dynamics"] = initialize_dynamics(dynamics_configuration=self._configuration["dynamics"])
-            # self._configuration["resets"] = initialize_resets(resets_configuration=self._configuration["resets"])
-            # self._configuration["invariants"] = initialize_invariants(invariants_configuration=self._configuration["invariants"])
-
-            self._states = create_state_subscriptions(node=self, state_configuration=self._configuration['states'])
-            
-            # self._available_modes = list(self._configuration['modes'].keys())
-
-            self._guards_evaluation_timer = self.create_timer(
-                timer_period_sec=1/self._evaluation_frequency, 
-                callback=lambda: evaluate_guards_timer_callback(
-                    lock = threading.Lock(),
-                    mode = self._mode,
-                    available_modes = self._MODE_ENUM_MAP,
-                    status = self._status,
-                    states=self._states,
-                    stamp = self.get_clock().now().to_msg(),
-                    mode_transitions = self._mode_transitions,
-                    status_publisher = self._status_publisher,
-                    transiiton_evaluation_publisher = self._transition_evaluation_publisher,
-                    logger = self.get_logger()
-                ),
-                callback_group=ReentrantCallbackGroup(),
-                clock=SYSTEM_CLOCK,
-                autostart=False
-            )
-
-            self._dynamics_timer = self.create_timer(
-                timer_period_sec=1 / self._control_frequency,
-                callback=lambda: evaluate_dynamics_timer_callback(
-                    lock=self._dynamics_timer_callback_lock,
-                    mode=self._mode,
-                    available_modes=self._MODE_ENUM_MAP,
-                    mode_dynamics=self._mode_dynamics,
-                    states=self._states,
-                    stamp=self.get_clock().now().to_msg(),
-                    dynamic_publisher=self._dynamics_publisher,
-                    logger=self.get_logger()
-                ),
-                callback_group=ReentrantCallbackGroup(),
-                clock=SYSTEM_CLOCK,
-                autostart=False
-            )
-
-            self._invariant_evaluation_timer = self.create_timer(
-                timer_period_sec=1/self._evaluation_frequency,
-                callback=lambda: evaluate_invariants_timer_callback(
-                    lock=self._invariant_evaluation_lock,
-                    mode=self._mode,
-                    available_modes=self._MODE_ENUM_MAP,
-                    stamp=self.get_clock().now().to_msg(),
-                    invariant_config=self._mode_invariants,
-                    states = self._states,
-                    invariant_publisher = self._invariant_publisher,
-                    logger=self.get_logger()
-                ),
-                callback_group=ReentrantCallbackGroup(),
-                autostart=False
-            )
+            # self._invariant_evaluation_timer = self.create_timer(
+            #     timer_period_sec=1/self._automaton_model.transition_evaluation_frequency_hz,
+            #     callback=lambda: evaluate_invariants_timer_callback(
+            #         lock=self._invariant_evaluation_lock,
+            #         mode=self._mode,
+            #         available_modes=self._MODE_ENUM_MAP,
+            #         stamp=self.get_clock().now().to_msg(),
+            #         invariant_config=self._mode_invariants,
+            #         states = self._states,
+            #         invariant_publisher = self._invariant_publisher,
+            #         logger=self.get_logger()
+            #     ),
+            #     callback_group=ReentrantCallbackGroup(),
+            #     autostart=False
+            # )
 
             # undeclare params from configuration mode
             for param_key in self._CONFIGURATION_PARAMS:

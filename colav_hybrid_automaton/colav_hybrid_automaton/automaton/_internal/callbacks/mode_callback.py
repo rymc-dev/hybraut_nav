@@ -3,7 +3,7 @@ from rclpy.node import Node
 from colav_hybrid_automaton.automaton._internal.constants import  HybridAutomatonStatusEnum
 from threading import Lock
 from rclpy.publisher import Publisher
-from colav_hybrid_automaton.automaton._internal.factory import generate_mode_profile
+# from colav_hybrid_automaton.automaton._internal.factory import generate_mode_profile
 
 from typing import Tuple
 from rclpy.impl.rcutils_logger import RcutilsLogger

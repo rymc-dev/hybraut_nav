@@ -18,10 +18,21 @@ class GenerateVirtualWaypointReset(ResetABC):
     to the left or right depending on colregs.
     """
 
-    RESET_TARGETS = [{
-        'name': 'waypoints_state',
-        'type': ROSWaypointsState
-    }]
+    _expected_init_inputs = {
+        "longitudinal_offset_distance": float,
+        "lateral_offset_distance": float,
+        "virtual_waypoint_acceptance_radius": float
+    }
+
+    _expected_state_inputs = {
+        "agent_state": ROSAgentState,
+        "obstacles_state": ROSObstaclesState,
+        "unsafe_set_state": ROSUnsafeSetState,
+        "waypoints_state": ROSWaypointsState
+    }
+    _reset_targets = {
+        'waypoints_state': ROSWaypointsState
+    }
 
 
     def __init__(self, **init_kwargs):
@@ -34,7 +45,7 @@ class GenerateVirtualWaypointReset(ResetABC):
         by the agent.
         """
 
-        super().__init__(self.RESET_TARGETS, **init_kwargs)
+        super().__init__(self._reset_targets, **init_kwargs)
 
         self.longitudinal_offset_distance: float = init_kwargs.get("longitudinal_offset_distance")
         self.lateral_offset_distance: float = init_kwargs.get("lateral_offset_distance")

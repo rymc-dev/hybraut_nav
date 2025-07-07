@@ -1,10 +1,11 @@
-from .guard import GuardABC
+from colav_hybrid_automaton.automaton.guards import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
 from math import dist as euclidean_distance
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class WaypointReachedGuard(GuardABC):
     """
@@ -27,6 +28,11 @@ class WaypointReachedGuard(GuardABC):
         ValueError: If `current_waypoint` inside `waypoints_state` is not valid.
     """
 
+    _state_input_spec = [
+        InputSpec(name='agent_state', type=ROSAgentState),
+        InputSpec(name='waypoints_state', type=ROSWaypointsState)
+    ]
+
     def __call__(self, **state_kwargs) -> bool:
         super().__call__(**state_kwargs) 
 
@@ -41,25 +47,17 @@ class WaypointReachedGuard(GuardABC):
         
         return euclidean_distance(agent_coords, waypoint_coords) <= \
                waypoints_state.current_waypoint.acceptance_radius
-    
-    def _validate_states(self, **state_kwargs):
-        super()._validate_states(**state_kwargs)
 
+if __name__ == '__main__':
+    from geometry_msgs.msg import Point 
+    init_kwarg_names = WaypointReachedGuard.init_input_names()
+    init_kwargs = {}
+    guard: GuardABC = WaypointReachedGuard(**init_kwargs)
 
-        try:
-            try:
-                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
-                    raise TypeError('agent_state is invalid type')
-            except KeyError:
-                raise KeyError('agent_state not given in __call__')
-            
-            try:
-                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
-                    raise TypeError('waypoints_state is invalid type')
-                        
-                if not isinstance(state_kwargs['waypoints_state'].current_waypoint, ROSWaypoint):
-                    raise AttributeError('waypoints_state does not contain a valid current_waypoint of type ROSWaypoint.')
-            except KeyError:
-                raise KeyError('waypoints_state not given in __call__')
-        except Exception as e: 
-            raise e
+    state_kwarg_names = WaypointReachedGuard.state_input_names()
+    state_kwargs = {
+        state_kwarg_names[0]: ROSAgentState(),
+        state_kwarg_names[1]: ROSWaypointsState()
+    } 
+    guard_evaluation: bool = guard.__call__(**state_kwargs)
+    print (guard_evaluation)

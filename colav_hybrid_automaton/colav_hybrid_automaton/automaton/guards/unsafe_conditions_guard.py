@@ -1,10 +1,11 @@
-from .guard import GuardABC
+from colav_hybrid_automaton.automaton.guards import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
     UnsafeSetState as ROSUnsafeSetState
 )
 from shapely.geometry import Polygon, Point
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class UnsafeConditionsGuard(GuardABC):
     """
@@ -13,6 +14,11 @@ class UnsafeConditionsGuard(GuardABC):
 
     When called, returns True if the safety radius intersect unsafe set polygon.
     """
+
+    _state_input_spec = [
+        InputSpec(name='agent_state', type=ROSAgentState),
+        InputSpec(name='unsafe_set_state', type=ROSUnsafeSetState)
+    ]
 
     def __call__(self, **state_kwargs):
         """
@@ -35,18 +41,16 @@ class UnsafeConditionsGuard(GuardABC):
         
         return agent_circle.intersects(unsafe_polygon)
     
-    def _validate_states(self, **state_kwargs):
-        super()._validate_states(**state_kwargs)
-        
-        try:
-            try:
-                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
-                    raise TypeError('')
-                if not isinstance(state_kwargs['obstacles_state'], ROSObstaclesState):
-                    raise TypeError('')
-                if not isinstance(state_kwargs['unsafe_set_state'], ROSUnsafeSetState):
-                    raise TypeError('')
-            except KeyError:
-                raise KeyError('')
-        except Exception as e:
-            raise e
+if __name__ == '__main__':
+    from geometry_msgs.msg import Point as ROSPoint 
+    init_kwarg_names = UnsafeConditionsGuard.init_input_names()
+    init_kwargs = {}
+    guard: GuardABC = UnsafeConditionsGuard(**init_kwargs)
+
+    state_kwarg_names = UnsafeConditionsGuard.state_input_names()
+    state_kwargs = {
+        state_kwarg_names[0]: ROSAgentState(),
+        state_kwarg_names[1]: ROSUnsafeSetState()
+    } 
+    guard_evaluation: bool = guard.__call__(**state_kwargs)
+    print (guard_evaluation)

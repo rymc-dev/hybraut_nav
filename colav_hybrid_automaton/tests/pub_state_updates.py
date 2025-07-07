@@ -1,18 +1,18 @@
-# from colav_interfaces.msg import AgentState, ObstaclesState, UnsafeSetState, Waypoint, WaypointsState
-# from rclpy.node import Node
+from colav_interfaces.msg import AgentState, ObstaclesState, UnsafeSetState, Waypoint, WaypointsState
+from rclpy.node import Node
 
-# import sys
-# from geometry_msgs.msg import Point
-# import os
+import sys
+from geometry_msgs.msg import Point
+import os
 
-# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-# import rclpy
-# from std_msgs.msg import Header
-# from builtin_interfaces.msg import Time
+import rclpy
+from std_msgs.msg import Header
+from builtin_interfaces.msg import Time
 
-# import time
-# from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
+import time
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy
 
 # QOS_PROFILE = QoSProfile(
 #     history=QoSHistoryPolicy.KEEP_LAST,
@@ -21,14 +21,18 @@
 # )
 
 
-# rclpy.init()
+rclpy.init()
 
-# pub_node = Node('pub_node')
-# agent_pub = pub_node.create_publisher(
-#     AgentState,
-#     '/state/agent',
-#     10
-# )
+pub_node = Node('pub_node')
+agent_pub = pub_node.create_publisher(
+    AgentState,
+    '/agent_state',
+    qos_profile=QoSProfile(depth=10)
+)
+
+agent_pub.publish(AgentState())
+
+rclpy.shutdown()
 
 # obstacles_pub = pub_node.create_publisher(
 #     ObstaclesState,

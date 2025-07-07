@@ -1,12 +1,18 @@
-from .guard import GuardABC
+# from .guard import GuardABC
+from colav_hybrid_automaton.automaton.guards import GuardABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 from typing import List
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class VirtualWaypointsGuard(GuardABC):
     """
     guard class on call which check if current waypoints 
     state contains a virtual waypoint
     """
+
+    _state_input_spec = [
+        InputSpec(name='waypoints_state', type=ROSWaypointsState)
+    ]
 
     def __call__(self, **state_kwargs):
         super().__call__(**state_kwargs)
@@ -15,14 +21,12 @@ class VirtualWaypointsGuard(GuardABC):
         virtual_waypoints: List[ROSWaypoint] = waypoints_state.virtual_waypoints 
         return len(virtual_waypoints) > 0 
     
-    def _validate_states(self, **state_kwargs):
-        super()._validate_states(**state_kwargs)
-        
-        try: 
-            try:
-                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
-                    raise TypeError('waypoints state invalid type') 
-            except KeyError:
-                raise KeyError('waypoints_state value not given in __call__')
-        except Exception as e:
-            raise e
+if __name__ == '__main__':
+    init_kwarg_names = VirtualWaypointsGuard.init_input_names()
+    guard: GuardABC = VirtualWaypointsGuard()
+    state_kwarg_names = VirtualWaypointsGuard.state_input_names()
+    state_kwargs = {
+        state_kwarg_names[0]: ROSWaypointsState()
+    }
+    guard_evaluation:bool = guard.__call__(**state_kwargs)
+    print (guard_evaluation)

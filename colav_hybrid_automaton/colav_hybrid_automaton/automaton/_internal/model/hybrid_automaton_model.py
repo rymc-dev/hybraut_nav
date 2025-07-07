@@ -179,6 +179,12 @@ class HybridAutomaton:
     transition_evaluation_frequency_hz: float
     control_frequency_hz: float
 
+    current_mode: int
+    current_state: int
+
+    def update_mode(self, current_mode: int):
+        self.current_mode = current_mode
+
     @classmethod
     def from_famd(cls, famd: Dict[str, Any]) -> "HybridAutomaton":
         name = famd.get('automaton_name', '')
@@ -190,17 +196,21 @@ class HybridAutomaton:
             int(k): Mode.from_famd(v, famd)
             for k, v in famd.get('modes', {}).items()
         }
+        initial_mode = famd.get('initial_mode', 0)
+        
         return cls(
             name=name,
             description=description,
             states=states,
             modes=modes,
-            initial_mode=famd.get('initial_mode', 0),
+            initial_mode=initial_mode,
             goal_modes=famd.get('goal_modes', []),
             transition_evaluation_frequency_hz=famd.get(
                 'transition_evaluation_frequency_hz', 10.0
             ),
             control_frequency_hz=famd.get('control_frequency_hz', 50.0),
+            current_mode=initial_mode,
+            current_state=0
         )
 
 

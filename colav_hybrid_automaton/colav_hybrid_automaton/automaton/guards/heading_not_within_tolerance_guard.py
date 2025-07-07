@@ -1,4 +1,5 @@
-from .guard import GuardABC
+# from .guard import GuardABC
+from colav_hybrid_automaton.automaton.guards.guard import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
@@ -9,6 +10,7 @@ from colav_hybrid_automaton.automaton._internal.utils import (
     delta_heading,
     quaternion_to_heading,
 )
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 
 class HeadingNotWithinToleranceGuard(GuardABC):
@@ -18,9 +20,12 @@ class HeadingNotWithinToleranceGuard(GuardABC):
 
     When called, returns True if the heading error is outside the tolerance.
     """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.heading_tolerance = kwargs.get('heading_tolerance', 0.2)
+
+    _init_input_spec  = [InputSpec(name='heading_tolerance', type=float)]
+    _state_input_spec  = [
+        InputSpec(name='agent_state', type=ROSAgentState),
+        InputSpec(name='waypoints_state', type=ROSWaypointsState)
+    ]
 
     def __call__(self, **state_kwargs):
         super().__call__(**state_kwargs)
@@ -47,7 +52,7 @@ class HeadingNotWithinToleranceGuard(GuardABC):
         desired_heading = math.atan2(wy - ay, wx - ax)
 
         # For large tolerances, detect raw yaw > 180° via quaternion.w sign
-        if self.heading_tolerance >= math.pi:
+        if self.__getattribute__('heading_tolerance') >= math.pi:
             # if quaternion half-angle cos < 0, original yaw > π
             if agent_state.pose.orientation.w < 0:
                 raw_yaw = wrapped_yaw + 2 * math.pi
@@ -63,38 +68,27 @@ class HeadingNotWithinToleranceGuard(GuardABC):
             )
 
         # consider floating-point boundary: treat near-equal as within tolerance
-        outside = abs(error) > self.heading_tolerance
-        if outside and not math.isclose(abs(error), self.heading_tolerance):
+        outside = abs(error) > self.__getattribute__('heading_tolerance')
+        if outside and not math.isclose(abs(error), self.__getattribute__('heading_tolerance')):
             return True
         return False
 
-    def _validate_initialization(self, **kwargs):
+    def _validate_initialization(self, **init_kwargs):
+        super()._validate_initialization(**init_kwargs)
 
-        try:
-            try:
-                if not isinstance(kwargs['heading_tolerance'], float):
-                    raise TypeError('heading tolerance is invalid type')
-                if kwargs.get('heading_tolerance') < 0.0:
+        if init_kwargs.get('heading_tolerance') < 0.0:
                     raise ValueError('heading tolerance cannot be less than 0.0')
-            except KeyError:
-                raise KeyError('heading tolerance not given in __init__')
-        except Exception as e:
-            raise e
 
-    def _validate_states(self, **state_kwargs):
-        super()._validate_states(**state_kwargs)
-        
-        try:
-            try:
-                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
-                    raise TypeError(f"agent_state data passed in __call__ invalid type")
-            except KeyError:
-                raise KeyError(f"agent_state value not given in __call__")
-            
-            try:
-                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
-                    raise TypeError(f"waypoints_state data passed in __call__ invalid type")
-            except KeyError:
-                raise KeyError(f"waypoints_state key not given in __call__")
-        except Exception as e: 
-            raise e
+if __name__ == "__main__":
+    from geometry_msgs.msg import Point
+    init_input_names = HeadingNotWithinToleranceGuard.init_input_names()
+    init_kwargs = {init_input_names[0]: 0.2} 
+    guard:GuardABC = HeadingNotWithinToleranceGuard(**init_kwargs)
+    state_input_names = HeadingNotWithinToleranceGuard.state_input_names()
+    state_kwargs = {
+        state_input_names[0]: ROSAgentState(),
+        state_input_names[1]: ROSWaypointsState(current_waypoint=ROSWaypoint(position=Point(x=20.0, y=100.0))) 
+    }   
+    guard_evaluation: bool = guard.__call__(**state_kwargs)
+
+    print (guard_evaluation)

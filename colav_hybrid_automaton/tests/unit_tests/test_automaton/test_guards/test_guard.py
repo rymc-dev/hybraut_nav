@@ -1,11 +1,15 @@
 import pytest
 from colav_hybrid_automaton.automaton.guards.guard import GuardABC
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 def test_guard_creation_and_calls():
     class TestGuard(GuardABC):
         """
         This is a test of the guard condition abstract class.
         """
+        _expected_init_inputs = [InputSpec(name='x', type=float)]
+        _expected_state_inputs = [InputSpec(name='x', type=float)]
+
         def __init__(self, **init_kwargs):
             super().__init__(**init_kwargs)
             self.x: float = init_kwargs.get('x')

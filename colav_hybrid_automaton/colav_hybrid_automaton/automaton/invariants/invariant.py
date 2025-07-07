@@ -16,8 +16,9 @@ Example Usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, Type, List
 from rclpy.logging import get_logger
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 
 class InvariantABC(ABC):
@@ -31,6 +32,9 @@ class InvariantABC(ABC):
         logger: ROS2 logger instance for debugging and information output
         is_initialized: Flag indicating if the invariant has been properly initialized
     """
+    
+    _expected_init_inputs: List[InputSpec] = []
+    _expected_state_inputs: List[InputSpec] = []
 
     def __init__(self, **init_kwargs):
         """
@@ -125,7 +129,27 @@ class InvariantABC(ABC):
         """
         if not self.is_initialized:
             raise RuntimeError(f'{self.__class__.__name__} invariant is not initialized')
-        
+    
+    @property
+    def expected_init_inputs(self) -> Dict[str, Type]:
+        """Return a list of initialization inputs expected for __init__, names and types"""
+        return self._expected_init_inputs.copy()
+
+    @property
+    def required_init_input_names(self) -> List[str]:
+        """return a list of names of initialization args"""
+        return list(self._expected_init_inputs.keys())
+
+    @property
+    def expected_state_inputs(self) -> Dict[str, Type]:
+        """Return a list of state inputs expected for the __init__ , names and types"""
+        return self._expected_state_inputs.copy()
+    
+    @property
+    def required_state_input_names(self) -> List[str]: 
+         """return a list of names of state args"""
+         return list(self._expected_state_inputs.keys())    
+    
     def get_invariant_info(self) -> Dict[str, Any]:
         """
         Get information about this invariant function.

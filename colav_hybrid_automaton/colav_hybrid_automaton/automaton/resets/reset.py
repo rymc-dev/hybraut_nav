@@ -26,8 +26,9 @@ Example Usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 from rclpy.logging import get_logger
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 
 class ResetABC(ABC):
@@ -43,6 +44,10 @@ class ResetABC(ABC):
         is_initialized: Flag indicating if the reset has been properly initialized
         reset_targets: List of objects that will be updated by this reset function
     """
+
+    _expected_init_inputs: List[InputSpec] = []
+    _expected_state_inputs = List[InputSpec] = []
+    _reset_targets = List[InputSpec] = []
 
     def __init__(self, reset_targets: List[Dict[str, Any]], **init_kwargs):
         """
@@ -205,6 +210,36 @@ class ResetABC(ABC):
                 if not isinstance(value, expected_type):
                     raise TypeError(f"Reset output '{name}' expected type {expected_type.__name__}, got {type(value).__name__}")
 
+    @property
+    def expected_init_inputs(self) -> Dict[str, Type]:
+        """Return a list of initialization inputs expected for the __init__ , names and types"""
+        return self._expected_init_inputs.copy()
+    
+    @property
+    def required_init_input_names(self) -> List[str]: 
+         """return a list of names of initialization args"""
+         return list(self._expected_init_inputs.keys())
+    
+    @property
+    def expected_state_inputs(self) -> Dict[str, Type]:
+        """Return a list of state inputs expected for the __call__ , names and types"""
+        return self._expected_state_inputs.copy()
+    
+    @property
+    def required_state_inputs_names(self) -> List[str]: 
+        """Return a list of state inputs"""
+        return list(self._expected_state_inputs.keys())
+
+    @property
+    def expected_reset_targets(self) -> Dict[str, Type]:
+        """Return a list of reset target names and types for the __call__"""
+        return self._reset_targets.copy()
+    
+    @property
+    def required_reset_target_names(self) -> List[str]: 
+        """Return a list of state inputs"""
+        return list(self._reset_targets.keys())
+
     def get_reset_info(self) -> Dict[str, Any]:
         """
         Get information about this reset function.
@@ -218,6 +253,14 @@ class ResetABC(ABC):
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
             'is_initialized': self.is_initialized,
+            'required_init_inputs':self.required_init_input_names(),
+            'required_init_types': {
+                name: type_.__name__ for name, type_ in self._expected_init_inputs.items()
+            },
+            'required_state_inputs': self.required_state_inputs_names,
+            'expected_state_types':  {
+                name: type_.__name__ for name, type_ in self._expected_state_inputs.items()
+            },
             'reset_targets': self.reset_targets,
             'target_count': len(self.reset_targets),
             'target_names': [target['name'] for target in self.reset_targets],

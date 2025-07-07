@@ -8,29 +8,25 @@ from rclpy.publisher import Publisher
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from typing import Tuple
 from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
+from typing import Dict
+from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model import State
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.qos import QoSProfile
 
 
-def create_state_subscriptions(node: Node, state_configuration: dict) -> dict: 
-
-    states = {}
-
-    def make_state_callback(key):
-        def state_callback(msg: str, key:str): 
-            states[key] = msg
-        return lambda msg: state_callback(msg, key)
-
-
-    """create ros2 state subscriptions""" # TODO: FOR STATES NEED TO ADD TIMEOUT EXCEPTIONS BASED ON PARAMS
-    for key, value in state_configuration.items():
+def create_state_subscriptions(node: Node, state_configuration: Dict[str, State]): 
+    """ 
+    runtime functionality for the hybrid automaton model which will enable 
+    the model to dynamically update the states utilizing ros2 subscriptions
+    """
+    for state_name, state_val in state_configuration.items():
         node.create_subscription(
-            topic=value['topic'],
-            msg_type=value['type'],
-            callback = make_state_callback(key),
-            qos_profile=QOS_PROFILE
+            msg_type=state_val.msg_type,
+            topic=state_val.topic,
+            callback=lambda msg, state=state_val: setattr(state, "current_state", msg),
+            callback_group=ReentrantCallbackGroup(),
+            qos_profile=QoSProfile(depth=10)
         )
-        states[key] = None
-
-    return states
 
 def create_state_publishers(node: Node) -> dict: 
     """create ros2 state subscriptions""" # TODO: FOR STATES NEED TO ADD TIMEOUT EXCEPTIONS BASED ON PARAMS

@@ -1,5 +1,5 @@
 from colav_proto.constants import AutomatonStatusEnum as ProtoAutomatonStatusEnum
-from colav_hybrid_automaton.automaton.constants import HybridAutomatonStatusEnum as PythonHybridAutomatonStatusEnum
+from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum as PythonHybridAutomatonStatusEnum
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus as ROSHybridAutomatonStatus
 import pytest
 
@@ -9,32 +9,32 @@ import pytest
         [
             (
                 PythonHybridAutomatonStatusEnum.INITIALIZING,
-                ROSHybridAutomatonStatus.INITIALIZING,
+                ROSHybridAutomatonStatus.STATUS_INITIALIZING,
                 ProtoAutomatonStatusEnum.INITIALIZING
             ),
             (
                 PythonHybridAutomatonStatusEnum.ACTIVE_MODE,
-                ROSHybridAutomatonStatus.ACTIVE_MODE,
+                ROSHybridAutomatonStatus.STATUS_ACTIVE_MODE,
                 ProtoAutomatonStatusEnum.ACTIVE_MODE
             ),
             (
                 PythonHybridAutomatonStatusEnum.TRANSITIONING,
-                ROSHybridAutomatonStatus.TRANSITIONING,
+                ROSHybridAutomatonStatus.STATUS_TRANSITIONING,
                 ProtoAutomatonStatusEnum.TRANSITIONING
             ),
             (
                 PythonHybridAutomatonStatusEnum.COMPLETED,
-                ROSHybridAutomatonStatus.COMPLETED,
+                ROSHybridAutomatonStatus.STATUS_COMPLETED,
                 ProtoAutomatonStatusEnum.COMPLETED
             ),
             (
                 PythonHybridAutomatonStatusEnum.DEACTIVATING,
-                ROSHybridAutomatonStatus.DEACTIVATING,
+                ROSHybridAutomatonStatus.STATUS_DEACTIVATING,
                 ProtoAutomatonStatusEnum.DEACTIVATING
             ),
             (
                 PythonHybridAutomatonStatusEnum.ERROR,
-                ROSHybridAutomatonStatus.ERROR,
+                ROSHybridAutomatonStatus.STATUS_ERROR,
                 ProtoAutomatonStatusEnum.ERROR
             ),
 

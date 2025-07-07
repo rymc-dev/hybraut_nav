@@ -9,15 +9,15 @@ class RemoveVirtualWaypointReset(ResetABC):
     goal waypoint.
     """
 
-    RESET_TARGET = [{
-        'name': 'waypoints_state',
-        'type': ROSWaypointsState
-    }]
+    _expected_state_inputs = {
+        "waypoints_state": ROSWaypointsState
+    }
+    _reset_targets = {'waypoints_state': ROSWaypointsState}
 
     def __init__(self, **init_kwargs):
         # Call parent constructor to properly initialize the reset
 
-        super().__init__(self.RESET_TARGET, **init_kwargs)
+        super().__init__(self._reset_targets, **init_kwargs)
     
     def __call__(self, **state_kwargs):
         """Pops the first virtual waypoint and sets the new current waypoint in waypoints state"""
