@@ -1,15 +1,17 @@
 from .dynamics import DynamicsABC
 from typing import NamedTuple
+from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpec, DynamicsField
 
-class PIDDynamicsOutput(NamedTuple):
-    velocity: float
-    yaw_rate: float
 
 class NoOpControllerDynamics(DynamicsABC):
 
-    def __init__(self, **init_kwargs):
-        super().__init__(PIDDynamicsOutput, **init_kwargs)
+    _dynamic_output_spec: DynamicsSpec = (
+        DynamicsSpec("AutomatonCMD", description="Automaton outputs for hydrofoil")
+        .add_field("velocity", float, unit="m/s", description="Velocity in meters per second")
+        .add_field("yaw_rate", float, unit="rad/s", description="Yaw rate in radians per second")
+    ).create_dataclass()
 
-    def __call__(**state_kwargs):
+    def __call__(self, **state_kwargs):
         super.__call__(**state_kwargs)
-        return PIDDynamicsOutput(velocity=0.0, yaw_rate=0.0)
+        output = self._dynamic_output_spec(velocity=0.0, yaw_rate=0.0)
+        return output

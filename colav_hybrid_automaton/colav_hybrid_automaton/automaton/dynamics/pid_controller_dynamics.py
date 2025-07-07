@@ -7,6 +7,8 @@ from colav_interfaces.msg import (
 )
 from colav_hybrid_automaton.automaton._internal.utils import quaternion_to_heading
 import math
+from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpec, DynamicsField
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class PIDControllerDynamics(DynamicsABC):
     """
@@ -15,12 +17,34 @@ class PIDControllerDynamics(DynamicsABC):
     relative to the target waypoint.
     """
     
-    class PIDDynamicsOutput(NamedTuple):
-        velocity: float
-        yaw_rate: float
+    _dynamic_output_spec: DynamicsSpec = (
+        DynamicsSpec("AutomatonCMD", description="Automaton outputs for hydrofoil")
+        .add_field("velocity", float, unit="m/s", description="Velocity in meters per second")
+        .add_field("yaw_rate", float, unit="rad/s", description="Yaw rate in radians per second")
+    ).create_dataclass()
+
+    _init_input_spec = [
+        InputSpec(name='target_velocity', type=float),
+        InputSpec(name='error_tolerance', type=float),
+        InputSpec(name='max_yaw_rate', type=float),
+        InputSpec(name='yaw_kp', type=float),
+        InputSpec(name='yaw_ki', type=float),
+        InputSpec(name='yaw_kd', type=float),
+        InputSpec(name='vel_kp', type=float),
+        InputSpec(name='vel_ki', type=float),
+        InputSpec(name='vel_kd', type=float),
+        InputSpec(name='target_velocity', type=float),
+        InputSpec(name='target_velocity', type=float),
+        InputSpec(name='target_velocity', type=float),
+    ]
+
+    _state_input_spec = [
+        InputSpec(name='agent_state', type=ROSAgentState),
+        InputSpec(name='waypoints_state', type=ROSWaypointsState)
+    ]
 
     def __init__(self, **init_kwargs):
-        super().__init__(self.PIDDynamicsOutput, **init_kwargs)
+        super().__init__(**init_kwargs)
 
         # static PID controller configuration
         self.target_velocity = init_kwargs.get('target_velocity')
@@ -44,96 +68,43 @@ class PIDControllerDynamics(DynamicsABC):
         self._velocity_error_integral = 0.0
         self._prev_velocity_error = 0.0
 
+        # in the dynamics I want to automatically have buffers for state inputs for improving the PID controllers
+
         # TODO: Should have an internal state for storing agent_states to help the PID controller. please add this for the future.
 
     def _validate_initialization(self, **init_kwargs):
         super()._validate_initialization(**init_kwargs)
 
         # target velocity arg
-        try: 
-            if not isinstance(init_kwargs['target_velocity'], float):
-                raise TypeError()
-            if init_kwargs['target_velocity'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
-        
-        # dt: this will by used for validation of agent states in buffer rather than for dynamics calculation
-        # try: 
-        #     if not isinstance(init_kwargs['dt'], float):
-        #         raise TypeError()
-        #     if init_kwargs['dt'] < 0.0:
-        #         raise ValueError()
-        # except KeyError as e:
-        #     raise KeyError()
-        
-        # error_tolerance
-        try: 
-            if not isinstance(init_kwargs['error_tolerance'], float):
-                raise TypeError()
-            if init_kwargs['error_tolerance'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
-        
-        # max_yaw_rate
-        try: 
-            if not isinstance(init_kwargs['max_yaw_rate'], float):
-                raise TypeError()
-            if init_kwargs['max_yaw_rate'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
+        if init_kwargs['target_velocity'] < 0.0:
+            raise ValueError()
+
+        if init_kwargs['error_tolerance'] < 0.0:
+            raise ValueError()
+
+        if init_kwargs['max_yaw_rate'] < 0.0:
+            raise ValueError()
         
         """ == PID Gains === """
-        try: 
-            if not isinstance(init_kwargs['yaw_kp'], float):
-                raise TypeError()
-            if init_kwargs['yaw_kp'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
-        try: 
-            if not isinstance(init_kwargs['yaw_ki'], float):
-                raise TypeError()
-            if init_kwargs['yaw_ki'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
-        
-        try: 
-            if not isinstance(init_kwargs['yaw_kd'], float):
-                raise TypeError()
-            if init_kwargs['yaw_kd'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
-        
-        try: 
-            if not isinstance(init_kwargs['vel_kp'], float):
-                raise TypeError()
-            if init_kwargs['vel_kp'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
-        
-        try: 
-            if not isinstance(init_kwargs['vel_ki'], float):
-                raise TypeError()
-            if init_kwargs['vel_ki'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
+        if init_kwargs['yaw_kp'] < 0.0:
+            raise ValueError()
 
-        try: 
-            if not isinstance(init_kwargs['yaw_kd'], float):
-                raise TypeError()
-            if init_kwargs['yaw_kd'] < 0.0:
-                raise ValueError()
-        except KeyError as e:
-            raise KeyError()
+        if init_kwargs['yaw_ki'] < 0.0:
+            raise ValueError()
         
-    def __call__(self, **state_kwargs) -> PIDDynamicsOutput:
+        if init_kwargs['yaw_kd'] < 0.0:
+            raise ValueError()
+    
+        if init_kwargs['vel_kp'] < 0.0:
+            raise ValueError()
+        
+        if init_kwargs['vel_ki'] < 0.0:
+            raise ValueError()
+
+        if init_kwargs['yaw_kd'] < 0.0:
+            raise ValueError()
+    
+    def __call__(self, **state_kwargs) -> _dynamic_output_spec:
         super().__call__(**state_kwargs)
 
         agent_state: ROSAgentState = state_kwargs.get('agent_state')
@@ -188,22 +159,3 @@ class PIDControllerDynamics(DynamicsABC):
         final_velocity = current_velocity + velocity_command
 
         return PIDControllerDynamics(velocity = final_velocity, yaw_rate=target_yaw_rate)
-    
-    def _validate_states(self, **state_kwargs):
-        super()._validate_states(**state_kwargs)
-    
-        # target velocity arg
-        try:
-            try: 
-                if not isinstance(state_kwargs['agent_state'], ROSAgentState):
-                    raise TypeError()
-            except KeyError as e:
-                raise KeyError()
-            
-            try: 
-                if not isinstance(state_kwargs['waypoints_state'], ROSWaypointsState):
-                    raise TypeError()
-            except KeyError as e:
-                raise KeyError()
-        except Exception as e:
-            raise e
