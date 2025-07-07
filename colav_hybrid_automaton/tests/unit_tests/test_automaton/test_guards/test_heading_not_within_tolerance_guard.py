@@ -181,7 +181,7 @@ def test_heading_not_within_tolerance_guard_comprehensive(
     ]
 )
 def test_heading_not_within_toleracne_guard_invalid_initializations(init_kwargs, expected_exception, test_description):
-    with pytest.raises(expected_exception):
+    with pytest.raises(expected_exception): 
         HeadingNotWithinToleranceGuard(**init_kwargs)
 
 @pytest.mark.parametrize(

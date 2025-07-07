@@ -66,7 +66,6 @@ class GuardABC(ABC):
         for key, value in init_kwargs.items():
             setattr(self, key, value)
 
-    @abstractmethod
     def __call__(self, **state_kwargs) -> bool:
         """
         Execute the guard function with current state inputs.

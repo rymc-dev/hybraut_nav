@@ -76,8 +76,10 @@ class HeadingNotWithinToleranceGuard(GuardABC):
     def _validate_initialization(self, **init_kwargs):
         super()._validate_initialization(**init_kwargs)
 
-        if init_kwargs.get('heading_tolerance') < 0.0:
-                    raise ValueError('heading tolerance cannot be less than 0.0')
+
+        heading_tol = init_kwargs['heading_tolerance']  # Now safe: key guaranteed present
+        if heading_tol < 0.0:
+            raise ValueError('heading tolerance cannot be less than 0.0')
 
 if __name__ == "__main__":
     from geometry_msgs.msg import Point
