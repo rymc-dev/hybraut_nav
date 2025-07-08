@@ -1,82 +1,225 @@
 import pytest
+import time
+import math
 from colav_hybrid_automaton.automaton.dynamics import PIDControllerDynamics, DynamicsABC
-from colav_interfaces.msg import (
-    AgentState as ROSAgentState,
-    WaypointsState as ROSWaypointsState
-)
+from colav_interfaces.msg import AgentState as ROSAgentState, WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
+from geometry_msgs.msg import Point
+import numpy as np
+
+@pytest.fixture
+def default_init_kwargs():
+    return  {
+        'control_frequency': 100,
+        'target_velocity': 25.0,
+        'error_tolerance': 0.3,
+        'max_velocity': 30.0,
+        'max_yaw_rate': 1.0,
+        'yaw_kp': 2.0,
+        'yaw_ki': 0.05,  # Reduced
+        'yaw_kd': 0.1,   # Reduced
+        'vel_kp': 2.0,   # Increased for faster response
+        'vel_ki': 0.01,  # Much lower to avoid oscillation
+        'vel_kd': 0.0,   # Remove derivative term initially
+        'integral_max': 5.0,  # Lower limit
+        'derivative_filter_alpha': 0.1,
+    }
+
+@pytest.fixture
+def far_waypoint():
+    wp = ROSWaypoint()
+    wp.position = Point(x=100.0, y=0.0, z=0.0)
+    return wp
+
+@pytest.fixture
+def dynamics(default_init_kwargs):
+    return PIDControllerDynamics(**default_init_kwargs)
+
+@pytest.fixture
+def state_kwargs(far_waypoint):
+    agent = ROSAgentState()
+    agent.velocity = 0.0
+    waypoints = ROSWaypointsState()
+    waypoints.current_waypoint = far_waypoint
+    return {'agent_state': agent, 'waypoints_state': waypoints}
+
+
+def test_comprehensive_velocity_and_yaw(dynamics, state_kwargs):
+    """Test PID controller behavior with realistic expectations for control systems."""
+    velocities = []
+    yaw_rates = []
+   
+    # Run the controller for stabilization + evaluation
+    total_iterations = 100  # Reduced from 1000 - too many iterations with sleep
+    stabilization_iterations = 20  # Increased stabilization period
+   
+    for i in range(total_iterations):
+        out = dynamics.__call__(**state_kwargs)
+        velocities.append(out.velocity)
+        yaw_rates.append(out.yaw_rate)
+        
+        # Update state for next iteration
+        state_kwargs['agent_state'].velocity = out.velocity
+        
+        # Remove or reduce sleep - makes tests slow and doesn't add value
+        # time.sleep(0.01)  # Consider removing this entirely
+   
+    # Basic sanity checks
+    assert len(velocities) == total_iterations
+    assert len(yaw_rates) == total_iterations
+    
+    # Velocity should start positive (assuming forward motion)
+    assert velocities[0] > 0.0
+   
+    # Only evaluate stability after initial stabilization period
+    stable_velocities = velocities[stabilization_iterations:]
+    stable_yaw_rates = yaw_rates[stabilization_iterations:]
+   
+    # PID controllers oscillate - check for reasonable bounds instead of monotonic increase
+    velocity_range = max(stable_velocities) - min(stable_velocities)
+    velocity_mean = np.mean(stable_velocities)
+    
+    # Velocity should be bounded and not wildly oscillating
+    # Allow for some oscillation but not excessive
+    max_reasonable_oscillation = velocity_mean * 0.3  # 30% of mean velocity
+    assert velocity_range <= max_reasonable_oscillation, f"Velocity oscillation too large: {velocity_range} > {max_reasonable_oscillation}"
+   
+    # Should not exceed max_velocity (check all velocities)
+    assert all(v <= dynamics.max_velocity for v in velocities), "Velocity exceeded maximum"
+    
+    # Velocity should be positive (assuming forward motion)
+    assert all(v > 0 for v in velocities), "Velocity should remain positive"
+   
+    # For straight-ahead motion, yaw_rate should be small (relaxed tolerance)
+    max_yaw_rate = max(abs(y) for y in stable_yaw_rates)
+    assert max_yaw_rate < 0.1, f"Yaw rate too large for straight motion: {max_yaw_rate}"
+   
+    # Convergence check - system should be settling toward target
+    target_velocity = dynamics.target_velocity
+    
+    # Split stabilized data into early and late portions
+    mid_point = len(stable_velocities) // 2
+    early_stable = stable_velocities[:mid_point]
+    late_stable = stable_velocities[mid_point:]
+    
+    if len(early_stable) > 0 and len(late_stable) > 0:
+        early_avg_error = np.mean([abs(v - target_velocity) for v in early_stable])
+        late_avg_error = np.mean([abs(v - target_velocity) for v in late_stable])
+        
+        # System should be converging or at least not diverging significantly
+        # Allow for some tolerance since PID can have steady-state error
+        assert late_avg_error <= early_avg_error * 1.1, "System appears to be diverging from target"
+    
+    # Optional: Check that final velocities are reasonably close to target
+    final_velocities = velocities[-5:]  # Last 5 readings
+    final_avg_error = np.mean([abs(v - target_velocity) for v in final_velocities])
+    
+    # Allow for reasonable steady-state error (e.g., 10% of target)
+    max_acceptable_error = target_velocity * 0.1
+    assert final_avg_error <= max_acceptable_error, f"Final error too large: {final_avg_error} > {max_acceptable_error}"
+    
+    # Additional stability check - variance should be reasonable
+    stable_velocity_std = np.std(stable_velocities)
+    max_acceptable_std = velocity_mean * 0.15  # 15% of mean
+    assert stable_velocity_std <= max_acceptable_std, f"Velocity too unstable: std={stable_velocity_std} > {max_acceptable_std}"
+
+
+def test_pid_controller_basic_functionality(dynamics, state_kwargs):
+    """Simplified test focusing on basic PID controller functionality."""
+    
+    # Run for fewer iterations to focus on core behavior
+    outputs = []
+    for i in range(50):
+        out = dynamics.__call__(**state_kwargs)
+        outputs.append(out)
+        state_kwargs['agent_state'].velocity = out.velocity
+    
+    velocities = [out.velocity for out in outputs]
+    yaw_rates = [out.yaw_rate for out in outputs]
+    
+    # Basic functionality checks
+    assert all(isinstance(v, (int, float)) for v in velocities), "Velocities should be numeric"
+    assert all(isinstance(y, (int, float)) for y in yaw_rates), "Yaw rates should be numeric"
+    
+    # Bounds checking
+    assert all(0 <= v <= dynamics.max_velocity for v in velocities), "Velocity out of bounds"
+    
+    # Controller should produce reasonable outputs
+    assert not all(v == velocities[0] for v in velocities), "Controller appears inactive"
+    
+    # For straight motion, yaw rates should be small
+    assert all(abs(y) < 0.5 for y in yaw_rates), "Excessive yaw rate for straight motion"
+
+
+def test_pid_controller_convergence_trend(dynamics, state_kwargs):
+    """Test that PID controller shows convergence trend over time."""
+    
+    target_velocity = dynamics.target_velocity
+    errors = []
+    
+    # Run controller and track error over time
+    for i in range(100):
+        out = dynamics.__call__(**state_kwargs)
+        error = abs(out.velocity - target_velocity)
+        errors.append(error)
+        state_kwargs['agent_state'].velocity = out.velocity
+    
+    # Check that error trend is generally decreasing
+    # Use moving average to smooth out oscillations
+    window_size = 10
+    if len(errors) >= window_size * 2:
+        early_avg = np.mean(errors[:window_size])
+        late_avg = np.mean(errors[-window_size:])
+        
+        # Allow for some tolerance - PID might not achieve perfect convergence
+        assert late_avg <= early_avg * 1.2, "No convergence trend detected"
 
 @pytest.mark.parametrize(
-        "init_kwargs, state_kwargs, expected_velocity, expected_yaw_rate",
-        (
-            # Test Case 1: 
-            {
-                "control_frequency": 100,
-                "target_velocity": 30.0,
-                "error_tolerance": 0.3,
-                "max_yaw_rate": 0.1,
-                "yaw_kp": 0.3,
-                "yaw_ki": 0.01,
-                "yaw_kd": 0.05,
-                "vel_kp": 0.05,
-                "vel_ki": 0.01,
-                "vel_kd": 0.05
-            },
-            {
-                "agent_state": ROSAgentState(),
-                "waypoints_state": ROSWaypointsState()
-            },
-            10.0,
-            0.2
-        ),
-        ids=[
-            "Test Case 1: "
-        ]
+    "init_kwargs, exception",
+    [
+        ({}, KeyError),
+        ({'target_velocity':10.0}, KeyError),
+        ({'target_yaw_rate':0.1}, KeyError),
+        ({'control_frequency':0, 'target_velocity':10.0, 'target_yaw_rate':0.1}, KeyError),
+        ({'control_frequency':100, 'target_velocity':10.0, 'target_yaw_rate':0.1, 'max_velocity':-1.0}, KeyError),
+        ({'control_frequency':100, 'target_velocity':10.0, 'target_yaw_rate':0.1, 'max_velocity':30.0, 'max_yaw_rate':1.0,
+          'yaw_kp':1.0, 'yaw_ki':0.1, 'yaw_kd':0.1, 'vel_kp':0.5, 'vel_ki':0.05, 'vel_kd':0.01,
+          'integral_max':5.0, 'derivative_filter_alpha':1.5}, KeyError),
+    ],
 )
-def test_pid_controller_dynamics_comprehensive(init_kwargs, state_kwargs, expected_velocity, expected_yaw_rate):
-    dynamics: DynamicsABC = PIDControllerDynamics(**init_kwargs)
-    output = dynamics.__call__(**state_kwargs)
+def test_invalid_initialization(init_kwargs, exception):
+    # missing or invalid init kwargs
+    with pytest.raises(exception):
+        PIDControllerDynamics(**init_kwargs)
 
-    print(output.velocity)
-    print(output.yaw_rate)
-
-    output = dynamics.__call__(**state_kwargs)
-
-    print(output.velocity)
-    print(output.yaw_rate)
-
-
-
-# @pytest.mark.parametrize(
-        
-# )
-# def test_pid_controller_dynamics_invalid_initialization():
-#     pass
-
-# @pytest.mark.parametrize(
-        
-# )
-# def test_pid_controller_dynamics_invalid_state_inputs():
-#     pass
+@pytest.mark.parametrize(
+    "state_kwargs_input, exception",
+    [
+        ({}, KeyError),
+        ({'agent_state': ROSAgentState()}, KeyError),
+        ({'waypoints_state': ROSWaypointsState()}, KeyError),
+        ({'agent_state': 'invalid', 'waypoints_state': ROSWaypointsState()}, TypeError),
+        ({'agent_state': ROSAgentState(), 'waypoints_state': 'invalid'}, TypeError),
+    ],
+)
+def test_invalid_state_inputs(dynamics, state_kwargs_input, exception, far_waypoint):
+    # for wrong states
+    with pytest.raises(exception):
+        # ensure current_waypoint exists if waypoints_state is correct type
+        if isinstance(state_kwargs_input.get('waypoints_state'), ROSWaypointsState):
+            state_kwargs_input['waypoints_state'].current_waypoint = far_waypoint
+        dynamics.__call__(**state_kwargs_input)
 
 
-if __name__ == '__main__':
-    test_pid_controller_dynamics_comprehensive(
-        init_kwargs={
-            "control_frequency": 100,
-            "target_velocity": 30.0,
-            "error_tolerance": 0.3,
-            "max_yaw_rate": 0.1,
-            "yaw_kp": 0.3,
-            "yaw_ki": 0.01,
-            "yaw_kd": 0.05,
-            "vel_kp": 0.05,
-            "vel_ki": 0.01,
-            "vel_kd": 0.05
-        },
-        state_kwargs={
-            "agent_state": ROSAgentState(),
-            "waypoints_state": ROSWaypointsState()
-        },
-        expected_velocity=10.0,
-        expected_yaw_rate=0.2
-    )
+def test_reset_and_diagnostics(dynamics, state_kwargs):
+    # call once to populate state
+    dynamics.__call__(**state_kwargs)
+    diag_before = dynamics.get_pid_diagnostics().copy()
+    assert diag_before['velocity_history_length'] > 0
+
+    # reset
+    dynamics.reset_pid_state()
+    diag_after = dynamics.get_pid_diagnostics()
+    assert diag_after['velocity_history_length'] == 0
+    assert diag_after['heading_error_history_length'] == 0
+    # avg_dt reset to initial dt
+    assert math.isclose(diag_after['avg_dt'], 1.0/dynamics.control_frequency, rel_tol=1e-3)
