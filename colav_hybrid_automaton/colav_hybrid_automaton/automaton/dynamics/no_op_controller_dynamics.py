@@ -1,4 +1,4 @@
-from .dynamics import DynamicsABC
+from colav_hybrid_automaton.automaton.dynamics import DynamicsABC
 from typing import NamedTuple
 from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpec, DynamicsField
 from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpecBuilder
@@ -14,3 +14,9 @@ class NoOpControllerDynamics(DynamicsABC):
             velocity=0.0,
             yaw_rate=0.0
         )
+
+if __name__ == '__main__':
+    dynamics: DynamicsABC = NoOpControllerDynamics()
+    dynamic_output = dynamics.__call__()
+
+    print (dynamic_output)

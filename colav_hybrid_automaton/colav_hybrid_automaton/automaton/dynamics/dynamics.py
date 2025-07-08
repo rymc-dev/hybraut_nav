@@ -338,13 +338,13 @@ class DynamicsABC(ABC):
         # Validate against _init_input_spec if defined
         if self._init_input_spec:
             for spec in self._init_input_spec:
-                if spec.name not in init_kwargs and spec.default is None:
-                    raise ValueError(f"Required initialization parameter '{spec.name}' missing")
-                
-                if spec.name in init_kwargs:
-                    value = init_kwargs[spec.name]
-                    if not isinstance(value, spec.type):
-                        raise TypeError(f"Parameter '{spec.name}' must be of type {spec.type.__name__}")
+                # Raise KeyError if required parameter is missing
+                if spec.name not in init_kwargs:
+                    raise KeyError(f"Missing required initialization parameter: '{spec.name}'")
+
+                value = init_kwargs[spec.name]
+                if not isinstance(value, spec.type):
+                    raise TypeError(f"Parameter '{spec.name}' must be of type {spec.type.__name__}")
     
     def _validate_output(self, output):
         """Validate the output against the output specification."""
@@ -363,17 +363,16 @@ class DynamicsABC(ABC):
         """Validate state inputs against the state input specification."""
         if not self.is_initialized:
             raise RuntimeError(f"{self.__class__.__name__} is not initialized")
-        
-        # Validate against _state_input_spec if defined
+
         if self._state_input_spec:
             for spec in self._state_input_spec:
-                if spec.name not in state_kwargs and spec.default is None:
-                    raise ValueError(f"Required state parameter '{spec.name}' missing")
-                
-                if spec.name in state_kwargs:
-                    value = state_kwargs[spec.name]
-                    if not isinstance(value, spec.type):
-                        raise TypeError(f"State parameter '{spec.name}' must be of type {spec.type.__name__}")
+                # Raise KeyError if required parameter is missing
+                if spec.name not in state_kwargs:
+                    raise KeyError(f"Missing required state parameter: '{spec.name}'")
+
+                value = state_kwargs[spec.name]
+                if not isinstance(value, spec.type):
+                    raise TypeError(f"State parameter '{spec.name}' must be of type {spec.type.__name__}")
 
     def create_output(self, **kwargs) -> Any:
         """
@@ -402,6 +401,58 @@ class DynamicsABC(ABC):
         self._validate_output(output)
         return output
 
+    @classmethod
+    def init_input_spec_names(cls) -> List[InputSpec]:
+        """Return a list of initialization inputs expected for the __init__, names and types"""
+        return [init_input.name for init_input in cls._init_input_spec]
+
+    @classmethod
+    def init_input_spec_types(cls) -> List[str]:
+        """returns a list of initialization input names passed for the __init__"""
+        return [init_input.type for init_input in cls._init_input_spec]
+
+    @classmethod
+    def state_input_spec_names(cls) -> List[InputSpec]:
+        """Return a list of state inputs expected for the __call__, names and types"""
+        return [state_input.name for state_input in cls._state_input_spec]
+
+    @classmethod
+    def state_input_spec_types(cls) -> List[str]:
+        """Returns a list of state input types required for the __call__, just names"""
+        return [state_input.type for state_input in cls._state_input_spec]
+
+    @classmethod
+    def dynamic_output_spec_name(cls) -> str:
+        return cls._dynamic_output_spec.name
+
+    @classmethod
+    def dynamic_output_spec_description(cls) -> str:
+        return cls._dynamic_output_spec.description
+
+    @classmethod
+    def dynamic_output_spec_names(cls) -> List[str]:
+        """
+        Return the list of output field names from the current dynamic output specification.
+
+        Returns:
+            List of field names defined in the current _dynamic_output_spec.
+        """
+        if cls._dynamic_output_spec is None:
+            return []
+        return [field.name for field in cls._dynamic_output_spec.fields]
+
+    @classmethod
+    def dynamic_output_spec_types(cls) -> List[str]:
+        if cls._dynamic_output_spec is None:
+            return []
+        return [field.dtype for field in cls._dynamic_output_spec.fields]
+    
+    @classmethod
+    def dynamic_output_spec_units(cls) -> List[str]:
+        if cls._dynamic_output_spec is None:
+            return []
+        return [field.unit for field in cls._dynamic_output_spec.fields]
+
     def get_dynamics_info(self) -> Dict[str, Any]:
         """Get information about this dynamics function."""
         class_doc = self.__class__.__doc__
@@ -409,11 +460,16 @@ class DynamicsABC(ABC):
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
             'is_initialized': self.is_initialized,
-            'output_type': self.output_type.__name__ if hasattr(self, 'output_type') else None,
-            'output_spec': self.output_spec.name if hasattr(self, 'output_spec') else None,
+            'init_input_spec_names': self.init_input_spec_names(),
+            'init_input_spec_types': self.init_input_spec_types(),
+            'state_input_spec_names': self.init_input_spec_names(),
+            'state_input_spec_types': self.init_input_spec_types(),
+            'output_spec_name': self.dynamic_output_spec_name(),
+            'output_spec_description': self.dynamic_output_spec_description(), 
+            'output_spec_param_names': self.dynamic_output_spec_names(),
+            'output_spec_param_types': self.dynamic_output_spec_types(),
+            'output_spec_param_units': self.dynamic_output_spec_units(),
             'description': class_doc.strip().split('\n')[0] if class_doc else "No description",
-            'init_spec': [{'name': s.name, 'type': s.type.__name__} for s in self._init_input_spec],
-            'state_spec': [{'name': s.name, 'type': s.type.__name__} for s in self._state_input_spec]
         }
 
     def __repr__(self) -> str:

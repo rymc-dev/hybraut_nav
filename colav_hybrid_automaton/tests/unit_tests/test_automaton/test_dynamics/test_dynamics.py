@@ -1,131 +1,163 @@
-# import pytest
-# from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsABC
-# from typing import NamedTuple
+"""
+Test class for DynamicsABC abstract class
 
-# def test_dynamic_creation_and_call():
-#     class TestDynamic(DynamicsABC):
-#         """
-#         This is a test of the dynamic condition abstract class.
-#         """
+In this class we utilize DyanmicsABC abstract class to test 
+the underlying functionalities for this abstract class to enusre it is working 
+as expected through the lifecycle of build and runtime
+"""
 
-#         class NamedTupleOutput(NamedTuple):
-#             velocity: float
-#             yaw_rate: float
 
-#         def __init__(self, **init_kwargs):
-#             super().__init__(self.NamedTupleOutput, **init_kwargs)
-#             self.target_velocity: float = init_kwargs.get('target_velocity')
-#             self.target_yaw_rate: float = init_kwargs.get('target_yaw_rate')
+import pytest
+from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsABC
+from typing import NamedTuple
+from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpecBuilder
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
+import pytest
 
-#         def __call__(self, **state_kwargs) -> NamedTupleOutput:
-#             super().__call__(**state_kwargs)
-#             current_velocity = state_kwargs.get('current_velocity')
-#             current_yaw_rate = state_kwargs.get('current_yaw_rate')
+@pytest.fixture
+def TestDynamicFixture():
+    """
+    Fixture to instantiate the TestDynamic class.
+    """
 
-#             if current_velocity < self.target_velocity:
-#                 current_velocity = current_velocity + 1.0
+    class TestDynamic(DynamicsABC):
+        """
+        A minimal concrete implementation of the abstract DynamicsABC class,
+        used for testing purposes.
 
-#             return self.NamedTupleOutput(velocity=current_velocity, yaw_rate=current_yaw_rate)
+        This test dynamic increments the current velocity by 1.0 if it is below
+        the target velocity. The yaw rate is passed through unchanged.
+        """
 
-#         def _validate_states(self, **state_kwargs):
-#             if 'current_velocity' not in state_kwargs:
-#                 raise ValueError("Missing state input 'current_velocity'")
-#             if not isinstance(state_kwargs.get('current_velocity'), float):
-#                 raise TypeError("current_velocity state input is invalid")
+        _init_input_spec = [
+            InputSpec(name='target_velocity', type=float),
+            InputSpec(name='target_yaw_rate', type=float)
+        ]
+        _state_input_spec = [
+            InputSpec(name='current_velocity', type=float),
+            InputSpec(name='current_yaw_rate', type=float)
+        ]
+        _dynamic_output_spec = DynamicsSpecBuilder.create_automaton_control_outputs()
 
-#         def _validate_initialization(self, **init_kwargs):
-#             if 'target_velocity' not in init_kwargs:
-#                 raise KeyError("Missing required parameter 'target_velocity'")
-#             if not isinstance(init_kwargs.get('target_velocity'), float):
-#                 raise TypeError("target_velocity is not valid type")
-#             if 'target_yaw_rate' not in init_kwargs:
-#                 raise KeyError("Missing required parameter 'target_yaw_rate'")
-#             if not isinstance(init_kwargs.get('target_yaw_rate'), float):
-#                 raise TypeError("target_yaw_rate is not valid type")
+        def __call__(self, **state_kwargs):
+            super().__call__(**state_kwargs)
+            current_velocity = state_kwargs.get('current_velocity')
+            current_yaw_rate = state_kwargs.get('current_yaw_rate')
 
-#     # Test valid creation
-#     init_kwargs = {'target_velocity': 5.0, 'target_yaw_rate': 0.2}
-#     dynamic = TestDynamic(**init_kwargs)
-#     assert dynamic.is_initialized
-#     assert dynamic.target_velocity == 5.0
-#     assert dynamic.target_yaw_rate == 0.2
+            if current_velocity < self.__getattribute__('target_velocity'):
+                current_velocity = current_velocity + 1.0
 
-#     # Test valid call
-#     output = dynamic(current_velocity=3.0, current_yaw_rate=0.1)
-#     assert isinstance(output, TestDynamic.NamedTupleOutput)
-#     assert output.velocity == 4.0  # velocity should have increased by 1
-#     assert output.yaw_rate == 0.1
+            return self.create_output(velocity=current_velocity, yaw_rate=current_yaw_rate)
 
-#     # Test call with velocity already above target (should stay the same)
-#     output = dynamic(current_velocity=6.0, current_yaw_rate=0.1)
-#     assert output.velocity == 6.0  # no change
+    yield TestDynamic
 
-#     # Test call with invalid state type
-#     with pytest.raises(TypeError):
-#         dynamic(current_velocity="fast", current_yaw_rate=0.1)
+def test_dynamic_abstract_class_comprehensive(TestDynamicFixture):
+    """
+    Tests the full initialization and usage of the TestDynamic class.
+    
+    - Validates correct handling of initial input spec.
+    - Validates correct state input/output specification.
+    - Confirms behavior of `__call__` method.
+    """
+    dynamic:DynamicsABC = TestDynamicFixture(target_velocity=5.0, target_yaw_rate=0.2)
 
-#     # Test call with missing state input
-#     with pytest.raises(ValueError):
-#         dynamic(current_yaw_rate=0.1)
+    assert dynamic.is_initialized
+    assert dynamic.target_velocity == 5.0
+    assert dynamic.target_yaw_rate == 0.2
 
-#     # Test creation with missing init parameter
-#     with pytest.raises(KeyError):
-#         TestDynamic(target_yaw_rate=0.1)  # missing target_velocity
+    assert dynamic.init_input_spec_names() == ['target_velocity', 'target_yaw_rate']
+    assert dynamic.init_input_spec_types() == [float, float]
 
-#     with pytest.raises(KeyError):
-#         TestDynamic(target_velocity=5.0)  # missing target_yaw_rate
+    assert dynamic.state_input_spec_names() == ['current_velocity', 'current_yaw_rate']
+    assert dynamic.state_input_spec_types() == [float, float]
 
-#     # Test creation with wrong type
-#     with pytest.raises(TypeError):
-#         TestDynamic(target_velocity="fast", target_yaw_rate=0.1)
+    assert dynamic.dynamic_output_spec_name() == "AutomatonControlOutputs"
+    assert dynamic.dynamic_output_spec_description() == 'outputs for automaton spec'
+    assert dynamic.dynamic_output_spec_names() == ['velocity', 'yaw_rate']
+    assert dynamic.dynamic_output_spec_types() == [float, float]
+    assert dynamic.dynamic_output_spec_units() == ['m/s', 'rad/s']
 
-#     with pytest.raises(TypeError):
-#         TestDynamic(target_velocity=5.0, target_yaw_rate="turn")
 
-#     # Info check
-#     info = dynamic.get_dynamics_info()
-#     assert info['class_name'] == 'TestDynamic'
-#     assert 'dynamics' in info['module'] or 'test_dynamic' in info['module']
-#     assert info['is_initialized'] is True
-#     assert info['description'] == 'This is a test of the dynamic condition abstract class.'
+    # Test valid call
+    output = dynamic.__call__(current_velocity=3.0, current_yaw_rate=0.1)
+    assert output.velocity == 4.0  # velocity should have increased by 1
+    assert output.yaw_rate == 0.1
 
-#     # String/representation
-#     # assert str(dynamic).startswith("Dynamic Function:")
-#     # assert repr(dynamic).startswith("TestDynamic(initialized=True)")
+    # Test call with velocity already above target (should stay the same)
+    output = dynamic.__call__(current_velocity=6.0, current_yaw_rate=0.1)
+    assert output.velocity == 6.0  # no change
 
-# # def test_guard_invalid_initialization_missing_param():
-# #     class TestGuard(Guard):
-# #         def _validate_initialization(self, **kwargs):
-# #             if 'x' not in kwargs:
-# #                 raise ValueError("Missing required parameter 'x'")
+@pytest.mark.parametrize(
+    "init_kwargs, expected_exception",
+    [
+        # Test Case 1: no initialization args -> pytest.assert(KeyError)
+        ({}, KeyError),
 
-# #         def __call__(self, **state_kwargs):
-# #             return super().__call__(**state_kwargs)
+        # Test Case 2: missing target_velocity in __init__ arg -> pytest.assert(KeyError)
+        ({'target_yaw_rate': 0.2}, KeyError),
 
-# #     with pytest.raises(ValueError):
-# #         TestGuard()  # Missing 'x'
+        # Test Case 3: missing target_yaw_rate in __init__ arg -> pytest.assert(KeyError)
+        ({'target_velocity': 2.0}, KeyError),
 
-# # def test_guard_invalid_initialization_wrong_type():
-# #     class TestGuard(Guard):
-# #         def _validate_initialization(self, **kwargs):
-# #             if not isinstance(kwargs.get('x'), float):
-# #                 raise TypeError('x is not valid type')
+        # Test Case 4: invalid target_velocity type -> ValueError
+        ({'target_velocity': 'invalid', 'target_yaw_rate': 0.2}, TypeError),
 
-# #         def __call__(self, **state_kwargs):
-# #             return super().__call__(**state_kwargs)
+        # Test Case 5: invalid target_yaw_rate type -> ValueError
+        ({'target_velocity': 10.0, 'target_yaw_rate': ''}, TypeError)
+    ],
+    ids=[
+        'Test Case 1: no init_kwargs for __init__ of dynamics, expect KeyError.',
+        'Test Case 2: missing target_yaw_rate in __init__, expect KeyError.',
+        'Test Case 3: missing target_velocity in __init__, expect KeyError.',
+        'Test Case 4: invalid target_velocity',
+        'Test Case 5: invalid target_yaw_rate type'
+    ]
+)
+def test_dynamic_invalid_initializations(init_kwargs, expected_exception, TestDynamicFixture):
+    """
+    Parameterized test for invalid initializations of the dynamic class.
+    
+    Each case checks if the class raises the expected exception type
+    when initialized with incomplete or incorrect types in kwargs.
+    """
+    with pytest.raises(expected_exception):
+        # Assuming TestDynamicFixture is a class or callable that takes **kwargs
+        TestDynamicFixture(**init_kwargs)
 
-# #     with pytest.raises(TypeError):
-# #         TestGuard(x="not a float")
+@pytest.mark.parametrize(
+    "state_kwargs, expected_exception",
+    [
+        # Test Case 1: no state args given -> pytest.assert(KeyError)
+        ({}, KeyError),
 
-# # def test_guard_call_before_init():
-# #     class TestGuard(Guard):
-# #         def __init__(self, **kwargs):
-# #             # Intentionally skip calling super().__init__ to simulate no init
-# #             self.is_initialized = False
+        # Test Case 2: current_velocity state arg not given -> pytest.assert(KeyError)
+        ({'current_velocity': 10.0}, KeyError),
 
-# #         def __call__(self, **state_kwargs):
-# #             return super().__call__(**state_kwargs)
+        # Test Case 3: current_velocity state arg not given -> pytest.assert(KeyError)
+        ({'current_yaw_rate': 0.1}, KeyError),
 
-# #     guard = TestGuard()
-# #     with pytest.raises(RuntimeError):
-# #         guard.__call__(x=1.0)
+        # Test Case 4: current_velocity state arg invalid type --> pytest.assert(TypeError)
+        ({'current_velocity': 'invalid type', 'current_yaw_rate': 0.2}, TypeError),
+
+        # Test Case 5: current_yaw_rate state arg invalid --> pytest.assert(TypeError)  
+        ({'current_velocity': 20.0, 'current_yaw_rate': 'invalid type'}, TypeError)
+    ],
+    ids=[
+        "Test Case 1: no state args given, expect KeyError.",
+        "Test Case 2: current_yaw_rate state arg missing on __call__, expect KeyError.",
+        "Test Case 3: current_velocity state arg missing on __call__, expect KeyError.",
+        "Test Case 4: current_velocity state arg type invalid on __call__, expect TypeError.",
+        "Test Case 5: current_yaw_rate state arg type invalid on __call__, expect TypeError."
+    ]
+)
+def test_dynamic_invalid_state_inputs(state_kwargs, expected_exception, TestDynamicFixture):
+    """
+    Parameterized test for invalid runtime state inputs to the dynamic class.
+    
+    Each test provides an invalid or incomplete state input dictionary,
+    and checks whether the `__call__` method raises the appropriate exception.
+    """
+    dynamics: DynamicsABC = TestDynamicFixture(target_velocity=20.0, target_yaw_rate=0.2)
+    
+    with pytest.raises(expected_exception):
+        dynamics.__call__(**state_kwargs)
