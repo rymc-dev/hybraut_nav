@@ -153,17 +153,17 @@ class ResetABC(ABC):
             except Exception as e:
                 raise e
             
-        self._validate_reset_targets(reset_targets=self._reset_targets_spec)
+        self._validate_reset_targets()
             
-    def _validate_reset_targets(self, reset_targets) -> None:
+    def _validate_reset_targets(self) -> None:
         """Validate reset targets specification."""
-        if not isinstance(reset_targets, list):
+        if not isinstance(self._reset_targets_spec, list):
             raise TypeError("reset_targets must be a list")
         
-        if not reset_targets:
+        if not self._reset_targets_spec:
             raise ValueError("reset_targets cannot be empty")
         
-        for i, target in enumerate(reset_targets):
+        for i, target in enumerate(self._reset_targets_spec):
             if not isinstance(target, InputSpec):
                 raise TypeError(f"reset_targets[{i}] must be an InputSpec object")
             
@@ -288,17 +288,17 @@ class ResetABC(ABC):
             'expected_state_types': {
                 spec.name: spec.type.__name__ for spec in self._state_input_spec
             },
-            'reset_targets': [{'name': target.name, 'type': target.type.__name__} for target in self.reset_targets],
-            'target_count': len(self.reset_targets),
-            'target_names': [target.name for target in self.reset_targets],
+            'reset_targets': [{'name': target.name, 'type': target.type.__name__} for target in self._reset_targets_spec],
+            'target_count': len(self._reset_targets_spec),
+            'target_names': [target.name for target in self._reset_targets_spec],
             'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
         }
     
     def __repr__(self) -> str:
         """String representation of the reset function."""
-        target_names = [target.name for target in self.reset_targets] if self.is_initialized else []
+        target_names = [target.name for target in self._reset_targets_spec] if self.is_initialized else []
         return f"{self.__class__.__name__}(initialized={self.is_initialized}, targets={target_names})"
     
     def __str__(self) -> str:
         """Human-readable string representation."""
-        return f"Reset Function: {self.__class__.__name__} (targets: {len(self.reset_targets) if self.is_initialized else 0})"
+        return f"Reset Function: {self.__class__.__name__} (targets: {len(self._reset_targets_spec) if self.is_initialized else 0})"

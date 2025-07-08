@@ -1,88 +1,77 @@
-# from colav_hybrid_automaton.automaton.resets import ResetABC
-# import pytest
-# from typing import Dict, Any
-# from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from colav_hybrid_automaton.automaton.resets import ResetABC
+import pytest
+from typing import Dict, Any
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
-# def test_reset_creation_and_calls():
-#     class TestReset(ResetABC):
-#         """
-#         This is a test of the reset function abstract class.
-#         """
+def test_reset_creation_and_calls():
+    class TestReset(ResetABC):
+        """
+        This is a test of the reset function abstract class.
+        """
         
-#         _expected_init_inputs = [
-#             InputSpec(name='i', type=float)
-#         ]
+        _init_input_spec = [
+            InputSpec(name='i', type=float)
+        ]
 
-#         _expected_state_inputs = [
-#             InputSpec(name='x', type=float)
-#         ]
+        _state_input_spec = [
+            InputSpec(name='x', type=float)
+        ]
 
-#         _reset_targets = [
-#             InputSpec(name='output_x', type=float),
-#             InputSpec(name='output_y', type=int)
-#         ]
+        _reset_targets_spec = [
+            InputSpec(name='output_x', type=float),
+            InputSpec(name='output_y', type=int)
+        ]
 
-#         def __init__(self, **init_kwargs):
-#             # Define reset targets that this reset function will update
-#             super().__init__(reset_targets=self._reset_targets, **init_kwargs)
-#             self.i: float = init_kwargs.get('i')
+        def __init__(self, **init_kwargs):
+            # Define reset targets that this reset function will update
+            super().__init__(**init_kwargs)
+            self.i: float = init_kwargs.get('i')
             
-#         def __call__(self, **state_kwargs) -> Dict[str, Any]:
-#             super().__call__(**state_kwargs)
-#             # Reset logic: return updated values for the reset targets
-#             return {
-#                 'output_x': state_kwargs['x'] * 2.0,
-#                 'output_y': int(state_kwargs['x'])
-#             }
-            
-#         def _validate_states(self, **state_kwargs):
-#             super()._validate_states(**state_kwargs)
-#             if 'x' not in state_kwargs:
-#                 raise ValueError("Missing state input 'x'")
-#             if not isinstance(state_kwargs.get('x'), float):
-#                 raise TypeError('x state input is invalid')
-                
-#         def _validate_initialization(self, **kwargs):
-#             super()._validate_initialization(**kwargs)
-#             if 'i' not in kwargs:
-#                 raise ValueError("Missing required parameter 'i'")
-#             if not isinstance(kwargs.get('x'), float):
-#                 raise TypeError('i is not valid type')
+        def __call__(self, **state_kwargs) -> Dict[str, Any]:
+            super().__call__(**state_kwargs)
+            # Reset logic: return updated values for the reset targets
+            return {
+                'output_x': state_kwargs['x'] * 2.0,
+                'output_y': int(state_kwargs['x'])
+            }
+        
+    # Test valid creation
+    kwargs = {'i': 10.0}
+    reset_func = TestReset(**kwargs)
+    assert reset_func.is_initialized
+    assert reset_func.i == 10.0
     
-#     # Test valid creation
-#     kwargs = {'i': 10.0}
-#     reset_func = TestReset(**kwargs)
-#     assert reset_func.is_initialized
-#     assert reset_func.x == 10.0
+    # Test valid call with correct state
+    state_kwargs = {'x': 5.0}
+    result = reset_func.__call__(**state_kwargs)
+    assert isinstance(result, dict)
+    assert result['output_x'] == 10.0  # 5.0 * 2.0
+    assert result['output_y'] == 5     # int(5.0)
     
-#     # Test valid call with correct state
-#     state_kwargs = {'x': 5.0}
-#     result = reset_func.__call__(**state_kwargs)
-#     assert isinstance(result, dict)
-#     assert result['output_x'] == 10.0  # 5.0 * 2.0
-#     assert result['output_y'] == 5     # int(5.0)
+    # Test call with invalid state type
+    invalid_kwargs = {'x': "not a float"}
+    with pytest.raises(TypeError):
+        reset_func.__call__(**invalid_kwargs)
     
-#     # Test call with invalid state type
-#     invalid_kwargs = {'x': "not a float"}
-#     with pytest.raises(TypeError):
-#         reset_func.__call__(**invalid_kwargs)
+    # Test call with missing state input
+    with pytest.raises(KeyError):
+        reset_func.__call__()
     
-#     # Test call with missing state input
-#     with pytest.raises(ValueError):
-#         reset_func.__call__()
+    # Test reset info
+    reset_info = reset_func.get_reset_info()
+    assert reset_info['class_name'] == 'TestReset'
+    assert reset_info['module'] == 'test_reset'  # Will be __main__ when run in test context
+    assert reset_info['is_initialized'] == True
+    assert reset_info['target_count'] == 2
+    assert reset_info['target_names'] == ['output_x', 'output_y']
+    assert reset_info['description'] == 'This is a test of the reset function abstract class.'
     
-#     # Test reset info
-#     reset_info = reset_func.get_reset_info()
-#     assert reset_info['class_name'] == 'TestReset'
-#     assert reset_info['module'] == 'test_reset'  # Will be __main__ when run in test context
-#     assert reset_info['is_initialized'] == True
-#     assert reset_info['target_count'] == 2
-#     assert reset_info['target_names'] == ['output_x', 'output_y']
-#     assert reset_info['description'] == 'This is a test of the reset function abstract class.'
-    
-#     # Test string representations
-#     assert reset_func.__str__() == "Reset Function: TestReset (targets: 2)"
-#     assert reset_func.__repr__() == "TestReset(initialized=True, targets=['output_x', 'output_y'])"
+    # Test string representations
+    assert reset_func.__str__() == "Reset Function: TestReset (targets: 2)"
+    assert reset_func.__repr__() == "TestReset(initialized=True, targets=['output_x', 'output_y'])"
+
+if __name__ == '__main__':
+    test_reset_creation_and_calls()
 
 # def test_reset_initialization_validation():
 #     """Test Reset class initialization validation"""
