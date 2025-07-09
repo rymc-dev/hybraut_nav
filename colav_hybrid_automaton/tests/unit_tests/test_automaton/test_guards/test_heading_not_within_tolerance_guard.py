@@ -6,7 +6,7 @@ for COLAV Hybrid Automaton
 import pytest
 import math
 from geometry_msgs.msg import Pose, Point, Quaternion
-from colav_hybrid_automaton.automaton.guards import HeadingNotWithinToleranceGuard
+from colav_hybrid_automaton.automaton.guards import HeadingNotWithinToleranceGuard, GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
@@ -30,8 +30,24 @@ def quaternion_from_euler(roll, pitch, yaw):
     
     return Quaternion(x=x, y=y, z=z, w=w)
 
+@pytest.fixture
+def guard_instance():
+    return HeadingNotWithinToleranceGuard(heading_tolerance=0.2)
+
 class TestHeadingNotWithinToleranceGuard:
     """Test suite for HeadingNotWithinTolerance Guard"""
+
+    def test_initialization_and_specs(self, guard_instance: GuardABC):
+        """test the initialization and specifications of the class instance are valid"""
+        assert guard_instance.init_input_spec_names() == ['heading_tolerance']
+        assert guard_instance.init_input_spec_types() == [float]
+        assert guard_instance.state_input_spec_names() == ['agent_state', 'waypoints_state']
+        assert guard_instance.state_input_spec_types() == [ROSAgentState, ROSWaypointsState] 
+
+    def test_string_representations(self, guard_instance: GuardABC):
+        """test the string representations of the guard instance"""
+        assert repr(guard_instance) == 'HeadingNotWithinToleranceGuard(initialized=True)'
+        assert str(guard_instance) == 'Guard Function: HeadingNotWithinToleranceGuard'
 
     @pytest.mark.parametrize(
         "heading_tolerance, agent_x, agent_y, agent_yaw, waypoint_x, waypoint_y, expected_guard_evaluation",

@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.guards import HeadingWithinToleranceGuard
+from colav_hybrid_automaton.automaton.guards import HeadingWithinToleranceGuard, GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
@@ -24,8 +24,24 @@ def quaternion_from_euler(roll, pitch, yaw):
     
     return Quaternion(x=x, y=y, z=z, w=w)
 
+@pytest.fixture
+def guard_instance():
+    return HeadingWithinToleranceGuard(heading_tolerance=0.2)
+
 class TestHeadingWithinToleranceGuard:
     """test suite for heading within tolerance guard"""
+
+    def test_initialization_and_specs(self, guard_instance: GuardABC):
+        """test the initialization and specifications of the class instance are valid"""
+        assert guard_instance.init_input_spec_names() == ['heading_tolerance']
+        assert guard_instance.init_input_spec_types() == [float]
+        assert guard_instance.state_input_spec_names() == ['agent_state', 'waypoints_state']
+        assert guard_instance.state_input_spec_types() == [ROSAgentState, ROSWaypointsState] 
+
+    def test_string_representations(self, guard_instance: GuardABC):
+        """test the string representations of the guard instance"""
+        assert repr(guard_instance) == 'HeadingWithinToleranceGuard(initialized=True)'
+        assert str(guard_instance) == 'Guard Function: HeadingWithinToleranceGuard'
 
     @pytest.mark.parametrize(
         "heading_tolerance, agent_x, agent_y, agent_yaw, waypoint_x, waypoint_y, expected_guard_evaluation",
@@ -163,7 +179,7 @@ class TestHeadingWithinToleranceGuard:
             "beyond_machine_epsilon_difference",
         ]
     )
-    def test_heading_not_within_tolerance_guard_comprehensive(
+    def test_guard_evaluation(
         self,
         heading_tolerance: float,
         agent_x: float,
