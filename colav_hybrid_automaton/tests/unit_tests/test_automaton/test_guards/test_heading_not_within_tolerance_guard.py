@@ -1,12 +1,17 @@
+"""
+Test file for HeadingNotWithinToleranceGuard with in an implementation of GuardABC 
+for COLAV Hybrid Automaton
+"""
+
+import pytest
+import math
+from geometry_msgs.msg import Pose, Point, Quaternion
 from colav_hybrid_automaton.automaton.guards import HeadingNotWithinToleranceGuard
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
-from geometry_msgs.msg import Pose, Point, Quaternion
-import pytest
-import math
 
 
 def quaternion_from_euler(roll, pitch, yaw):
