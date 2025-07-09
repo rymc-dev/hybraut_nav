@@ -157,15 +157,15 @@ class GuardABC(ABC):
     @classmethod
     def init_input_spec_names(cls) -> List[InputSpec]:
         """Return a list of initialization inputs expected for the __init__, names and types"""
-        return [init_input.type for init_input in cls._init_input_spec]
+        return [init_input.name for init_input in cls._init_input_spec]
     
     @classmethod
     def init_input_spec_types(cls) -> List[str]:
         """returns a list of initialization input names passed for the __init__"""
-        return [init_input.name for init_input in cls._init_input_spec]
+        return [init_input.type for init_input in cls._init_input_spec]
     
     @classmethod
-    def state_inputs_spec_names(cls) -> List[InputSpec]:
+    def state_input_spec_names(cls) -> List[InputSpec]:
         """Return a list of state inputs expected for the __call__, names and types"""
         return [state_input.name for state_input in cls._state_input_spec]
 
@@ -190,7 +190,7 @@ class GuardABC(ABC):
             'is_initialized': self.is_initialized,
             "init_input_spec_names": self.init_input_spec_names(),
             "init_input_spec_types": self.init_input_spec_types(),
-            "state_input_spec_names": self.state_inputs_spec_names(),
+            "state_input_spec_names": self.state_input_spec_names(),
             "state_input_spec_types": self.state_input_spec_types(),
 
         }

@@ -112,8 +112,8 @@ class TestResetABC:
             ({'x': 'invalid_type'}, TypeError)
         ],
         ids=[
-            "missing_required_state_argument",
-            "invalid_state_argument_type"
+            "Test Case 1: missing_required_state_argument",
+            "Test Case 2: invalid state argument type"
         ]
     )
     def test_invalid_state_inputs(self, state_kwargs, expected_exception, reset_instance):
