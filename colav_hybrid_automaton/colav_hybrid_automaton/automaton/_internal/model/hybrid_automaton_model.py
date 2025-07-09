@@ -167,6 +167,7 @@ class Mode:
             transitions=sorted(transitions, key=lambda tr: tr.priority),
         )
 
+from hybrid_automaton_interfaces.msg import HybridAutomatonMode
 
 @dataclass
 class HybridAutomaton:
@@ -182,8 +183,19 @@ class HybridAutomaton:
     current_mode: int
     current_state: int
 
-    def update_mode(self, current_mode: int):
-        self.current_mode = current_mode
+    def set_mode(self, new_mode: HybridAutomatonMode) -> bool:
+        try:
+            mode_idx = new_mode.type
+            if mode_idx not in self.modes.keys():
+                raise ValueError(f"invalid mode idx received: {mode_idx}, available mode idx are: {self.modes.keys()}.")
+            self.current_mode = mode_idx
+            return True
+        except Exception as e:
+            raise Exception(f"exception occured during 'HybridAutomaton.update_mode': {str(e)}")
+        
+
+    def get_mode(self) -> int:
+        return self.current_mode
 
     @classmethod
     def from_famd(cls, famd: Dict[str, Any]) -> "HybridAutomaton":

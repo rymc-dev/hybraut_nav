@@ -212,6 +212,10 @@ dynamics:
     module: colav_hybrid_automaton.automaton.dynamics
     class_name: PIDControllerDynamics
     configuration:
+      control_frequency: 100
+      max_velocity: 30.0
+      integral_max: 0.2
+      derivative_filter_alpha: 0.1
       target_velocity: 25.0 # updated cruise speed
       yaw_kp: 0.3 # gentle heading proportional gain
       yaw_ki: 0.01 # small integral for smooth correction
@@ -226,6 +230,10 @@ dynamics:
     module: colav_hybrid_automaton.automaton.dynamics
     class_name: PIDControllerDynamics
     configuration:
+      control_frequency: 100
+      max_velocity: 30.0
+      derivative_filter_alpha: 0.1
+      integral_max: 0.2
       target_velocity: 25.0 # updated cruise speed
       yaw_kp: 0.3 # gentle heading proportional gain
       yaw_ki: 0.01 # small integral for smooth correction
@@ -240,7 +248,7 @@ dynamics:
     module: colav_hybrid_automaton.automaton.dynamics
     class_name: NoOpControllerDynamics
     description: "No operation controller, used in waypoint reached and fallback mode for returning state 0 yaw rate and velocity."
-    
+
 # ============================================================================
 # Modes (Q)
 # Discrete states, each associated with dynamics, invariants, and transitions.
@@ -277,6 +285,14 @@ modes:
           priority: 2
 
   2:
+    name: fallback
+    description: "Fallback mode for emergency conditions, no active control"
+    dynamics: no_op_controller
+    invariants:
+      - failing_invariant
+    transitions: []
+
+  3:
     name: waypoint_reached
     description: "Waypoint reached mode, indicating successful navigation to a waypoint"
     dynamics: no_op_controller
@@ -285,14 +301,6 @@ modes:
     transitions:
       - proceed_to_next_waypoint:
           priority: 0
-
-  3:
-    name: fallback
-    description: "Fallback mode for emergency conditions, no active control"
-    dynamics: no_op_controller
-    invariants:
-      - failing_invariant
-    transitions: []
 
 # ============================================================================
 # Goal Modes (Q_goal)
