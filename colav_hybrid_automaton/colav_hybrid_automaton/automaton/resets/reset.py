@@ -31,7 +31,7 @@ Example Usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List
 from rclpy.logging import get_logger
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
@@ -238,34 +238,34 @@ class ResetABC(ABC):
                     raise TypeError(f"Reset output '{name}' expected type {expected_type.__name__}, got {type(value).__name__}")
 
     @classmethod
-    def init_input_spec(cls) -> List[InputSpec]:
+    def init_input_spec_names(cls) -> List[InputSpec]:
         """Return a list of initialization inputs expected for the __init__, names and types"""
-        return cls._init_input_spec.copy()
-    
-    @classmethod
-    def init_input_names(cls) -> List[str]: 
-        """Return a list of names of initialization args"""
         return [spec.name for spec in cls._init_input_spec]
     
     @classmethod
-    def state_input_spec(cls) -> List[InputSpec]:
-        """Return a list of state inputs expected for the __call__, names and types"""
-        return cls._state_input_spec.copy()
+    def init_input_spec_types(cls) -> List[str]: 
+        """Return a list of names of initialization args"""
+        return [spec.type for spec in cls._init_input_spec]
     
     @classmethod
-    def state_input_names(cls) -> List[str]: 
-        """Return a list of state input names"""
+    def state_input_spec_names(cls) -> List[InputSpec]:
+        """Return a list of state inputs expected for the __call__, names and types"""
         return [spec.name for spec in cls._state_input_spec]
+    
+    @classmethod
+    def state_input_spec_types(cls) -> List[str]: 
+        """Return a list of state input names"""
+        return [spec.type for spec in cls._state_input_spec]
 
     @classmethod
-    def reset_targets_spec(cls) -> List[InputSpec]:
+    def reset_target_spec_names(cls) -> List[InputSpec]:
         """Return a list of reset target names and types for the __call__"""
-        return cls._reset_targets_spec.copy()
+        return [spec.name for spec in cls._reset_targets_spec]
     
     @classmethod
-    def reset_targets_names(cls) -> List[str]: 
+    def reset_target_spec_types(cls) -> List[str]: 
         """Return a list of reset target names"""
-        return [spec.name for spec in cls._reset_targets_spec]
+        return [spec.type for spec in cls._reset_targets_spec]
 
     def get_reset_info(self) -> Dict[str, Any]:
         """
@@ -279,19 +279,14 @@ class ResetABC(ABC):
         return {
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
+            'description': class_doc.strip().split('\n')[0] if class_doc else "No description",
             'is_initialized': self.is_initialized,
-            'required_init_inputs': self.init_input_names(),
-            'required_init_types': {
-                spec.name: spec.type.__name__ for spec in self._init_input_spec
-            },
-            'required_state_inputs': self.state_input_names(),
-            'expected_state_types': {
-                spec.name: spec.type.__name__ for spec in self._state_input_spec
-            },
-            'reset_targets': [{'name': target.name, 'type': target.type.__name__} for target in self._reset_targets_spec],
-            'target_count': len(self._reset_targets_spec),
-            'target_names': [target.name for target in self._reset_targets_spec],
-            'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
+            'init_input_spec_names': self.init_input_spec_names(),
+            'init_input_spec_types': self.init_input_spec_types(),
+            'state_input_spec_names': self.state_input_spec_names(),
+            'state_input_spec_types': self.state_input_spec_types(),
+            'reset_target_spec_names': self.reset_target_spec_names(),
+            'reset_target_spec_types': self.reset_target_spec_types(),
         }
     
     def __repr__(self) -> str:

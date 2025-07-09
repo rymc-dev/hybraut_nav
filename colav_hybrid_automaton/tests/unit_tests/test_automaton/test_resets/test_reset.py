@@ -1,9 +1,18 @@
+"""
+Test class for ResetABC abstract class
+
+In this class we utilize ResetABC to test 
+the underlying functionalities for this abstract class to ensure it is working
+as expected through the lifecycle of build and runtime.
+"""
+
 from colav_hybrid_automaton.automaton.resets import ResetABC
 import pytest
 from typing import Dict, Any
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
-def test_reset_creation_and_calls():
+@pytest.fixture()
+def TestResetFixture():
     class TestReset(ResetABC):
         """
         This is a test of the reset function abstract class.
@@ -35,15 +44,19 @@ def test_reset_creation_and_calls():
                 'output_y': int(state_kwargs['x'])
             }
         
-    # Test valid creation
-    kwargs = {'i': 10.0}
-    reset_func = TestReset(**kwargs)
-    assert reset_func.is_initialized
-    assert reset_func.i == 10.0
+    yield TestReset
+
+def test_reset_abstract_class_comprehensive(TestResetFixture):
+
+    reset_class = TestResetFixture()
+    reset: ResetABC = reset_class(i=10.0)
+
+    assert reset.is_initialized
+    assert reset.i == 10.0
     
     # Test valid call with correct state
     state_kwargs = {'x': 5.0}
-    result = reset_func.__call__(**state_kwargs)
+    result = reset.__call__(**state_kwargs)
     assert isinstance(result, dict)
     assert result['output_x'] == 10.0  # 5.0 * 2.0
     assert result['output_y'] == 5     # int(5.0)
