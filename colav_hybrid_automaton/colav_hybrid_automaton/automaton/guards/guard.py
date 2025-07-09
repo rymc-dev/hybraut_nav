@@ -20,7 +20,7 @@ Example Usage:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type, List, ClassVar
+from typing import Any, Dict, List, ClassVar
 from rclpy.logging import get_logger
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
@@ -155,24 +155,24 @@ class GuardABC(ABC):
                 raise TypeError(f"State input '{expected_state_input.name}' expected type: {expected_state_input.type}, actual type: {type(state_kwargs[expected_state_input.name])}")   
 
     @classmethod
-    def init_input_spec(cls) -> List[InputSpec]:
+    def init_input_spec_names(cls) -> List[InputSpec]:
         """Return a list of initialization inputs expected for the __init__, names and types"""
-        return cls._init_input_spec.copy()
+        return [init_input.type for init_input in cls._init_input_spec]
     
     @classmethod
-    def init_input_names(cls) -> List[str]:
+    def init_input_spec_types(cls) -> List[str]:
         """returns a list of initialization input names passed for the __init__"""
         return [init_input.name for init_input in cls._init_input_spec]
     
     @classmethod
-    def state_inputs(cls) -> List[InputSpec]:
+    def state_inputs_spec_names(cls) -> List[InputSpec]:
         """Return a list of state inputs expected for the __call__, names and types"""
-        return cls._state_input_spec.copy()
+        return [state_input.name for state_input in cls._state_input_spec]
 
     @classmethod
-    def state_input_names(cls) -> List[str]:
+    def state_input_spec_types(cls) -> List[str]:
         """Returns a list of state input names required for the __call__, just names"""
-        return [state_input.name for state_input in cls._state_input_spec]
+        return [state_input.type for state_input in cls._state_input_spec]
 
     def get_guard_info(self) -> Dict[str, Any]:
         """
@@ -186,10 +186,13 @@ class GuardABC(ABC):
         return {
             'class_name': self.__class__.__name__,
             'module': self.__class__.__module__,
+            'description': class_doc.strip().split('\n')[0] if class_doc else "No description",
             'is_initialized': self.is_initialized,
-            'state_input_spec': self._state_input_spec,
-            'init_input_spec': self._init_input_spec,
-            'description': class_doc.strip().split('\n')[0] if class_doc else "No description"
+            "init_input_spec_names": self.init_input_spec_names(),
+            "init_input_spec_types": self.init_input_spec_types(),
+            "state_input_spec_names": self.state_inputs_spec_names(),
+            "state_input_spec_types": self.state_input_spec_types(),
+
         }
     
     def __repr__(self) -> str:
