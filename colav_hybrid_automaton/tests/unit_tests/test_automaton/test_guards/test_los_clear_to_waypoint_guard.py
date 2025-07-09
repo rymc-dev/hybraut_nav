@@ -24,6 +24,18 @@ def guard_instance():
 class TestLOSClearToWaypointGuard:
     """test suite for LOSClearToWaypointGuard class"""
 
+    def test_initialization_and_specs(self, guard_instance: GuardABC):
+        """test the initialization and specifications of the class instance are valid"""
+        assert guard_instance.init_input_spec_names() == ['los_distance_threshold']
+        assert guard_instance.init_input_spec_types() == [float]
+        assert guard_instance.state_input_spec_names() == ['agent_state', 'obstacles_state', 'unsafe_set_state', 'waypoints_state']
+        assert guard_instance.state_input_spec_types() == [ROSAgentState, ROSObstaclesState, ROSUnsafeSetState , ROSWaypointsState] 
+
+    def test_string_representations(self, guard_instance: GuardABC):
+        """test the string representations of the guard instance"""
+        assert repr(guard_instance) == 'LOSClearToWaypointGuard(initialized=True)'
+        assert str(guard_instance) == 'Guard Function: LOSClearToWaypointGuard'
+
     @pytest.mark.parametrize(
         "los_distance_threshold, agent_state, obstacles_state, unsafe_set_state, waypoints_state, expected_guard_evaluation",
         [
@@ -348,3 +360,7 @@ class TestLOSClearToWaypointGuard:
         """Parameterized test for variations of invalid state inputs."""
         with pytest.raises(expected_exception):
             guard_instance(**state_kwargs)
+
+
+if __name__ == '__main__':
+    pytest.main([__file__])
