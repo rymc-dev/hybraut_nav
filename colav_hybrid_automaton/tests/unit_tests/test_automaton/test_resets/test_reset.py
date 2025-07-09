@@ -85,7 +85,7 @@ def test_reset_abstract_class_comprehensive(TestResetFixture):
             # Test Case 1: no init args passed
             ({}, KeyError),
             # Test Case 2: appropriate kwarg passed but wrong type
-            ({'': 'invalid type'}, TypeError),
+            ({'i': 'invalid type'}, TypeError),
         ],
         ids=[
             "Test Case 1: no init_kwargs for __init__ of reset, expect KeyError",
@@ -128,37 +128,37 @@ def test_reset_invalid_state_inputs(state_kwargs, expected_exception, TestResetF
     with pytest.raises(expected_exception):
         reset.__call__(**state_kwargs) 
 
-if __name__ == '__main__':
-    class TestReset(ResetABC):
-            """
-            This is a test of the reset function abstract class.
-            """
+# if __name__ == '__main__':
+#     class TestReset(ResetABC):
+#             """
+#             This is a test of the reset function abstract class.
+#             """
             
-            _init_input_spec = [
-                InputSpec(name='i', type=float)
-            ]
+#             _init_input_spec = [
+#                 InputSpec(name='i', type=float)
+#             ]
 
-            _state_input_spec = [
-                InputSpec(name='x', type=float)
-            ]
+#             _state_input_spec = [
+#                 InputSpec(name='x', type=float)
+#             ]
 
-            _reset_targets_spec = [
-                InputSpec(name='output_x', type=float),
-                InputSpec(name='output_y', type=int)
-            ]
+#             _reset_targets_spec = [
+#                 InputSpec(name='output_x', type=float),
+#                 InputSpec(name='output_y', type=int)
+#             ]
 
-            def __init__(self, **init_kwargs):
-                # Define reset targets that this reset function will update
-                super().__init__(**init_kwargs)
-                self.i: float = init_kwargs.get('i')
+#             def __init__(self, **init_kwargs):
+#                 # Define reset targets that this reset function will update
+#                 super().__init__(**init_kwargs)
+#                 self.i: float = init_kwargs.get('i')
                 
-            def __call__(self, **state_kwargs) -> Dict[str, Any]:
-                super().__call__(**state_kwargs)
-                # Reset logic: return updated values for the reset targets
-                return {
-                    'output_x': state_kwargs['x'] * 2.0,
-                    'output_y': int(state_kwargs['x'])
-                }
-    test_reset_abstract_class_comprehensive(
-        TestResetFixture = TestReset
-    )
+#             def __call__(self, **state_kwargs) -> Dict[str, Any]:
+#                 super().__call__(**state_kwargs)
+#                 # Reset logic: return updated values for the reset targets
+#                 return {
+#                     'output_x': state_kwargs['x'] * 2.0,
+#                     'output_y': int(state_kwargs['x'])
+#                 }
+#     test_reset_abstract_class_comprehensive(
+#         TestResetFixture = TestReset
+#     )
