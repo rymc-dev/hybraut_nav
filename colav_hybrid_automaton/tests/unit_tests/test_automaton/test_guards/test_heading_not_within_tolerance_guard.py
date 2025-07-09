@@ -189,7 +189,7 @@ class TestHeadingNotWithinToleranceGuard:
             agent_yaw (float): The agent's yaw angle in radians.
             waypoint_x, waypoint_y (float): Waypoint position coordinates.
             expected_guard_evaluation (bool): Expected result of guard evaluation.
-            test_description (str): Description of the test case.
+            request
         """
         # Create agent state
         agent_state = ROSAgentState(
