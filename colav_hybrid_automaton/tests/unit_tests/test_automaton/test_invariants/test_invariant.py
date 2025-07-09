@@ -1,91 +1,80 @@
 import pytest
 from colav_hybrid_automaton.automaton.invariants.invariant import InvariantABC
+from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
-def test_invariant_creation_and_calls():
-    class TestInvariant(InvariantABC):
-        """
-        This is a test of the invariant condition abstract class.
-        """
-        def __init__(self, **init_kwargs):
-            super().__init__(**init_kwargs)
-            self.x: float = init_kwargs.get('x')
+class MockInvariant(InvariantABC): 
+    """
+    This is a test of the invariant condition abstract class.
+    """
+    _init_input_spec = [InputSpec(name='i', type=str)]
+    _state_input_spec = [InputSpec(name='x', type=int)]
 
-        def __call__(self, **state_kwargs):
-            return super().__call__(**state_kwargs)
+    def __call__(self, **state_kwargs):
+        super().__call__(**state_kwargs)
 
-        def _validate_states(self, **state_kwargs):
-            if 'x' not in state_kwargs:
-                raise ValueError("Missing state input 'x'")
-            if not isinstance(state_kwargs.get('x'), float):
-                raise TypeError('x state input is invalid')
+        if self.__getattribute__('i') == 'hello world!' and state_kwargs.get('x') == 10:
+            return True
+        
+        return False
 
-        def _validate_initialization(self, **kwargs):
-            if 'x' not in kwargs:
-                raise ValueError("Missing required parameter 'x'")
-            if not isinstance(kwargs.get('x'), float):
-                raise TypeError('x is not valid type')
+@pytest.fixture
+def invariant_instance():
+    return MockInvariant(i='hello world!')
 
-    # Test valid creation
-    kwargs = {'x': 10.0}
-    invariant = TestInvariant(**kwargs)
-    assert invariant.is_initialized
-    assert invariant.x == 10.0
+class TestInvariantABC:
+    def test_initialization_and_specs(self, invariant_instance: InvariantABC): 
+        # Test valid creation
+        assert invariant_instance.is_initialized
+        assert invariant_instance.i == 'hello world!'
 
-    # Test valid call with correct state
-    kwargs = {'x':5.0 }
-    invariant.__call__(**kwargs)  # Should not raise
+        assert invariant_instance.init_input_spec_names() == ['i']
+        assert invariant_instance.init_input_spec_types() == [str]
+        assert invariant_instance.state_input_spec_names() == ['x']
+        assert invariant_instance.state_input_spec_types() == [int]
+    
+    def test_string_representations(self, invariant_instance):
+        assert repr(invariant_instance) == "MockInvariant(initialized=True)"
+        assert str(invariant_instance) == "Invariant Function: MockInvariant"
 
-    # Test call with invalid state type
-    kwargs = {'x':"not a float" }
-    with pytest.raises(TypeError):
-        invariant.__call__(kwargs)
+    def test_invariant_evaluation(self, invariant_instance: InvariantABC):
+        """Test that the invariant evaluation works"""
+    
+        # Test valid call with correct state
+        assert invariant_instance(x=10) is True  # Should not raise
+        assert invariant_instance(x=20) is False
 
-    # Test call with missing state input
-    with pytest.raises(ValueError):
-        invariant.__call__()
+    @pytest.mark.parametrize(
+        "init_kwargs, expected_exception",
+        [
+            ({}, KeyError),
+            ({'i': 1.0}, TypeError),
+        ],
+        ids=[
+            "missing_required_init_argument",
+            "invalid_init_argument_type"
+        ]
+    )
+    def test_invalid_initialization(self, init_kwargs, expected_exception):
+        """Test that invalid initialization parameters raise appropriate exceptions."""
+        with pytest.raises(expected_exception):
+            MockInvariant(**init_kwargs)
+    
+    @pytest.mark.parametrize(
+        "state_kwargs, expected_exception",
+        [
+            ({}, KeyError),
+            ({'x': 'invalid_type'}, TypeError)
+        ],
+        ids=[
+            "missing_required_state_argument",
+            "invalid_state_argument_type"
+        ]
+    )
+    def test_invalid_state_inputs(self, state_kwargs, expected_exception, invariant_instance: InvariantABC):
+        """Test that invalid state inputs raise appropriate exceptions."""
+        with pytest.raises(expected_exception):
+            invariant_instance(**state_kwargs)
 
-    invariant_info = invariant.get_invariant_info()
-    assert invariant_info['class_name'] == 'TestInvariant'
-    assert invariant_info['module'] == 'test_invariant'
-    assert invariant_info['is_initialized'] == True
-    assert invariant_info['description'] == 'This is a test of the invariant condition abstract class.'
-
-    assert invariant.__str__() == "Invariant Function: TestInvariant"
-    assert invariant.__repr__() == "TestInvariant(initialized=True)"
-
-def test_invariant_invalid_initialization_missing_param():
-    class TestInvariant(InvariantABC):
-        def _validate_initialization(self, **kwargs):
-            if 'x' not in kwargs:
-                raise ValueError("Missing required parameter 'x'")
-
-        def __call__(self, **state_kwargs):
-            return super().__call__(**state_kwargs)
-
-    with pytest.raises(ValueError):
-        TestInvariant()  # Missing 'x'
-
-def test_invariant_invalid_initialization_wrong_type():
-    class TestInvariant(InvariantABC):
-        def _validate_initialization(self, **kwargs):
-            if not isinstance(kwargs.get('x'), float):
-                raise TypeError('x is not valid type')
-
-        def __call__(self, **state_kwargs):
-            return super().__call__(**state_kwargs)
-
-    with pytest.raises(TypeError):
-        TestInvariant(x="not a float")
-
-def test_invariant_call_before_init():
-    class TestInvariant(InvariantABC):
-        def __init__(self, **kwargs):
-            # Intentionally skip calling super().__init__ to simulate no init
-            self.is_initialized = False
-
-        def __call__(self, **state_kwargs):
-            return super().__call__(**state_kwargs)
-
-    invariant = TestInvariant()
-    with pytest.raises(RuntimeError):
-        invariant.__call__(x=1.0)
+        
+if __name__ == '__main__':
+    pass

@@ -1,45 +1,68 @@
+"""
+Test class for GuardABC abstract class
+
+Tests the underlying functionalities for the GuardABC abstract class to ensure it works
+as expected through the lifecycle of build and runtime.
+"""
+
 import pytest
 from colav_hybrid_automaton.automaton.guards.guard import GuardABC
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
+
 class MockGuard(GuardABC):
-    """
-    This is a test of the guard condition abstract class.
-    """
+    """Mock implementation of GuardABC for testing purposes."""
+    
     _init_input_spec = [InputSpec(name='i', type=float)]
     _state_input_spec = [InputSpec(name='x', type=float)]
-
+    
     def __call__(self, **state_kwargs):
-        """a simple mock guard which returns true if class atribute i is greater than 10 and state arg too."""
+        """
+        Simple mock guard that returns True if both class attribute 'i' and 
+        state argument 'x' are greater than 10.
+        """
         super().__call__(**state_kwargs)
+        return self.i > 10 and state_kwargs.get('x') > 10
 
-        if self.__getattribute__('i') > 10 and state_kwargs.get('x') > 10:
-            return True
-        else:
-            return False
 
 @pytest.fixture
-def guard_instance() -> GuardABC:
+def guard_instance():
+    """Fixture providing a properly initialized MockGuard instance."""
     return MockGuard(i=20.0)
 
+
 class TestGuardABC:
-    def test_guard_creation_and_calls(self, guard_instance: GuardABC):
-        # Test valid creation
+    """Test suite for GuardABC abstract class functionality."""
+    
+    def test_initialization_and_specs(self, guard_instance):
+        """Test that guard instance initializes correctly with proper specs."""
         assert guard_instance.i == 20.0
-        assert guard_instance.is_initialized == True
+        assert guard_instance.is_initialized
+        
+        # Test input specifications
         assert guard_instance.init_input_spec_names() == ['i']
         assert guard_instance.init_input_spec_types() == [float]
+        
+        # Test state input specifications
         assert guard_instance.state_input_spec_names() == ['x']
         assert guard_instance.state_input_spec_types() == [float]
-        assert guard_instance.__repr__() == 'MockGuard(initialized=True)'
-        assert guard_instance.__str__() == 'Guard Function: MockGuard'
-
-        eval: bool = guard_instance.__call__(x=20.0)
-        assert eval == True
-
-        eval: bool = guard_instance.__call__(x=5.0)
-        assert eval == False
-
+    
+    def test_string_representations(self, guard_instance):
+        """Test string representation methods."""
+        assert repr(guard_instance) == 'MockGuard(initialized=True)'
+        assert str(guard_instance) == 'Guard Function: MockGuard'
+    
+    def test_guard_evaluation(self, guard_instance):
+        """Test that guard evaluation works correctly."""
+        # Both values > 10, should return True
+        assert guard_instance(x=20.0) is True
+        
+        # State value <= 10, should return False
+        assert guard_instance(x=5.0) is False
+        
+        # Edge case: exactly 10
+        assert guard_instance(x=10.0) is False
+    
     @pytest.mark.parametrize(
         "init_kwargs, expected_exception",
         [
@@ -55,7 +78,7 @@ class TestGuardABC:
         """Test that invalid initialization parameters raise appropriate exceptions."""
         with pytest.raises(expected_exception):
             MockGuard(**init_kwargs)
-
+    
     @pytest.mark.parametrize(
         "state_kwargs, expected_exception",
         [
@@ -67,13 +90,15 @@ class TestGuardABC:
             "invalid_state_argument_type"
         ]
     )
-    def test_invalid_state_inputs(self, state_kwargs, expected_exception, guard_instance: GuardABC):
+    def test_invalid_state_inputs(self, state_kwargs, expected_exception, guard_instance):
         """Test that invalid state inputs raise appropriate exceptions."""
-        guard = guard_instance
-        
         with pytest.raises(expected_exception):
-            guard(**state_kwargs)
+            guard_instance(**state_kwargs)
+
 
 if __name__ == '__main__':
     mock_guard = MockGuard(i=20.0)
-    TestGuardABC.test_guard_creation_and_calls(mock_guard)
+    test_instance = TestGuardABC()
+    test_instance.test_initialization_and_specs(mock_guard)
+    test_instance.test_string_representations(mock_guard)
+    test_instance.test_guard_evaluation(mock_guard)

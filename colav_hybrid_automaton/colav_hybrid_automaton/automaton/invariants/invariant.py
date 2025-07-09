@@ -151,24 +151,24 @@ class InvariantABC(ABC):
                 raise TypeError(f"State input '{expected_state_input.name}' expected type: {expected_state_input.type}, actual type: {type(state_kwargs[expected_state_input.name])}")   
 
     @classmethod
-    def init_input_spec(cls) -> List[InputSpec]:
+    def init_input_spec_names(cls) -> List[InputSpec]:
         """Return a list of initialization inputs expected for the __init__, names and types"""
-        return cls._init_input_spec.copy()
-    
-    @classmethod
-    def init_input_names(cls) -> List[str]:
-        """returns a list of initialization input names passed for the __init__"""
         return [init_input.name for init_input in cls._init_input_spec]
     
     @classmethod
-    def state_input_spec(cls) -> List[InputSpec]:
+    def init_input_spec_types(cls) -> List[str]:
+        """returns a list of initialization input names passed for the __init__"""
+        return [init_input.type for init_input in cls._init_input_spec]
+    
+    @classmethod
+    def state_input_spec_names(cls) -> List[InputSpec]:
         """Return a list of state inputs expected for the __call__, names and types"""
-        return cls._state_input_spec.copy()
+        return [state_input.name for state_input in cls._state_input_spec]
 
     @classmethod
-    def state_input_names(cls) -> List[str]:
+    def state_input_spec_types(cls) -> List[str]:
         """Returns a list of state input names required for the __call__, just names"""
-        return [state_input.name for state_input in cls._state_input_spec]
+        return [state_input.type for state_input in cls._state_input_spec]
 
     def get_invariant_info(self) -> Dict[str, Any]:
         """
