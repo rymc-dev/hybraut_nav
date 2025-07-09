@@ -1,15 +1,24 @@
+"""
+Test class for InvariantABC abstract class
+
+Tests the underlying functionalities for the InvariantABC abstract class to ensure it works
+as expected through the lifecycle of build and runtime.
+"""
+
 import pytest
 from colav_hybrid_automaton.automaton.invariants.invariant import InvariantABC
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class MockInvariant(InvariantABC): 
-    """
-    This is a test of the invariant condition abstract class.
-    """
+    """Mock Implementation of InvariantABC for testing purposes."""
     _init_input_spec = [InputSpec(name='i', type=str)]
     _state_input_spec = [InputSpec(name='x', type=int)]
 
     def __call__(self, **state_kwargs):
+        """
+        Simple mock invariant that returns True if both class attribute 'i' == 'hello world! and 
+        state argument 'x' == 10.
+        """
         super().__call__(**state_kwargs)
 
         if self.__getattribute__('i') == 'hello world!' and state_kwargs.get('x') == 10:
@@ -22,7 +31,10 @@ def invariant_instance():
     return MockInvariant(i='hello world!')
 
 class TestInvariantABC:
-    def test_initialization_and_specs(self, invariant_instance: InvariantABC): 
+    """Test suite for InvariantABC abstract class functionality."""
+
+    def test_initialization_and_specs(self, invariant_instance: InvariantABC):
+        """Test that invariant instacne initializes correctly and with proper specs.""" 
         # Test valid creation
         assert invariant_instance.is_initialized
         assert invariant_instance.i == 'hello world!'
@@ -33,14 +45,13 @@ class TestInvariantABC:
         assert invariant_instance.state_input_spec_types() == [int]
     
     def test_string_representations(self, invariant_instance):
+        """Test string representation methods."""
         assert repr(invariant_instance) == "MockInvariant(initialized=True)"
         assert str(invariant_instance) == "Invariant Function: MockInvariant"
 
     def test_invariant_evaluation(self, invariant_instance: InvariantABC):
-        """Test that the invariant evaluation works"""
-    
-        # Test valid call with correct state
-        assert invariant_instance(x=10) is True  # Should not raise
+        """Test invariant evaluation works correctly."""
+        assert invariant_instance(x=10) is True  
         assert invariant_instance(x=20) is False
 
     @pytest.mark.parametrize(
@@ -77,4 +88,4 @@ class TestInvariantABC:
 
         
 if __name__ == '__main__':
-    pass
+    pytest.main([__file__])

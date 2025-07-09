@@ -97,8 +97,4 @@ class TestGuardABC:
 
 
 if __name__ == '__main__':
-    mock_guard = MockGuard(i=20.0)
-    test_instance = TestGuardABC()
-    test_instance.test_initialization_and_specs(mock_guard)
-    test_instance.test_string_representations(mock_guard)
-    test_instance.test_guard_evaluation(mock_guard)
+    pytest.main([__file__])

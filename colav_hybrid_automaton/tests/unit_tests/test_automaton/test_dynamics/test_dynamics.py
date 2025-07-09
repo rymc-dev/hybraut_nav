@@ -140,3 +140,6 @@ class TestDynamicsABC:
         """
         with pytest.raises(expected_exception):
             dynamics_instance.__call__(**state_kwargs)
+
+if __name__ == '__main__':
+    pytest.main([__file__])

@@ -122,3 +122,6 @@ class TestResetABC:
         
         with pytest.raises(expected_exception):
             reset(**state_kwargs)
+
+if __name__ == '__main__':
+    pytest.main([__file__])
