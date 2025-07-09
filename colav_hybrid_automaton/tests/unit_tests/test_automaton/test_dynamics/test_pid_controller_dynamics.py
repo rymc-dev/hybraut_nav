@@ -1,5 +1,13 @@
+"""
+Test class for PIDControllerDynamics an implementation of the Abstract Dynamics ABC for COLAV hybrid automaton control modes cruise and t2los control modes.
+
+In this class we utilize PIDControllerDynamics to test 
+the underlying functionalities for this abstract class to enusre it is working 
+as expected through the lifecycle of build and runtime
+"""
+
+
 import pytest
-import time
 import math
 from colav_hybrid_automaton.automaton.dynamics import PIDControllerDynamics, DynamicsABC
 from colav_interfaces.msg import AgentState as ROSAgentState, WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
@@ -88,6 +96,7 @@ class TestPIDControllerDynamics():
         assert dynamics.dynamic_output_spec_units() == ['m/s', 'rad/s']
 
     def test_string_representations(self, dynamics):
+        """Test string representation methods"""
         assert repr(dynamics) == 'PIDControllerDynamics(output_type=AutomatonControlOutputs, initialized=True)'
         assert str(dynamics) == 'Dynamics Function: PIDControllerDynamics (Output: AutomatonControlOutputs)'
 
@@ -233,9 +242,17 @@ class TestPIDControllerDynamics():
             'yaw_kp':1.0, 'yaw_ki':0.1, 'yaw_kd':0.1, 'vel_kp':0.5, 'vel_ki':0.05, 'vel_kd':0.01,
             'integral_max':5.0, 'derivative_filter_alpha':1.5}, KeyError),
         ],
+        ids=[
+
+        ]
     )
     def test_invalid_initialization(self, init_kwargs, exception):
-        # missing or invalid init kwargs
+        """
+        Parameterized test for invalid initializations of the dynamic class.
+        
+        Each case checks if the class raises the expected exception type
+        when initialized with incomplete or incorrect types in kwargs.
+        """
         with pytest.raises(exception):
             PIDControllerDynamics(**init_kwargs)
 
@@ -248,9 +265,17 @@ class TestPIDControllerDynamics():
             ({'agent_state': 'invalid', 'waypoints_state': ROSWaypointsState()}, TypeError),
             ({'agent_state': ROSAgentState(), 'waypoints_state': 'invalid'}, TypeError),
         ],
+        ids=[
+
+        ]
     )
     def test_invalid_state_inputs(self, dynamics, state_kwargs_input, exception, far_waypoint):
-        # for wrong states
+        """
+        Parameterized test for invalid runtime state inputs to the dynamic class.
+        
+        Each test provides an invalid or incomplete state input dictionary,
+        and checks whether the `__call__` method raises the appropriate exception.
+        """
         with pytest.raises(exception):
             # ensure current_waypoint exists if waypoints_state is correct type
             if isinstance(state_kwargs_input.get('waypoints_state'), ROSWaypointsState):
