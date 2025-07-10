@@ -1,18 +1,8 @@
-from std_msgs.msg import String
-from rclpy.node import Node
-from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
 from threading import Lock
 from rclpy.publisher import Publisher
-# from colav_hybrid_automaton.automaton._internal.factory import generate_mode_profile
-from typing import Tuple
-from rclpy.impl.rcutils_logger import RcutilsLogger
-from rclpy.node import Node
-from colav_hybrid_automaton.automaton._internal.utils import validate_mode
-from typing import List
 from hybrid_automaton_interfaces.msg import HybridAutomatonMode
 from colav_hybrid_automaton.automaton._internal.model import HybridAutomaton
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus
-from colav_hybrid_automaton.automaton._internal.factory import HybridAutomatonFactory
 
 def on_mode_callback(
     lock: Lock,
