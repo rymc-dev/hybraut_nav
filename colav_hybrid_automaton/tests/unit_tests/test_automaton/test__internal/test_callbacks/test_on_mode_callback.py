@@ -60,6 +60,7 @@ class TestOnModeCallback:
     test suite for the on_mode_callback function a key component of the hybrid automaton
     framework.
     """
+
     @pytest.mark.parametrize(
         "current_mode, mode_msg, expected_mode, expected_status, expected_status_message",
         [
@@ -147,47 +148,55 @@ class TestOnModeCallback:
         assert status_list[-1].type == expected_status, f'status value not the same - Test ID: {test_id}'
         assert status_list[-1].message == expected_status_message, f'status message not the same - Test ID: {test_id}'
     
-    # @pytest.mark.parametrize(
-    #         "lock_arg, rcv_mode_msg_arg, is_automaton_model_arg, is_status_publisher_arg, expected_status_type, expected_status_message",
-    #         [
-    #             (None, HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), True, True, HybridAutomatonStatus.STATUS_FATAL, "")
-    #         ],
-    #         ids=[
-    #             "invalid lock arg given to automaton"
-    #         ]
-    # )
-    # def test_mode_callback_exception_handling(
-    #     self,
-    #     lock_arg,
-    #     rcv_mode_msg_arg,
-    #     is_automaton_model_arg,
-    #     is_status_publisher_arg,
-    #     expected_status_type,
-    #     expected_status_message,
-    #     mock_automaton_node_fixture,
-    #     request
-    # ):
-    #     """
-    #     Test exception handling for invalid parameter types passed to on_mode_callback.
-    #     Note: Since the function has comprehensive try-catch blocks, most invalid inputs
-    #     will result in error status messages rather than raised exceptions.
-    #     """
-    #     mock_automaton_node, status_publisher, status_list = mock_automaton_node_fixture
+    # TODO: Need to add custom exception messages for each of these
+    @pytest.mark.parametrize(
+            "lock_arg, rcv_mode_msg_arg, is_automaton_model_arg, is_status_publisher_arg, expected_status_type, expected_status_message",
+            [
+                (None, HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), True, True, HybridAutomatonStatus.STATUS_FATAL, ""),
+                (Lock(), None, True, True, HybridAutomatonStatus.STATUS_FATAL, ""),
+                (Lock(), HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), False, True, HybridAutomatonStatus.STATUS_FATAL, ""),
+                # (Lock(), HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), True, False, HybridAutomatonStatus.STATUS_FATAL, ""), #TODO: Need to get this test working
+            ],
+            ids=[
+                "invalid lock arg given to automaton",
+                "invalid rcv_mode_msg",
+                "invalid automaton model passed",
+                # "invalid status_publisher passed"
+            ]
+    )
+    def test_mode_callback_exception_handling(
+        self,
+        lock_arg,
+        rcv_mode_msg_arg,
+        is_automaton_model_arg,
+        is_status_publisher_arg,
+        expected_status_type,
+        expected_status_message,
+        mock_automaton_node_fixture,
+        request
+    ):
+        """
+        Test exception handling for invalid parameter types passed to on_mode_callback.
+        Note: Since the function has comprehensive try-catch blocks, most invalid inputs
+        will result in error status messages rather than raised exceptions.
+        """
+        mock_automaton_node, status_publisher, status_list = mock_automaton_node_fixture
 
-    #     with pytest.raises(AttributeError):
-    #         on_mode_callback(
-    #             lock=lock_arg,
-    #             rcv_mode_msg=rcv_mode_msg_arg,
-    #             automaton_model=mock_automaton_node.__getattribute__('automaton_model') if is_automaton_model_arg else None,
-    #             status_publisher=status_publisher if is_status_publisher_arg else None
-    #         )
+        on_mode_callback(
+            lock=lock_arg,
+            rcv_mode_msg=rcv_mode_msg_arg,
+            automaton_model=mock_automaton_node.__getattribute__('automaton_model') if is_automaton_model_arg else None,
+            status_publisher=status_publisher if is_status_publisher_arg else None
+        )
 
-    #     time.sleep(0.1)
+        time.sleep(0.1)
 
-    #     test_id = request.node.callspec.id if hasattr(request.node, 'callspec') else "unknown"
-    #     actual_status_type = status_list[-1].type
-    #     assert actual_status_type == expected_status_type, f"{test_id}: test failed got status_type: {actual_status_type}, expected: {expected_status_type}"
-    #     # assert status_list[-1].message == expected_status_message
+        test_id = request.node.callspec.id if hasattr(request.node, 'callspec') else "unknown"
+        actual_status_type = status_list[-1].type
+        assert actual_status_type == expected_status_type, f"{test_id}: test failed got status_type: {actual_status_type}, expected: {expected_status_type}"
+        # assert status_list[-1].message == expected_status_message
+        print ('error message:')
+        print (status_list[-1].message)
 
 if __name__ == '__main__':
     pytest.main([__file__])

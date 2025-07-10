@@ -32,7 +32,7 @@ def on_mode_callback(
     automaton_model: Hybrid automaton model to update
     status_publisher: Publisher for status messages
     """
-    
+
     try:
         with lock:
             # Validate the new mode exists before attempting transition
@@ -67,7 +67,7 @@ def on_mode_callback(
         status_publisher.publish(status_msg)
     except Exception as e:
         status_msg = HybridAutomatonStatus(
-        type=HybridAutomatonStatus.STATUS_ERROR,
+        type=HybridAutomatonStatus.STATUS_FATAL ,
         message=f"Unexpected error in on_mode_callback: {e}"
         )
         status_publisher.publish(status_msg)
