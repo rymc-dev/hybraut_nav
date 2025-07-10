@@ -8,11 +8,18 @@ from colav_hybrid_automaton.automaton.guards import GuardABC
 from colav_hybrid_automaton.automaton.resets import ResetABC
 from colav_hybrid_automaton.automaton.invariants import InvariantABC
 from colav_hybrid_automaton.automaton.dynamics import DynamicsABC
+from rclpy.publisher import Publisher
+from rclpy.node import Node
+from rclpy.qos import QoSProfile
+from rclpy.callback_groups import ReentrantCallbackGroup, CallbackGroup
 
 # Set up module logger
 type Logger = logging.Logger
 logger: Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+DEFAULT_QOS = QoSProfile(depth=10)
+DEFAULT_CALLBACK_GROUP = ReentrantCallbackGroup()
 
 
 def import_class(module_path: str, class_name: str) -> Type[Any]:
@@ -31,6 +38,7 @@ class State:
     topic: str
     msg_type: Any
     current_state: Optional[Any] = None
+    publisher: Optional[Publisher] = None
     update_hz: float = -1.0
     timeout_sec: float = -1.0
 
@@ -196,6 +204,44 @@ class HybridAutomaton:
 
     def get_mode(self) -> int:
         return self.current_mode
+    
+    def create_state_subscriptions(self, node: Node, qos_profile = DEFAULT_QOS, callback_group = DEFAULT_CALLBACK_GROUP) -> None: 
+        """ 
+        Attach ROS 2 subscriptions to each State object, enabling runtime updates 
+        to their `current_state` attribute via incoming messages.
+
+        Args:
+            node (Node): The ROS 2 node to which subscriptions are attached.
+            states (Dict[str, State]): A dictionary of state names to State objects.
+        """
+        for _, state_val in self.states.items():
+            node.create_subscription(
+                msg_type=state_val.msg_type,
+                topic=state_val.topic,
+                callback=lambda msg, state=state_val: setattr(state, "current_state", msg),
+                callback_group=callback_group,
+                qos_profile=qos_profile
+            )
+
+    def create_state_publishers(self, node: Node, qos_profile: QoSProfile = DEFAULT_QOS, callback_group:CallbackGroup = DEFAULT_CALLBACK_GROUP) -> None: 
+      """
+      Create and assign ROS 2 publishers for each State object, enabling outgoing
+      messages from the hybrid automaton model.
+
+      Args:
+          node (Node): The ROS 2 node used to create the publishers.
+          states (Dict[str, State]): A dictionary of state names to State objects.
+
+      Returns:
+          Dict[str, State]: The same input dictionary with updated `publisher` attributes.
+      """
+      for state_name, state_val in self.states.items():
+          self.states[state_name].publisher = node.create_publisher(
+              topic=state_val.topic,
+              msg_type=state_val.msg_type,
+              callback_group=callback_group,
+              qos_profile=qos_profile
+          )
 
     @classmethod
     def from_famd(cls, famd: Dict[str, Any]) -> "HybridAutomaton":
