@@ -272,7 +272,6 @@ class HybridAutomaton:
         )
 
 
-
 if __name__ == '__main__':
     famd_content = yaml.safe_load('''# COLAV Hybrid Automaton Formal Automaton Model Definition (FAMD)
 # ============================================================================
