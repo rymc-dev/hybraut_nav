@@ -10,7 +10,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 # import pytest
-# from colav_hybrid_automaton.automaton._internal.callbacks.transition_callbacks import transition_evaluation_callback
+from colav_hybrid_automaton.automaton._internal.callbacks.transition_callbacks import transition_evaluation_callback
 from colav_hybrid_automaton.automaton._internal.factory import HybridAutomatonFactory
 
 from hybrid_automaton_interfaces.msg import (
@@ -109,18 +109,29 @@ if __name__ == '__main__':
     )
 
     automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
-        automaton_famd_path='/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
+        automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
         generate_mmd_diagrams=False
     )
     automaton_model.create_state_publishers(node=mock_node)
-    automaton_model.create_state_publishers(node=mock_node)
+    automaton_model.create_state_subscriptions(node=mock_node)
     
     executor.add_node(mock_node)
     threading.Thread(target=executor.spin).start()
 
     import time
-    from colav_interfaces.msg import AgentState
+    from colav_interfaces.msg import AgentState, ObstaclesState, UnsafeSetState, WaypointsState
+
     automaton_model.states['agent_state'].publisher.publish(AgentState())
-    time.sleep(5.0)
-    print (automaton_model)
+    automaton_model.states['obstacles_state'].publisher.publish(ObstaclesState())
+    automaton_model.states['waypoints_state'].publisher.publish(WaypointsState())
+    automaton_model.states['unsafe_set_state'].publisher.publish(UnsafeSetState())
+    time.sleep(0.2)
+    transition_evaluation_callback(
+        lock=threading.Lock(),
+        automaton_model=automaton_model,
+        stamp=mock_node.get_clock().now().to_msg(),
+        mode_publisher=mode_publisher,
+        transition_evaluation_publisher=transition_evaluation_publisher,
+        status_publisher=status_publisher
+    )
     rclpy.shutdown()

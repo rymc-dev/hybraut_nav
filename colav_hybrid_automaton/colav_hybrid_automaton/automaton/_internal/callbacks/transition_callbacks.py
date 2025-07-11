@@ -117,10 +117,14 @@ def transition_evaluation_callback(
             transition_evaluation_msg.transitions_and_guards_evaluations = transitions_and_guard_evaluations
             transition_evaluation_msg.selected_transition_name = selected_transition_name
 
+            
             if not selected_transition_name == '':
+                # should publish status for transitioning here
+                status_publisher.publish(HybridAutomatonStatus(type=HybridAutomatonStatus.STATUS_TRANSITIONING, message=f"performing {selected_transition_name} transition", stamp=stamp))
                 for transition in current_mode_transitions:
                     if transition.name == selected_transition_name:
                         if transition.reset is not None:
+                            
                             reset_name = transition.reset.get_reset_info()['class_name']
                             reset_description = transition.reset.get_reset_info()['description']
                             reset_state_target_keys = transition.reset.reset_target_spec_names()
@@ -131,25 +135,33 @@ def transition_evaluation_callback(
                             }
                             # reset_outputs = transition.reset.__call__(**state_kwargs)
                             from colav_interfaces.msg import Waypoint
-                            reset_output = [Waypoint()]
+                            resets_outputs = [Waypoint()]
                             
                             reset_target_outputs = {
-                                target:output for target, output in zip(reset_target_outputs, reset_outputs) 
+                                target:output for target, output in zip(reset_target_outputs, resets_outputs) 
                             }
-                            # need a method of getting a reset publisher utilizing reset name here
+                            
+                            for key, val in reset_target_outputs.items():
+                                automaton_model.states[key].publisher.publish(val)
 
+                            transition_evaluation_msg.selected_transition_resets.append(HybridAutomatonReset(
+                                name=reset_name,
+                                description=transition.reset.get_reset_info()['description'],
+                                state_targets=reset_target_outputs.keys()
+                            ))
 
-                
-                # we append here to the guard evaluations
+                for transition in automaton_model.modes[current_mode].transitions:
+                    if selected_transition_name == transition.name:
+                        target_mode = transition.target_mode
 
+                previous_mode = automaton_model.current_mode
+                mode_publisher.publish(HybridAutomatonMode(type=target_mode, stamp=stamp))
+                status_publisher.publish(HybridAutomatonStatus(type=HybridAutomatonStatus.STATUS_ACTIVE_MODE, message=f"transitioned from {previous_mode}.{automaton_model.modes[previous_mode].name} -> {target_mode}.{automaton_model.modes[target_mode].name}. automaton executing.", stamp=stamp))
 
-                # guard_evaluation =  
-
-
-
+            transition_evaluation_publisher.publish(transition_evaluation_msg)
     except Exception as e: 
         pass
-
+    
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
