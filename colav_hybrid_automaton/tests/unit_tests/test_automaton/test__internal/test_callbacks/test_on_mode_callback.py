@@ -17,7 +17,7 @@ def mock_automaton_node_fixture():
     mock_automaton_node = Node('mock_automaton_node')
 
     automaton_model = HybridAutomatonFactory.hybrid_automaton_registry(
-        automaton_famd_path='/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
+        automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
         generate_mmd_diagrams=False
     )
 

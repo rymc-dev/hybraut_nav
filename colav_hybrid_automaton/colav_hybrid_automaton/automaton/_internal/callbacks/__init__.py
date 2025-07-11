@@ -5,7 +5,7 @@
 #     on_invariant_received_callback,
 #     handle_invariant_timeout_guard
 # )
-from .transition_callbacks import transition_evaluation_callback
+from .transition_callback import transition_evaluation_callback
 from .mode_callback import on_mode_callback
 # from .reset_callbacks import reset_callback
 # from .status_callbacks import on_status_received_callback

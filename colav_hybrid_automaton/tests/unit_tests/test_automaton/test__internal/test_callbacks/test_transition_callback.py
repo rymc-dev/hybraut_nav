@@ -87,11 +87,17 @@ from rclpy.executors import MultiThreadedExecutor
 import threading
 
 if __name__ == '__main__':
+
+    hybrid_automaton_mode = HybridAutomatonMode()
+    hybrid_automaton_status = HybridAutomatonStatus()
+    hybrid_automaton_transition_evaluations = HybridAutomatonTransitionEvaluations()
+    print (hybrid_automaton_transition_evaluations)
     rclpy.init()
 
     mock_node = Node('mock_node')
     executor = MultiThreadedExecutor()
     qos_profile = QoSProfile(depth=10)
+
     mode_publisher = mock_node.create_publisher(
         topic='/hybrid_automaton/mode',
         msg_type=HybridAutomatonMode,
