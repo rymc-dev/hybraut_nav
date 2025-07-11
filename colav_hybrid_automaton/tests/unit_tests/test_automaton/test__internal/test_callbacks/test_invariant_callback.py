@@ -1,31 +1,40 @@
 import pytest
 import rclpy
 from rclpy.node import Node
+import os
+
+TEST_AUTOMATON_FAMD_FILE_PATH = os.path.join(os.path.dirname(__file__), 'test_data/test_hybrid_automaton.famd.yaml')
+
+# @pytest.fixture
+# def mock_invaraints_callback_requirements():
+#     pass
+
+# class TestInvariantCallback:
+#     """test suite for the invariants evaluation callback"""
+
+#     @pytest.mark.parametrize(
+#             "",
+#             [
+
+#             ],
+#             ids=[
+
+#             ]
+#     )
+#     def test_invariant_evaluation_callback_comprehensive():
+#         pass
 
 
-
-@pytest.fixture
-def mock_invaraints_callback_requirements():
-    pass
-
-class TestInvariantCallback:
-    """test suite for the invariants evaluation callback"""
-
-    @pytest.mark.parametrize(
-            "",
-            [
-
-            ],
-            ids=[
-
-            ]
-    )
-    def test_invariant_evaluation_callback_comprehensive():
-        pass
-
+import os
+import yaml
+from colav_hybrid_automaton.automaton._internal.factory import HybridAutomatonFactory
+import pypickle
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+
+    automaton_model = HybridAutomatonFactory.hybrid_automaton_registry(TEST_AUTOMATON_FAMD_FILE_PATH)
+    
+    # pytest.main([__file__])
 # import rclpy
 # from rclpy.executors import MultiThreadedExecutor
 # import threading

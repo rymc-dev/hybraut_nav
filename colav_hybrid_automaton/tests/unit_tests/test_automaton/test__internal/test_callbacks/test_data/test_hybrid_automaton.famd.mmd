@@ -1,0 +1,36 @@
+stateDiagram-v2
+    %% test_hybrid_automaton State Diagram
+
+    %% Initial Mode
+    [*] --> 0
+
+	%% Modes
+	%% test_mode Mode details
+    0 : 0.test_mode
+    note left of 0
+        =====================
+        <b>0.test_mode</b>
+        =====================
+        <b>description</b>: Initial test mode with trivial invariant and transition
+        <b>invariants</b>: ['TrivialInvariant, No description']
+        <b>dynamics</b>: NoOpControllerDynamics, No description
+    end note
+
+	%% test_mode transitions.
+    0 --> 1 : <b>0.test_transition</b>  [<b>guard</b> = DummyGuard, <b>reset</b> = DummyReset]
+
+	%% goal_mode Mode details
+    1 : 1.goal_mode
+    note left of 1
+        =====================
+        <b>1.goal_mode</b>
+        =====================
+        <b>description</b>: Goal mode reached
+        <b>invariants</b>: ['TrivialInvariant, No description']
+        <b>dynamics</b>: NoOpControllerDynamics, No description
+    end note
+
+	%% goal_mode transitions.
+
+    %% Goal Modes
+    1 --> [*]
