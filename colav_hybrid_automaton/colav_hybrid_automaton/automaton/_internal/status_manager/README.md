@@ -2,8 +2,6 @@
 
 Hybrid-automaton mission flows can become quite intricate once you factor in initialization, mission setup, error handling, recovery and finalization. To make the entire lifecycle easily observable—and to cleanly separate automaton modes from node-lifecycle states—we introduce a dedicated Status-Manager FSM.
 
-![State‑Machine Diagram](./status_manager.fsm.png "Hybrid Automaton FSM")
-
 ## 1. Goals & Responsibilities
 
 ### Full-lifecycle visibility
@@ -88,32 +86,58 @@ Time    stamp   # ROS timestamp
 ## 4. FSM Transitions & Driving Events
 
 ```mermaid
+%% Sub-DSF for internal automaton during ACTIVE mode of the top-level DSF.
+%% This DSF functions as a watchdog, continuously monitoring and managing
+%% asynchronous operations such as:
+%% - transition evaluation
+%% - dynamics evaluation
+%% - invariant enforcement
+%% and other critical processes within the automaton's execution context.
+
 stateDiagram-v2
     direction LR
 
-    [*] --> INIT           : EVENT_SYSTEM_BOOT
-    INIT --> IDLE          : EVENT_INIT_COMPLETED
-    INIT --> FATAL         : EVENT_BOOT_FAILURE
+    %% Entry point
+    [*] --> ACTIVE: ON_VALID_MISSION_REQUEST
 
-    IDLE --> ACTIVE        : EVENT_MISSION_RECEIVED
-    IDLE --> FATAL         : EVENT_INIT_MISSION_FAILURE
+    %% Main operational flow (horizontal)
+    ACTIVE --> TRANSITIONING: TRANSITION_GUARD_ENABLED
+    TRANSITIONING --> ACTIVE: TRANSITION_COMPLETE
+    ACTIVE --> MISSION_COMPLETE: MISSION_COMPLETE
 
-    ACTIVE --> TRANSITIONING : EVENT_TRANSITION_GUARD_ENABLED
-    TRANSITIONING --> ACTIVE  : EVENT_TRANSITION_COMPLETE
-    TRANSITIONING --> ERROR   : TRANSITION_FAILURE
+    %% Error handling branch (below main flow)
+    ACTIVE --> ERROR: RECOVERABLE_ERROR
+    TRANSITIONING --> ERROR: TRANSITION_FAILURE
+    ERROR --> RECOVERING: ATTEMPT_FIX
+    ERROR --> FATAL: CRITICAL_FAILURE
+    RECOVERING --> ACTIVE: RECOVERED
+    RECOVERING --> ERROR: RECOVERY_FAILED
 
-    ACTIVE --> WARNING     : EVENT_NON_BLOCKING_ANOMALY
-    WARNING --> ACTIVE     : EVENT_ANOMALY_RESOLVED_OR_TIMEOUT
+    %% Warning handling branch (above main flow)
+    ACTIVE --> WARNING: NON_BLOCKING_ANOMALY
+    WARNING --> ACTIVE: ANOMALY_RESOLVED_OR_TIMEOUT
 
-    ACTIVE --> ERROR       : EVENT_RECOVERABLE_ERROR
-    ERROR --> RECOVERING   : EVENT_ATTEMPT_FIX
-    RECOVERING --> ACTIVE  : EVENT_RECOVERED
-    ERROR --> FATAL        : EVENT_CRITICAL_FAILURE
+    %% Terminal state
+    FATAL --> [*]: SHUTDOWN
+    MISSION_COMPLETE --> [*]: RETURN TO INACTIVE STATE
 
-    ACTIVE --> GOAL_REACHED : EVENT_MISSION_COMPLETE
-    GOAL_REACHED --> [*]
+    %% State styling for better visualization
+    classDef inactiveState fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef activeState fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
+    classDef transitionState fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef warningState fill:#fff8e1,stroke:#ffc107,stroke-width:2px
+    classDef errorState fill:#ffebee,stroke:#f44336,stroke-width:2px
+    classDef fatalState fill:#ffcdd2,stroke:#d32f2f,stroke-width:3px
+    classDef completeState fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
 
-    FATAL --> [*]
+    class INACTIVE inactiveState
+    class ACTIVE activeState
+    class TRANSITIONING transitionState
+    class WARNING warningState
+    class ERROR errorState
+    class RECOVERING errorState
+    class FATAL fatalState
+    class MISSION_COMPLETE completeState
 ```
 
 ### Key Behaviors
