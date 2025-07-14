@@ -42,6 +42,10 @@ invariants:
   trivial_invariant:
     module: colav_hybrid_automaton.automaton.invariants
     class_name: TrivialInvariant
+  
+  failing_invariant:
+    module: colav_hybrid_automaton.automaton.invariants
+    class_name: FailingInvariant
 
 # ============================================================================
 # Dynamics (F)
@@ -83,7 +87,7 @@ modes:
     description: "Goal mode reached"
     dynamics: no_op_controller
     invariants:
-      - trivial_invariant
+      - failing_invariant
     transitions: []
 
 # ============================================================================
