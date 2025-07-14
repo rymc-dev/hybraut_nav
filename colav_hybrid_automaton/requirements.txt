@@ -10,6 +10,7 @@ pytest-xdist
 pytest-ordering 
 pytest-dependency 
 PyYAML
+transitions
 jsonschema
 
 # External system dependencies (install seperately)
