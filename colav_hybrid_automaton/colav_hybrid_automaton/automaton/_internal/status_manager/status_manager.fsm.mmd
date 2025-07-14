@@ -1,37 +1,52 @@
+%% Sub-DSF for internal automaton during ACTIVE mode of the top-level DSF.
+%% This DSF functions as a watchdog, continuously monitoring and managing
+%% asynchronous operations such as:
+%% - transition evaluation
+%% - dynamics evaluation
+%% - invariant enforcement
+%% and other critical processes within the automaton's execution context.
+
 stateDiagram-v2
     direction LR
 
     %% Entry point
-    [*] --> 0.INIT: 0.SYSTEM_BOOT
+    [*] --> ACTIVE: ON_VALID_MISSION_REQUEST
 
-    %% INIT to IDLE
-    0.INIT --> 1.IDLE: 2.INIT_COMPLETED
+    %% Main operational flow (horizontal)
+    ACTIVE --> TRANSITIONING: TRANSITION_GUARD_ENABLED
+    TRANSITIONING --> ACTIVE: TRANSITION_COMPLETE
+    ACTIVE --> MISSION_COMPLETE: MISSION_COMPLETE
 
-    %% IDLE to ACTIVE
-    1.IDLE --> 2.ACTIVE: 3.MISSION_RECEIVED
+    %% Error handling branch (below main flow)
+    ACTIVE --> ERROR: RECOVERABLE_ERROR
+    TRANSITIONING --> ERROR: TRANSITION_FAILURE
+    ERROR --> RECOVERING: ATTEMPT_FIX
+    ERROR --> FATAL: CRITICAL_FAILURE
+    RECOVERING --> ACTIVE: RECOVERED
+    RECOVERING --> ERROR: RECOVERY_FAILED
 
-    %% ACTIVE transitions
-    %% SHOULD BE A TRANSITION_FAILURE, TRANSITION FAILURE IS ALWAYS GOING TO CAUSE AN ERROR, WHEN THIS HAPPENS OUR FSM CAN RETRY THE PREVIOUS TRANSITION
-    %% BY MAKING A REQUEST ONE MORE TIME, IF IT FAILS AGAIN IT IS FATAL 
-    2.ACTIVE --> 3.TRANSITIONING: 5.TRANSITION_GUARD_ENABLED
-    3.TRANSITIONING --> 2.ACTIVE: 6.TRANSITION_COMPLETE
-    3.TRANSITIONING --> 5.ERROR: 14.TRANSITION_FAILURE
+    %% Warning handling branch (above main flow)
+    ACTIVE --> WARNING: NON_BLOCKING_ANOMALY
+    WARNING --> ACTIVE: ANOMALY_RESOLVED_OR_TIMEOUT
 
-    2.ACTIVE --> 4.WARNING: 7.NON_BLOCK_ANOMALY 
-    4.WARNING --> 2.ACTIVE: 8.ANOMALY_RESOLVED_OR_TIMEOUT 
+    %% Terminal state
+    FATAL --> [*]: SHUTDOWN
+    MISSION_COMPLETE --> [*]: RETURN TO INACTIVE STATE
 
-    2.ACTIVE --> 5.ERROR: 9.RECOVERABLE_ERROR
-    5.ERROR --> 6.RECOVERING: 11.ATTEMPT_FIX
-    6.RECOVERING --> 2.ACTIVE: 13.RECOVERED
-    5.ERROR --> 7.FATAL: 12.CRITICAL_FAILURE
+    %% State styling for better visualization
+    classDef inactiveState fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef activeState fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
+    classDef transitionState fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    classDef warningState fill:#fff8e1,stroke:#ffc107,stroke-width:2px
+    classDef errorState fill:#ffebee,stroke:#f44336,stroke-width:2px
+    classDef fatalState fill:#ffcdd2,stroke:#d32f2f,stroke-width:3px
+    classDef completeState fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
 
-    %% FATAL terminal
-    7.FATAL --> [*]
-
-    %% Goal complete
-    2.ACTIVE --> 8.MISSION_COMPLETE: 10.MISSION_COMLETE
-    8.MISSION_COMPLETE --> [*]
-
-    %% Other entries
-    1.IDLE --> 7.FATAL: 4.INIT_MISSION_FAILURE
-    0.INIT --> 7.FATAL: 1.BOOT_FAILURE
+    class INACTIVE inactiveState
+    class ACTIVE activeState
+    class TRANSITIONING transitionState
+    class WARNING warningState
+    class ERROR errorState
+    class RECOVERING errorState
+    class FATAL fatalState
+    class MISSION_COMPLETE completeState
