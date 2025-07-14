@@ -21,6 +21,9 @@
 # from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus
 # from rclpy.qos import QoSProfile
 # import time
+# import os
+
+# TEST_FAMD_PATH = os.path.join(os.path.dirname(__file__), 'test_data/test_hybrid_automaton.famd.yaml')
 
 # @pytest.fixture
 # def mock_dynamics_fixture():
@@ -32,7 +35,7 @@
     
 #     lock = threading.Lock()
 #     automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
-#         automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
+#         automaton_famd_path=TEST_FAMD_PATH, 
 #         generate_mmd_diagrams=False
 #     )
 #     automaton_model.create_state_publishers(node=mock_node)
@@ -83,7 +86,7 @@
 #     @pytest.mark.parametrize(
 #             "mode, agent_state, waypoints_state",
 #             [
-#                 (HybridAutomatonMode.MODE_CRUISE, AgentState(), WaypointsState())
+#                 (0, AgentState(), WaypointsState())
 #             ],
 #             ids=[
 #                 "valid agent state and waypoints state for a controller"
@@ -94,8 +97,8 @@
 #         lock, automaton_model, stamp, dynamics_evaluation_publisher, status_publisher, dynamics_evaluation_list, status_list = mock_dynamics_fixture
 
 #         automaton_model.current_mode = mode
-#         automaton_model.states['agent_state'].publisher.publish(agent_state)
-#         automaton_model.states['waypoints_state'].publisher.publish(waypoints_state)
+#         # automaton_model.states['agent_state'].publisher.publish(agent_state)
+#         # automaton_model.states['waypoints_state'].publisher.publish(waypoints_state)
 
 #         time.sleep(0.1)
 
@@ -113,65 +116,65 @@
 #         print (f"dynamics_evaluation_list: {dynamics_evaluation_list}")
 #         assert True
 
-# if __name__ == '__main__':
-#     rclpy.init()
-#     executor = MultiThreadedExecutor(num_threads=2)
-#     mock_node = Node('mock_node')
-#     executor.add_node(mock_node)
-#     qos_profile = QoSProfile(depth=10)
+# # if __name__ == '__main__':
+# #     rclpy.init()
+# #     executor = MultiThreadedExecutor(num_threads=2)
+# #     mock_node = Node('mock_node')
+# #     executor.add_node(mock_node)
+# #     qos_profile = QoSProfile(depth=10)
     
-#     lock = threading.Lock()
-#     automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
-#         automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
-#         generate_mmd_diagrams=False
-#     )
-#     automaton_model.create_state_publishers(node=mock_node)
-#     automaton_model.create_state_subscriptions(node=mock_node)
-#     stamp = mock_node.get_clock().now().to_msg()
-#     dynamics_evaluation_publisher = mock_node.create_publisher(
-#         topic = '/hybrid_automaton/dynamics',
-#         msg_type = HybridAutomatonDynamicsEvaluation,
-#         qos_profile = qos_profile
-#     ) 
-#     status_publisher = mock_node.create_publisher(
-#         topic = '/hybrid_automaton/status',
-#         msg_type = HybridAutomatonStatus,
-#         qos_profile = qos_profile
-#     )
+# #     lock = threading.Lock()
+# #     automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
+# #         automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
+# #         generate_mmd_diagrams=False
+# #     )
+# #     automaton_model.create_state_publishers(node=mock_node)
+# #     automaton_model.create_state_subscriptions(node=mock_node)
+# #     stamp = mock_node.get_clock().now().to_msg()
+# #     dynamics_evaluation_publisher = mock_node.create_publisher(
+# #         topic = '/hybrid_automaton/dynamics',
+# #         msg_type = HybridAutomatonDynamicsEvaluation,
+# #         qos_profile = qos_profile
+# #     ) 
+# #     status_publisher = mock_node.create_publisher(
+# #         topic = '/hybrid_automaton/status',
+# #         msg_type = HybridAutomatonStatus,
+# #         qos_profile = qos_profile
+# #     )
 
-#     threading.Thread(target=executor.spin).start()
+# #     threading.Thread(target=executor.spin).start()
 
-#     status_list = []
+# #     status_list = []
 
-#     def status_callback(msg: HybridAutomatonStatus):
-#         status_list.append(msg)
+# #     def status_callback(msg: HybridAutomatonStatus):
+# #         status_list.append(msg)
 
-#     mock_node.create_subscription(
-#         msg_type=HybridAutomatonStatus,       # ❌ Wrong
-#         topic='/hybrid_automaton/status',   # This topic publishes `HybridAutomatonDynamicsEvaluation`
-#         callback=status_callback,
-#         qos_profile=qos_profile
-#     )
+# #     mock_node.create_subscription(
+# #         msg_type=HybridAutomatonStatus,       # ❌ Wrong
+# #         topic='/hybrid_automaton/status',   # This topic publishes `HybridAutomatonDynamicsEvaluation`
+# #         callback=status_callback,
+# #         qos_profile=qos_profile
+# #     )
 
-#     dynamics_evaluation_list = []
-#     def dynamics_callback(msg: HybridAutomatonDynamicsEvaluation):
-#         dynamics_evaluation_list.append(msg)
+# #     dynamics_evaluation_list = []
+# #     def dynamics_callback(msg: HybridAutomatonDynamicsEvaluation):
+# #         dynamics_evaluation_list.append(msg)
 
-#     mock_node.create_subscription(
-#         msg_type=HybridAutomatonDynamicsEvaluation,
-#         topic='/hybrid_automaton/dynamics_evaluation',
-#         callback=dynamics_callback,
-#         qos_profile=qos_profile
-#     )
+# #     mock_node.create_subscription(
+# #         msg_type=HybridAutomatonDynamicsEvaluation,
+# #         topic='/hybrid_automaton/dynamics_evaluation',
+# #         callback=dynamics_callback,
+# #         qos_profile=qos_profile
+# #     )
 
-#     mock_dynamics_fixture = lock, automaton_model, stamp, dynamics_evaluation_publisher, status_publisher, dynamics_evaluation_list, status_list
+# #     mock_dynamics_fixture = lock, automaton_model, stamp, dynamics_evaluation_publisher, status_publisher, dynamics_evaluation_list, status_list
 
-#     TestDynamicsEvaluationCallback().test_dynamics_evaluation_callback_comprehensive(
-#         mode=HybridAutomatonMode.MODE_CRUISE,
-#         agent_state=AgentState(),
-#         waypoints_state=WaypointsState(),
-#         mock_dynamics_fixture=mock_dynamics_fixture,
-#         request="hello world"
-#     )
+# #     TestDynamicsEvaluationCallback().test_dynamics_evaluation_callback_comprehensive(
+# #         mode=HybridAutomatonMode.MODE_CRUISE,
+# #         agent_state=AgentState(),
+# #         waypoints_state=WaypointsState(),
+# #         mock_dynamics_fixture=mock_dynamics_fixture,
+# #         request="hello world"
+# #     )
 
-#     rclpy.shutdown()
+# #     rclpy.shutdown()

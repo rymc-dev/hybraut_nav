@@ -5,20 +5,11 @@ if they exists while at the same time passing feedback in the ros2 status, modes
 """
 
 
-from rclpy.node import Node
-from std_msgs.msg import String
-from colav_hybrid_automaton.automaton._internal.constants import HybridAutomatonStatusEnum
-from colav_hybrid_automaton.automaton._internal.utils import validate_mode, parse_transition
 from threading import Lock
 from builtin_interfaces.msg import Time
-from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.publisher import Publisher
-from typing import List, Dict, Any, Optional, Tuple
-from rclpy.guard_condition import GuardCondition
-from rclpy.node import Node
+from typing import List, Tuple
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonMode
-from std_msgs.msg import String
-from colav_hybrid_automaton.automaton._internal.factory.famd_factory import HybridAutomatonFactory
 from colav_hybrid_automaton.automaton._internal.model import HybridAutomaton
 from colav_interfaces.msg import Waypoint
 

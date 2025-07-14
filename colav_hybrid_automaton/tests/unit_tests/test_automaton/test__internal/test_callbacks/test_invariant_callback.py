@@ -2,7 +2,7 @@ import pytest
 import rclpy
 from rclpy.node import Node
 import os
-from colav_hybrid_automaton.automaton._internal.callbacks.invariant_callbacks import invariants_evaluation_callback
+from colav_hybrid_automaton.automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from colav_hybrid_automaton.automaton._internal.factory import HybridAutomatonFactory
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonModeState, HybridAutomatonInvariantStatus, HybridAutomatonInvariantsEvaluation
 from rclpy.executors import MultiThreadedExecutor
