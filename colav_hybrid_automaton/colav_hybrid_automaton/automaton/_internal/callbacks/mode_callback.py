@@ -26,27 +26,27 @@ def on_mode_callback(
     try:
         with lock:
             # Validate the new mode exists before attempting transition
-            if rcv_mode_state_msg.type not in automaton_model.modes:
-                raise ValueError(f"Invalid mode type: {rcv_mode_state_msg.type}")
+            if rcv_mode_state_msg.current_mode_id not in automaton_model.modes:
+                raise ValueError(f"Invalid mode type: {rcv_mode_state_msg.current_mode_id}")
             
             previous_mode = automaton_model.get_mode()
             
             # Only update if the mode is actually changing
-            if previous_mode != rcv_mode_state_msg.type:
+            if previous_mode != rcv_mode_state_msg.current_mode_id:
                 automaton_model.set_mode(rcv_mode_state_msg)
                 # Get mode names safely with fallback
                 prev_mode_name = automaton_model.modes[previous_mode].name
-                new_mode_name = automaton_model.modes[rcv_mode_state_msg.type].name
+                new_mode_name = automaton_model.modes[rcv_mode_state_msg.current_mode_id].name
                 status_msg = HybridAutomatonStatus(
                 type=HybridAutomatonStatus.STATUS_ACTIVE_MODE,
-                message=f"Mode transition: {previous_mode}.{prev_mode_name} -> {rcv_mode_state_msg.type}.{new_mode_name}"
+                message=f"Mode transition: {previous_mode}.{prev_mode_name} -> {rcv_mode_state_msg.current_mode_id}.{new_mode_name}"
                 )
                 status_publisher.publish(status_msg)
             else:
                 # Log that mode is already active (optional)
                 status_msg = HybridAutomatonStatus(
                 type=HybridAutomatonStatus.STATUS_INFO,
-                message=f"Mode {rcv_mode_state_msg.type}.{automaton_model.modes[rcv_mode_state_msg.type].name} already active")
+                message=f"Mode {rcv_mode_state_msg.current_mode_id}.{automaton_model.modes[rcv_mode_state_msg.current_mode_id].name} already active")
                 status_publisher.publish(status_msg)
 
     except ValueError as e:
@@ -57,7 +57,7 @@ def on_mode_callback(
         status_publisher.publish(status_msg)
     except Exception as e:
         status_msg = HybridAutomatonStatus(
-        type=HybridAutomatonStatus.STATUS_FATAL ,
+        type=HybridAutomatonStatus.STATUS_FATAL,
         message=f"Unexpected error in on_mode_callback: {e}"
         )
         status_publisher.publish(status_msg)

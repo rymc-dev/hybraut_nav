@@ -6,8 +6,12 @@ import time
 import pytest
 from rclpy.executors import MultiThreadedExecutor
 import threading
-from hybrid_automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus
+from hybrid_automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus, HybridAutomatonModeState
 from colav_hybrid_automaton.automaton._internal.factory import HybridAutomatonFactory
+import os
+
+
+TEST_FAMD_PATH = os.path.join(os.path.dirname(__file__), 'test_data/test_hybrid_automaton.famd.yaml')
 
 @pytest.fixture
 def mock_automaton_node_fixture():
@@ -17,7 +21,7 @@ def mock_automaton_node_fixture():
     mock_automaton_node = Node('mock_automaton_node')
 
     automaton_model = HybridAutomatonFactory.hybrid_automaton_registry(
-        automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
+        automaton_famd_path=TEST_FAMD_PATH, 
         generate_mmd_diagrams=False
     )
 
@@ -62,66 +66,42 @@ class TestOnModeCallback:
     """
 
     @pytest.mark.parametrize(
-        "current_mode, mode_msg, expected_mode, expected_status, expected_status_message",
+        "current_mode_id, update_mode_id, expected_mode_id, expected_status_id, expected_status_message",
         [
             (
-                HybridAutomatonMode.MODE_CRUISE, 
-                HybridAutomatonMode.MODE_T2LOS, 
-                HybridAutomatonMode.MODE_T2LOS,
+                0, # test_mode 
+                1,  # goal_mode
+                1, # goal_mode
                 HybridAutomatonStatus.STATUS_ACTIVE_MODE, 
-                'Mode transition: 0.cruise -> 1.t2los'
+                'Mode transition: 0.test_mode -> 1.goal_mode'
             ),
             (
-                HybridAutomatonMode.MODE_T2LOS,
-                HybridAutomatonMode.MODE_WAYPOINT_REACHED,
-                HybridAutomatonMode.MODE_WAYPOINT_REACHED,
-                HybridAutomatonStatus.STATUS_ACTIVE_MODE,
-                'Mode transition: 1.t2los -> 3.waypoint_reached'
-            ),
-            (
-                HybridAutomatonMode.MODE_WAYPOINT_REACHED,
-                HybridAutomatonMode.MODE_CRUISE,
-                HybridAutomatonMode.MODE_CRUISE,
-                HybridAutomatonStatus.STATUS_ACTIVE_MODE,
-                'Mode transition: 3.waypoint_reached -> 0.cruise'
-            ),
-            (
-                HybridAutomatonMode.MODE_CRUISE,
-                HybridAutomatonMode.MODE_FALLBACK,
-                HybridAutomatonMode.MODE_FALLBACK,
-                HybridAutomatonStatus.STATUS_ACTIVE_MODE,
-                'Mode transition: 0.cruise -> 2.fallback'
-            ),
-            (
-                HybridAutomatonMode.MODE_CRUISE,
-                HybridAutomatonMode.MODE_CRUISE,
-                HybridAutomatonMode.MODE_CRUISE,
+                0,
+                0,
+                0,
                 HybridAutomatonStatus.STATUS_INFO,
-                'Mode 0.cruise already active'
+                'Mode 0.test_mode already active'
             ),
             (
-                HybridAutomatonMode.MODE_CRUISE,
+                0,
                 50,
-                HybridAutomatonMode.MODE_CRUISE,
+                0,
                 HybridAutomatonStatus.STATUS_ERROR,
                 "Mode validation error in on_mode_callback: Invalid mode type: 50"
             )
         ],
         ids=[
-            "a valid new mode received from transition engine, allowing us to move from cruise to t2los",
-            "a valid new mode receive from transition engine, changing current mode for hybrid automaton state to waypoint_reached ",
-            "a valid new mode received from the transtiion engine, changing current mode from waypoint_reached to cruise",
-            "a valid new mode received from transition engine, allowing us to move from cruise to fallback mode.",
+            "a valid new mode received from transition engine, allowing us to move from test_mode to goal_mode",
             "a new mode is received but it is the same mode that is already active, therefore we just ignore and send a status message informing the user.",
             "invalid new mode received, should get a valid status exception."
         ]
     )
     def test_mode_callback_comprehensive(
         self, 
-        current_mode: int, 
-        mode_msg: int, 
-        expected_mode: int,
-        expected_status: int, 
+        current_mode_id: int, 
+        update_mode_id: int, 
+        expected_mode_id: int,
+        expected_status_id: HybridAutomatonStatus, 
         expected_status_message: str,
         mock_automaton_node_fixture,
         request
@@ -132,29 +112,30 @@ class TestOnModeCallback:
         """
         mock_automaton_node, status_publisher, status_list = mock_automaton_node_fixture
         status_list.clear()
-        mock_automaton_node.__getattribute__('automaton_model').current_mode = current_mode
+        mock_automaton_node.__getattribute__('automaton_model').current_mode = current_mode_id
         
         on_mode_callback(
             lock=Lock(),
-            rcv_mode_msg=HybridAutomatonMode(type=mode_msg),
+            rcv_mode_state_msg=HybridAutomatonModeState(current_mode_id=update_mode_id),
             automaton_model=mock_automaton_node.__getattribute__('automaton_model'),
             status_publisher=status_publisher
         )
 
-        time.sleep(0.05)
+        time.sleep(0.2)
 
-        test_id = request.node.callspec.id if hasattr(request.node, 'callspec') else "unknown"
-        assert mock_automaton_node.__getattribute__('automaton_model').current_mode == expected_mode, f'new mode not the same as current mode - Test ID: {test_id}'
-        assert status_list[-1].type == expected_status, f'status value not the same - Test ID: {test_id}'
+        # test_id = request.node.callspec.id if hasattr(request.node, 'callspec') else "unknown"
+        test_id = 1
+        assert mock_automaton_node.__getattribute__('automaton_model').current_mode == expected_mode_id, f'new mode not the same as current mode - Test ID: {test_id}'
+        assert status_list[-1].type == expected_status_id, f'status value not the same - Test ID: {test_id}'
         assert status_list[-1].message == expected_status_message, f'status message not the same - Test ID: {test_id}'
     
     # TODO: Need to add custom exception messages for each of these
     @pytest.mark.parametrize(
-            "lock_arg, rcv_mode_msg_arg, is_automaton_model_arg, is_status_publisher_arg, expected_status_type, expected_status_message",
+            "lock_arg, current_mode_id, is_automaton_model_arg, is_status_publisher_arg, expected_status_type, expected_status_message",
             [
-                (None, HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), True, True, HybridAutomatonStatus.STATUS_FATAL, ""),
-                (Lock(), None, True, True, HybridAutomatonStatus.STATUS_FATAL, ""),
-                (Lock(), HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), False, True, HybridAutomatonStatus.STATUS_FATAL, ""),
+                (None, 0, True, True, HybridAutomatonStatus.STATUS_FATAL, "Unexpected error in on_mode_callback: 'NoneType' object does not support the context manager protocol"),
+                (Lock(), None, True, True, HybridAutomatonStatus.STATUS_ERROR, "Mode validation error in on_mode_callback: Invalid mode type: None"),
+                (Lock(), 1, False, True, HybridAutomatonStatus.STATUS_FATAL, "Unexpected error in on_mode_callback: 'NoneType' object does not support the context manager protocol"),
                 # (Lock(), HybridAutomatonMode(type=HybridAutomatonMode.MODE_T2LOS), True, False, HybridAutomatonStatus.STATUS_FATAL, ""), #TODO: Need to get this test working
             ],
             ids=[
@@ -167,7 +148,7 @@ class TestOnModeCallback:
     def test_mode_callback_exception_handling(
         self,
         lock_arg,
-        rcv_mode_msg_arg,
+        current_mode_id,
         is_automaton_model_arg,
         is_status_publisher_arg,
         expected_status_type,
@@ -184,7 +165,7 @@ class TestOnModeCallback:
 
         on_mode_callback(
             lock=lock_arg,
-            rcv_mode_msg=rcv_mode_msg_arg,
+            rcv_mode_state_msg=HybridAutomatonModeState(current_mode_id=current_mode_id),
             automaton_model=mock_automaton_node.__getattribute__('automaton_model') if is_automaton_model_arg else None,
             status_publisher=status_publisher if is_status_publisher_arg else None
         )
@@ -194,9 +175,8 @@ class TestOnModeCallback:
         test_id = request.node.callspec.id if hasattr(request.node, 'callspec') else "unknown"
         actual_status_type = status_list[-1].type
         assert actual_status_type == expected_status_type, f"{test_id}: test failed got status_type: {actual_status_type}, expected: {expected_status_type}"
-        # assert status_list[-1].message == expected_status_message
-        print ('error message:')
-        print (status_list[-1].message)
+        # actual_status_message = status_list[-1].message
+        # assert actual_status_message == expected_status_message
 
 if __name__ == '__main__':
     pytest.main([__file__])
