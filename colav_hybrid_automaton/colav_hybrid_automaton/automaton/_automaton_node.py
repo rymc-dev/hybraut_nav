@@ -9,58 +9,44 @@ Performs transitions resets and transition evaluations
 # from rclpy.lifecycle import Node, State, TransitionCallbackReturn
 import rclpy
 import os
-from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
-from std_msgs.msg import String, Bool
 from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model import HybridAutomaton
                                            
-from hybrid_automaton_interfaces.msg import HybridAutomatonDynamics, HybridAutomatonGuardEvaluations, HybridAutomatonMode, HybridAutomatonInvariant, HybridAutomatonStatus
+from hybrid_automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
-from colav_hybrid_automaton.automaton._internal.utils import load_yml
-from colav_hybrid_automaton.automaton._internal.factory import (
-    # create_hybrid_automaton_config,
-    create_state_subscriptions,
-    create_state_publishers
-)
-from colav_interfaces.msg import Waypoint, WaypointsState
+from colav_interfaces.msg import Waypoint as ROSWaypoint, WaypointsState
+from rclpy.action.server import ServerGoalHandle
+
 from geometry_msgs.msg import Point
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.timer import Timer
 from rclpy.publisher import Publisher
-from typing import List, Optional
 from rclpy.subscription import Subscription
-from rclpy.client import Client
 import threading
-from lifecycle_msgs.msg import Transition
 from lifecycle_msgs.srv import ChangeState
 from rclpy.guard_condition import GuardCondition
-from functools import partial
 
-from colav_hybrid_automaton.automaton._internal.constants import (
-    QOS_PROFILE, 
-    HybridAutomatonStatusEnum
-)
+from hybrid_automaton_interfaces.msg import HybridAutomatonModeState 
+from rclpy.action import ActionServer, GoalResponse, CancelResponse
+from colav_hybrid_automaton.automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
+from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus, HybridAutomatonTransitionEvaluations
+from hybrid_automaton_interfaces.msg import HybridAutomatonInvariantsEvaluation
+from colav_hybrid_automaton.automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
+from hybrid_automaton_interfaces.action import ExecuteMission
+
+
+from rclpy.action import ActionServer, GoalResponse, CancelResponse
+from colav_hybrid_automaton.automaton._internal.constants import QOS_PROFILE
 import sys  
 
 from colav_hybrid_automaton.automaton._internal.callbacks import (
-    evaluate_guards_timer_callback,
-    evaluate_dynamics_timer_callback,
-    evaluate_invariants_timer_callback,
-    on_invariant_received_callback,
-    transition_engine_callback,
     transition_evaluation_callback,
     on_mode_callback,
-    on_status_received_callback,
-    handle_invariant_timeout_guard
 )
 from colav_hybrid_automaton.automaton._internal.factory import (
-    create_state_publishers,
-    create_state_subscriptions,
-    generate_mode_profile,
     HybridAutomatonFactory
 )
-from hybrid_automaton_interfaces.msg import HybridAutomatonInvariant
 
 SYSTEM_CLOCK = None
 
@@ -78,95 +64,27 @@ class HybridAutomatonNode(LifecycleNode):
         ]
     }
 
-    _ACTIVATION_PARAMS = {
-        'waypoint_x': [
-            0.0,
-            "COLAV Hybrid Automaton State for goal waypoints 'x' position (m)."
-        ], 
-        'waypoint_y': [
-            0.0,
-            "COLAV Hybrid Automaton State for goal waypoints 'y' position (m)."
-        ], 
-        'waypoint_acceptance_radius': [
-            10.0,
-            "COLAV Hybrid Automaton State for goal waypoints 'acceptance radius' (m)."
-        ]
-    }
+    # _ACTIVATION_PARAMS = {
+    #     'waypoint_x': [
+    #         0.0,
+    #         "COLAV Hybrid Automaton State for goal waypoints 'x' position (m)."
+    #     ], 
+    #     'waypoint_y': [
+    #         0.0,
+    #         "COLAV Hybrid Automaton State for goal waypoints 'y' position (m)."
+    #     ], 
+    #     'waypoint_acceptance_radius': [
+    #         10.0,
+    #         "COLAV Hybrid Automaton State for goal waypoints 'acceptance radius' (m)."
+    #     ]
+    # }
 
-    _MODE_ENUM_MAP = {
-        value: name
-        for name, value in vars(HybridAutomatonMode).items()
-        if name.isupper() and isinstance(value, int)
-    }
-            
     def __init__(
         self, 
         name: str,
     ):
         """init"""
         super().__init__(name)
-
-        # Internal states
-        # self._mode:HybridAutomatonMode = HybridAutomatonMode(type=HybridAutomatonMode.MODE_INACTIVE, stamp=self.get_clock().now().to_msg())
-        # self._states:dict = {}
-        # self._mode_dynamics = None
-        # self._mode_invariants = None 
-        # self._mode_transitions = None
-        # self._status:HybridAutomatonStatusEnum
-        # self._invariant:bool
-        # self._current_transition:str
-        # self._current_transition_evaluation:Transition
-        # self._reset_event = None
-        # self._waiting_after_reset:bool = False
-        # self._reset_complete_time = None
-        # self._current_invariant_status = None
-
-        # self._automaton_mode = None
-
-        # # locks
-        # self.transition_lock = threading.Lock()
-        # self.error_lock = threading.Lock()
-        # self.executing_mode_lock = threading.Lock()
-        # self.completed_lock = threading.Lock()
-        # self._mode_callback_lock = threading.Lock()
-
-        # # Publishers
-        # self._mode_publisher:Publisher = None
-        # self._invariant_publisher: Publisher = None
-        # self._status_publisher:Publisher = None
-        # self._transition_evaluation_publisher:Publisher = None
-        # self._dynamics_publisher:Publisher = None
-        # self._waypoints_publisher: Publisher = None
-
-        # # Subscriptions
-        # self._transition_subscription:Subscription = None
-        # self._transition_evaluation_subscriber:Subscription = None
-        # self._mode_subscription:Subscription = None
-        # self._status_subscription:Subscription = None
-
-        # # clients: 
-        # self._trigger_lifecycle_transition:Client = None
-
-        # # Timers
-        # self._guards_evaluation_timer:Timer = None
-        # self._dynamics_timer:Timer = None
-        # self._invariant_timer:Timer = None
-
-        # # Guards
-        # self._transition_engine: GuardCondition = None  
-
-        # # Internal Continuous states
-        # self._goal_waypoint:Waypoint = None
-
-        # # self._available_modes:List[str] = None
-        # self._configuration: dict = None
-
-        # self._control_frequency:int = 100
-        # self._evaluation_frequency:int = 100
-
-        self._transition_eval_lock = threading.Lock()
-        self._dynamics_timer_callback_lock = threading.Lock()
-        self._invariant_evaluation_lock = threading.Lock()
 
         for param_key in self._CONFIGURATION_PARAMS:
             self.declare_parameter(
@@ -187,76 +105,101 @@ class HybridAutomatonNode(LifecycleNode):
         self.get_logger().info(f"🔄 Node '{self.get_name()}' 📍 '{state.label}' ➡️ configure")
 
         try:
-            # retrieve configuration params
-            _automaton_famd_file_path = self.get_parameter('configuration_path').value
-            self._automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(_automaton_famd_file_path)
-            create_state_subscriptions(node=self, state_configuration=self._automaton_model.states)
+            famd_path = self.get_parameter('configuration_path').value
+            automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
+                automaton_famd_path=famd_path,
+                generate_mmd_diagrams=True
+            )
+            automaton_model.create_state_publishers(self)
+            automaton_model.create_state_publishers(self)
 
-            # self._transition_evaluator_callback = self.create_timer(
-            #     timer_period_sec=1/self._automaton_model.transition_evaluation_frequency_hz, 
-            #     callback=lambda: evaluate_guards_timer_callback(
-            #         lock = threading.Lock(),
-            #         mode = self._mode,
-            #         available_modes = self._MODE_ENUM_MAP,
-            #         status = self._status,
-            #         states=self._states,
-            #         stamp = self.get_clock().now().to_msg(),
-            #         mode_transitions = self._mode_transitions,
-            #         status_publisher = self._status_publisher,
-            #         transiiton_evaluation_publisher = self._transition_evaluation_publisher,
-            #         logger = self.get_logger()
-            #     ),
-            #     callback_group=ReentrantCallbackGroup(),
-            #     clock=SYSTEM_CLOCK,
-            #     autostart=False
-            # )
+            self.automaton_model = automaton_model
 
-            # self._dynamics_timer = self.create_timer(
-            #     timer_period_sec=1 / self._automaton_model.control_frequency_hz,
-            #     callback=lambda: evaluate_dynamics_timer_callback(
-            #         lock=self._dynamics_timer_callback_lock,
-            #         mode=self._mode,
-            #         available_modes=self._MODE_ENUM_MAP,
-            #         mode_dynamics=self._mode_dynamics,
-            #         states=self._states,
-            #         stamp=self.get_clock().now().to_msg(),
-            #         dynamic_publisher=self._dynamics_publisher,
-            #         logger=self.get_logger()
-            #     ),
-            #     callback_group=ReentrantCallbackGroup(),
-            #     clock=SYSTEM_CLOCK,
-            #     autostart=False
-            # )
+            # # NOTE: should probably make status_publisher and mode publisher apart of the automaton_model
+            self.mode_publisher = self.create_publisher(
+                msg_type=HybridAutomatonModeState,
+                topic='/hybrid_automaton/mode_state',
+                qos_profile=QOS_PROFILE,
+                callback_group=ReentrantCallbackGroup()
+            )
+            self.status_publisher = self.create_publisher(
+                msg_type=HybridAutomatonStatus,
+                topic='/hybrid_automaton/status',
+                qos_profile=QOS_PROFILE,
+                callback_group=ReentrantCallbackGroup()
+            )
 
-            # self._invariant_evaluation_timer = self.create_timer(
-            #     timer_period_sec=1/self._automaton_model.transition_evaluation_frequency_hz,
-            #     callback=lambda: evaluate_invariants_timer_callback(
-            #         lock=self._invariant_evaluation_lock,
-            #         mode=self._mode,
-            #         available_modes=self._MODE_ENUM_MAP,
-            #         stamp=self.get_clock().now().to_msg(),
-            #         invariant_config=self._mode_invariants,
-            #         states = self._states,
-            #         invariant_publisher = self._invariant_publisher,
-            #         logger=self.get_logger()
-            #     ),
-            #     callback_group=ReentrantCallbackGroup(),
-            #     autostart=False
-            # )
+            self.transitions_evaluation_publisher = self.create_publisher(
+                msg_type=HybridAutomatonTransitionEvaluations,
+                topic='/hybrid_automaton/transitions_evaluation',
+                qos_profile=QOS_PROFILE,
+                callback_group=ReentrantCallbackGroup()
+            )
+            self.transitions_evaluation_timer:Timer = self.create_timer(
+                timer_period_sec=1/self.automaton_model.transition_evaluation_frequency_hz, 
+                callback=lambda: transition_evaluation_callback(
+                    lock = threading.Lock(),
+                    automaton_model=self.automaton_model,
+                    stamp=self.get_clock().now().to_msg(),
+                    mode_publisher=self.mode_publisher,
+                    transition_evaluation_publisher=self.transitions_evaluation_publisher,
+                    status_publisher=self.status_publisher
+                ),
+                callback_group=ReentrantCallbackGroup(),
+                clock=SYSTEM_CLOCK,
+                autostart=False
+            )
 
-            # undeclare params from configuration mode
-            for param_key in self._CONFIGURATION_PARAMS:
-                self.undeclare_parameter(param_key)
+            self.dynamics_evaluation_publisher: Publisher = self.create_publisher(
+                msg_type=HybridAutomatonDynamicsEvaluation,
+                topic='/hybrid_automaton/dynamics_evaluation',
+                qos_profile=QOS_PROFILE,
+                callback_group=ReentrantCallbackGroup()
+            )
+            self.dynamic_evaluation_timer: Timer = self.create_timer(
+                timer_period_sec=1 / self.automaton_model.control_frequency_hz,
+                callback=lambda: dynamics_evaluation_callback(
+                    lock=threading.Lock(),
+                    automaton_model=self.automaton_model,
+                    stamp=self.get_clock().now().to_msg(),
+                    dynamics_evaluation_publisher=self.dynamics_evaluation_publisher,
+                    status_publisher=self.status_publisher
+                ),
+                callback_group=ReentrantCallbackGroup(),
+                clock=SYSTEM_CLOCK,
+                autostart=False
+            )
 
-            # declare params for activation mode
-            for param_key in self._ACTIVATION_PARAMS:
-                self.declare_parameter(
-                    param_key,
-                    value=self._ACTIVATION_PARAMS[param_key][0],
-                    descriptor=ParameterDescriptor(
-                        description = self._ACTIVATION_PARAMS[param_key][1]
-                    )
-                )
+            self.invariants_evaluation_publisher: Publisher = self.create_publisher(
+                msg_type=HybridAutomatonInvariantsEvaluation,
+                topic='/hybrid_automaton/invariants_evaluation',
+                qos_profile=QOS_PROFILE,
+                callback_group=ReentrantCallbackGroup()
+            )
+            self.invariants_evaluation_timer: Timer = self.create_timer(
+                timer_period_sec=1/self.automaton_model.transition_evaluation_frequency_hz,
+                callback=lambda: invariants_evaluation_callback(
+                    lock=threading.Lock(),
+                    automaton_model=self.automaton_model,
+                    stamp=self.get_clock().now().to_msg(),
+                    invariants_evaluation_publisher=self.invariants_evaluation_publisher,
+                    status_publisher=self.status_publisher
+                ),
+                callback_group=ReentrantCallbackGroup(),
+                autostart=False
+            )
+
+            self._goal_lock = threading.Lock()
+            self.automaton_action_server = ActionServer(
+                self,
+                ExecuteMission,
+                'execute_mission',
+                execute_callback=self.execute_callback,
+                goal_callback=self.goal_callback,
+                handle_accepted_callback=self.handle_accepted_callback,
+                cancel_callback=self.cancel_callback,
+                callback_group=ReentrantCallbackGroup()
+            )
         except Exception as e: 
             self.get_logger().error(f"unexpected exception occured during transition from '{state.label}' to 'configured': {str(e)}")
             return TransitionCallbackReturn.FAILURE
@@ -264,13 +207,126 @@ class HybridAutomatonNode(LifecycleNode):
         self.get_logger().info(f"✅ Node '{self.get_name()}' configured!")
         return super().on_configure(state)
 
+    def goal_callback(self, mission_request: ExecuteMission.Goal):
+        """Accept or reject a client request to begin an action."""
+        self.get_logger().info('Received goal request')
+
+        goal_response = GoalResponse.ACCEPT
+        try:
+            if not isinstance(mission_request.goal_waypoint, ROSWaypoint ):
+                self.get_logger().warning(f"invalid goal_waypoint type received.")
+                goal_response = GoalResponse.REJECT
+
+            if mission_request.goal_waypoint.acceptance_radius < 0.5:
+                self.get_logger().warning(
+                    f"Invalid goal waypoint received: each waypoint must have an acceptance radius greater than 0.5 meters. Received: {mission_request.goal_waypoint}"
+                )
+                goal_response = GoalResponse.REJECT
+        except Exception as e:
+            self.get_logger().error(f"exception occured during hybrid automaton request validation: '{str(e)}'")
+            goal_response = GoalResponse.REJECT
+        
+        self.get_logger().info(f"Goal {goal_response.name.lower()}ed.")
+        return goal_response
+
+    def handle_accepted_callback(self, goal_handle: ServerGoalHandle):
+        """handles valid accepted goals, cancels the current goal if their is a goal active
+        if not then we just send the next goal."""
+        with self._goal_lock:
+            # This server only allows one goal at a time
+            if self._goal_handle is not None and self._goal_handle.is_active:
+                self.get_logger().info('Aborting previous goal')
+                # Abort the existing goal
+                self._goal_handle.abort()
+            
+            # validate hybrid automaton request
+            req: HybridAutomaton.Goal = goal_handle._goal_request
+
+
+            self._goal_handle = goal_handle
+
+        goal_handle.execute()
+
+    def execute_callback(self, goal_handle: ServerGoalHandle):
+        """Execute the goal."""
+        self.get_logger().info(f"Executing goal. Mission is to sequentially navigate to each of the goal waypoints: '{goal_handle._goal_request.goal_waypoints.waypoints}'")
+
+        # Append the seeds for the Fibonacci sequence
+        self._current_status = HybridAutomatonStatus.INITIALIZING.name
+        rate = self.create_rate(1.0, SYSTEM_CLOCK)
+        rate.sleep()
+        self._action_server_feedback_timer.reset()
+
+        for idx, goal_waypoint in enumerate(goal_handle._goal_request.goal_waypoints.waypoints):
+            self._waypoint_idx = idx
+            self._current_goal_waypoint = goal_waypoint
+            self._activate_automaton.trigger()
+            
+            self._mission_active = True
+            
+            rate = self.create_rate(frequency=10.0, clock=SYSTEM_CLOCK)
+            
+            while self._mission_active:
+                rclpy.spin_once(self, timeout_sec=1.0)
+
+        # # Start executing the action
+        # for i in range(1, goal_handle.request.order):
+        #     # If goal is flagged as no longer active (ie. another goal was accepted),
+        #     # then stop executing
+        #     if not goal_handle.is_active:
+        #         self.get_logger().info('Goal aborted')
+        #         return HybridAutomaton.Result()
+
+        #     if goal_handle.is_cancel_requested:
+        #         goal_handle.canceled()
+        #         self.get_logger().info('Goal canceled')
+        #         return HybridAutomaton.Result()
+
+        #     # Update Fibonacci sequence
+        #     feedback_msg.sequence.append(feedback_msg.sequence[i] + feedback_msg.sequence[i-1])
+
+        #     self.get_logger().info('Publishing feedback: {0}'.format(feedback_msg.sequence))
+
+        #     # Publish the feedback
+        #     goal_handle.publish_feedback(feedback_msg)
+
+        #     # Sleep for demonstration purposes
+        #     time.sleep(1)
+
+        # with self._goal_lock:
+        #     if not goal_handle.is_active:
+        #         self.get_logger().info('Goal aborted')
+        #         return HybridAutomaton.Result()
+
+        #     goal_handle.succeed()
+
+        # Populate result message
+        result = HybridAutomaton.Result()
+        # result.sequence = feedback_msg.sequence
+
+        self.get_logger().info('Returning result: {0}'.format(result.sequence))
+
+        return result
+
+
+
+    def cancel_callback(self, goal):
+        """Accept or reject a client request to cancel an action."""
+        self.get_logger().info('Received cancel request')
+        return CancelResponse.ACCEPT
+
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         """
         activates the hybrid automaton
         """
         self.get_logger().info(f"🔌 {self.get_name()}: {state.label} ➡️ activating")
+        from colav_hybrid_automaton.automaton._internal.status_manager.status_fsm import StatusFSM
 
         try:
+            automaton_watchdog_fsm = StatusFSM(
+                self.status_publisher,
+                logger=self.get_logger()
+            )
             # initialize transition trigger client
             goal_waypoint_params = {
                 'waypoint_x': None,

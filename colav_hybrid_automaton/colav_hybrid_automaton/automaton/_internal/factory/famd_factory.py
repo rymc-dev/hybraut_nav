@@ -35,7 +35,7 @@ class HybridAutomatonFactory:
         raise NotImplementedError("This class is a factory and should not be instantiated directly.")
 
     @staticmethod
-    def hybrid_automaton_registry(automaton_famd_path: str, generate_mmd_diagrams: bool = True) -> Dict[str, Any]:
+    def hybrid_automaton_registry(automaton_famd_path: str, generate_mmd_diagrams: bool = True) -> HybridAutomaton:
         """
         Validates and processes a hybrid automaton configuration dictionary:
         1. Validates against schema.

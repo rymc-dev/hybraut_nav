@@ -14,6 +14,18 @@ from hybrid_automaton_interfaces.msg import (
     HybridAutomatonStatus
 )
 
+
+def invariant_enforcer_callback(
+        
+):
+    """
+    this callback will enforce invariant rules, this callback occurs when an invaraint evaluates as failing, IF Transitioning status 
+    does not activate within a time limit, aka 2 seconds we will check if the current control mode is a goal mode if so we will complete 
+    the automaton by publishing a status of COMPLETE, If we are not in a valid goal state invaraint we will still pbulished the 
+    completed state value but return an error as well.
+    """
+    pass
+
 def invariants_evaluation_callback(
         lock: threading.Lock,
         automaton_model: HybridAutomaton,
