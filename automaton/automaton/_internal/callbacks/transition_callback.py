@@ -9,14 +9,14 @@ from threading import Lock
 from builtin_interfaces.msg import Time
 from rclpy.publisher import Publisher
 from typing import List, Tuple
-from automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonMode
+from automaton_interfaces.msg import AutomatonStatus, AutomatonMode
 from automaton._internal.model import HybridAutomaton
 from colav_interfaces.msg import Waypoint
 
 from automaton_interfaces.msg import (
-    HybridAutomatonReset, 
-    HybridAutomatonTransitionAndGuardEvaluation, 
-    HybridAutomatonTransitionEvaluations
+    AutomatonReset, 
+    AutomatonTransitionAndGuardEvaluation, 
+    AutomatonTransitionEvaluations
 )
 
 
@@ -39,7 +39,7 @@ def _validate_current_mode(automaton_model: HybridAutomaton) -> None:
 
 def _should_skip_evaluation(automaton_model: HybridAutomaton) -> bool:
     """Check if transition evaluation should be skipped"""
-    return automaton_model.current_state == HybridAutomatonStatus.STATUS_TRANSITIONING
+    return automaton_model.current_state == AutomatonStatus.STATUS_TRANSITIONING
 
 
 def _evaluate_guard(transition, automaton_model: HybridAutomaton) -> Tuple[bool, str]:
@@ -87,9 +87,9 @@ def _evaluate_all_transitions(automaton_model: HybridAutomaton, stamp: Time) -> 
                 _select_highest_priority_transition(result, transition_name, transition_priority)
 
             result.transitions_and_guard_evaluations.append(
-                HybridAutomatonTransitionAndGuardEvaluation(
+                AutomatonTransitionAndGuardEvaluation(
                     transition_name=transition_name,
-                    transition_mode_target=HybridAutomatonMode(type=transition.target_mode, stamp=stamp),
+                    transition_mode_target=AutomatonMode(type=transition.target_mode, stamp=stamp),
                     transition_priority=transition_priority,
                     guard_name=guard_name,
                     guard_description=transition.guard.get_guard_info()['description'],
@@ -131,7 +131,7 @@ def _execute_reset(transition, automaton_model: HybridAutomaton) -> List[HybridA
         for key, val in reset_target_outputs.items():
             automaton_model.states[key].publisher.publish(val)
 
-        resets.append(HybridAutomatonReset(
+        resets.append(AutomatonReset(
             name=reset_name,
             description=reset_description,
             state_targets=list(reset_target_outputs.keys())
@@ -154,7 +154,7 @@ def _execute_transition(
     stamp: Time,
     mode_publisher: Publisher,
     status_publisher: Publisher
-) -> Tuple[List[HybridAutomatonReset], str]:
+) -> Tuple[List[AutomatonReset], str]:
     """
     Execute the selected transition
     
@@ -165,8 +165,8 @@ def _execute_transition(
     current_mode_transitions = automaton_model.modes[current_mode].transitions
     
     # Publish transitioning status
-    status_publisher.publish(HybridAutomatonStatus(
-        type=HybridAutomatonStatus.STATUS_TRANSITIONING,
+    status_publisher.publish(AutomatonStatus(
+        type=AutomatonStatus.STATUS_TRANSITIONING,
         message=f"Performing {selected_transition_name} transition",
         stamp=stamp
     ))
@@ -183,14 +183,14 @@ def _execute_transition(
     target_mode = selected_transition.target_mode
     
     # Publish mode change
-    mode_publisher.publish(HybridAutomatonMode(type=target_mode, stamp=stamp))
+    mode_publisher.publish(AutomatonMode(type=target_mode, stamp=stamp))
     
     # Publish success status
     previous_mode_name = automaton_model.modes[current_mode].name
     target_mode_name = automaton_model.modes[target_mode].name
     
-    status_publisher.publish(HybridAutomatonStatus(
-        type=HybridAutomatonStatus.STATUS_ACTIVE_MODE,
+    status_publisher.publish(AutomatonStatus(
+        type=AutomatonStatus.STATUS_ACTIVE_MODE,
         message=f"Transitioned from {current_mode}.{previous_mode_name} -> {target_mode}.{target_mode_name}. Automaton executing.",
         stamp=stamp
     ))

@@ -8,10 +8,10 @@ from builtin_interfaces.msg import Time
 from automaton._internal.model import HybridAutomaton
 
 from automaton_interfaces.msg import (
-    HybridAutomatonInvariantsEvaluation, 
-    HybridAutomatonInvariantStatus, 
-    HybridAutomatonMode,  
-    HybridAutomatonStatus
+    AutomatonInvariantsEvaluation, 
+    AutomatonInvariantStatus, 
+    AutomatonMode,  
+    AutomatonStatus
 )
 
 
@@ -49,8 +49,8 @@ def invariants_evaluation_callback(
     try:
         with lock:
             current_mode = automaton_model.current_mode
-            msg = HybridAutomatonInvariantsEvaluation(
-                current_mode=HybridAutomatonMode(type=current_mode, stamp=stamp),
+            msg = AutomatonInvariantsEvaluation(
+                current_mode=AutomatonMode(type=current_mode, stamp=stamp),
                 stamp=stamp
             )
 
@@ -68,7 +68,7 @@ def invariants_evaluation_callback(
 
                 holds = invariant.instance(**state_kwargs)
 
-                invariant_statuses.append(HybridAutomatonInvariantStatus(
+                invariant_statuses.append(AutomatonInvariantStatus(
                     invariant_name=invariant_name,
                     invariant_description=invariant_description,
                     holds=holds
@@ -80,8 +80,8 @@ def invariants_evaluation_callback(
             invariants_evaluation_publisher.publish(msg)
 
     except Exception as e:
-        status_publisher.publish(HybridAutomatonStatus(
-            type=HybridAutomatonStatus.STATUS_FATAL,
+        status_publisher.publish(AutomatonStatus(
+            type=AutomatonStatus.STATUS_FATAL,
             message=f"Fatal exception occurred in invariant evaluation: {str(e)}",
             stamp=stamp
         ))

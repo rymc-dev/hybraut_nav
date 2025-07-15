@@ -17,23 +17,19 @@ stateDiagram-v2
     TRANSITIONING --> ACTIVE: TRANSITION_COMPLETE
     ACTIVE --> MISSION_COMPLETE: MISSION_COMPLETE
 
-    %% Error handling branch (below main flow)
+    %% Error handling (shared async error trigger)
     ACTIVE --> ERROR: RECOVERABLE_ERROR
-    TRANSITIONING --> ERROR: TRANSITION_FAILURE
+    TRANSITIONING --> ERROR: RECOVERABLE_ERROR
     ERROR --> RECOVERING: ATTEMPT_FIX
     ERROR --> FATAL: CRITICAL_FAILURE
     RECOVERING --> ACTIVE: RECOVERED
-    RECOVERING --> ERROR: RECOVERY_FAILED
-
-    %% Warning handling branch (above main flow)
-    ACTIVE --> WARNING: NON_BLOCKING_ANOMALY
-    WARNING --> ACTIVE: ANOMALY_RESOLVED_OR_TIMEOUT
-
+    RECOVERING --> FATAL: RECOVERY_FAILED
+  
     %% Terminal state
     FATAL --> [*]: SHUTDOWN
     MISSION_COMPLETE --> [*]: RETURN TO INACTIVE STATE
 
-    %% State styling for better visualization
+    %% State styling
     classDef inactiveState fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
     classDef activeState fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
     classDef transitionState fill:#fff3e0,stroke:#ff9800,stroke-width:2px
@@ -45,7 +41,6 @@ stateDiagram-v2
     class INACTIVE inactiveState
     class ACTIVE activeState
     class TRANSITIONING transitionState
-    class WARNING warningState
     class ERROR errorState
     class RECOVERING errorState
     class FATAL fatalState

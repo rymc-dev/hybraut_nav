@@ -1,9 +1,9 @@
 from threading import Lock
 from builtin_interfaces.msg import Time
 from rclpy.publisher import Publisher
-from automaton_interfaces.msg import HybridAutomatonMode 
+from automaton_interfaces.msg import AutomatonMode 
 from automaton._internal.model import HybridAutomaton
-from automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus
+from automaton_interfaces.msg import AutomatonDynamicsEvaluation, AutomatonStatus
 
 
 def _validate_current_mode(automaton_model: HybridAutomaton) -> None:
@@ -12,10 +12,11 @@ def _validate_current_mode(automaton_model: HybridAutomaton) -> None:
     if current_mode not in automaton_model.modes:
         raise ValueError(f"Invalid mode type: {current_mode}")
 
-def _evaluate_dynamics(automaton_model: HybridAutomaton, stamp: Time) -> HybridAutomatonDynamicsEvaluation:
+# TODO Utilized event publisher not status publisher
+def _evaluate_dynamics(automaton_model: HybridAutomaton, stamp: Time) -> AutomatonDynamicsEvaluation:
     """evaluates the dynamics for the current automaton mode"""
-    msg = HybridAutomatonDynamicsEvaluation(
-        mode=HybridAutomatonMode(type=automaton_model.current_mode, stamp=stamp),
+    msg = AutomatonDynamicsEvaluation(
+        mode=AutomatonMode(type=automaton_model.current_mode, stamp=stamp),
         stamp=stamp
     )
     
@@ -65,12 +66,12 @@ def dynamics_evaluation_callback(
         with lock:
             _validate_current_mode(automaton_model)
             
-            evaluation_result:HybridAutomatonDynamicsEvaluation = _evaluate_dynamics(automaton_model, stamp)
+            evaluation_result:AutomatonDynamicsEvaluation = _evaluate_dynamics(automaton_model, stamp)
 
             dynamics_evaluation_publisher.publish(evaluation_result)
     except Exception as e:
-        status_publisher.publish(HybridAutomatonStatus(
-            type=HybridAutomatonStatus.STATUS_ERROR, 
+        status_publisher.publish(AutomatonStatus(
+            type=AutomatonStatus.STATUS_ERROR, 
             meesage=f"exception occured during dynamics evaluation: {str(e)}",
             stamp=stamp
         ))

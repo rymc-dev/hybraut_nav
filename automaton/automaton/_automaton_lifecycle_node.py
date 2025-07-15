@@ -13,7 +13,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from automaton._internal.model.hybrid_automaton_model import HybridAutomaton
                                            
-from automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus
+from automaton_interfaces.msg import AutomatonMode, AutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from colav_interfaces.msg import Waypoint as ROSWaypoint, WaypointsState
 from rclpy.action.server import ServerGoalHandle
@@ -27,11 +27,11 @@ import threading
 from lifecycle_msgs.srv import ChangeState
 from rclpy.guard_condition import GuardCondition
 
-from automaton_interfaces.msg import HybridAutomatonModeState 
+from automaton_interfaces.msg import AutomatonModeState 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
-from automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus, HybridAutomatonTransitionEvaluations
-from automaton_interfaces.msg import HybridAutomatonInvariantsEvaluation
+from automaton_interfaces.msg import AutomatonDynamicsEvaluation, AutomatonStatus, AutomatonTransitionEvaluations
+from automaton_interfaces.msg import AutomatonInvariantsEvaluation
 from automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from automaton_interfaces.action import ExecuteMission
 from automaton._internal.status_manager.status_fsm import StatusFSM
@@ -118,20 +118,20 @@ class AutomatonLifecycleNode(LifecycleNode):
 
             # # NOTE: should probably make status_publisher and mode publisher apart of the automaton_model
             self.mode_publisher = self.create_publisher(
-                msg_type=HybridAutomatonModeState,
+                msg_type=AutomatonModeState,
                 topic='/hybrid_automaton/mode_state',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self.status_publisher = self.create_publisher(
-                msg_type=HybridAutomatonStatus,
+                msg_type=AutomatonStatus,
                 topic='/hybrid_automaton/status',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
 
             self.transitions_evaluation_publisher = self.create_publisher(
-                msg_type=HybridAutomatonTransitionEvaluations,
+                msg_type=AutomatonTransitionEvaluations,
                 topic='/hybrid_automaton/transitions_evaluation',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
@@ -152,7 +152,7 @@ class AutomatonLifecycleNode(LifecycleNode):
             )
 
             self.dynamics_evaluation_publisher: Publisher = self.create_publisher(
-                msg_type=HybridAutomatonDynamicsEvaluation,
+                msg_type=AutomatonDynamicsEvaluation,
                 topic='/hybrid_automaton/dynamics_evaluation',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
@@ -172,7 +172,7 @@ class AutomatonLifecycleNode(LifecycleNode):
             )
 
             self.invariants_evaluation_publisher: Publisher = self.create_publisher(
-                msg_type=HybridAutomatonInvariantsEvaluation,
+                msg_type=AutomatonInvariantsEvaluation,
                 topic='/hybrid_automaton/invariants_evaluation',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
@@ -253,7 +253,7 @@ class AutomatonLifecycleNode(LifecycleNode):
         self.get_logger().info(f"Executing goal. Mission is to sequentially navigate to each of the goal waypoints: '{goal_handle._goal_request.goal_waypoints.waypoints}'")
 
         # Append the seeds for the Fibonacci sequence
-        self._current_status = HybridAutomatonStatus.INITIALIZING.name
+        self._current_status = AutomatonStatus.INITIALIZING.name
         rate = self.create_rate(1.0, SYSTEM_CLOCK)
         rate.sleep()
         self._action_server_feedback_timer.reset()
@@ -357,31 +357,31 @@ class AutomatonLifecycleNode(LifecycleNode):
 
             # initialize hybrid automaton topic publishers
             self._mode_publisher = self.create_publisher(
-                HybridAutomatonMode,
+                AutomatonMode,
                 '/hybrid_automaton/mode',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._invariant_publisher = self.create_publisher(
-                HybridAutomatonInvariant,
+                AutomatonInvariantsEvaluation,
                 '/hybrid_automaton/invariant',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._status_publisher = self.create_publisher(
-                HybridAutomatonStatus,
+                AutomatonStatus,
                 '/hybrid_automaton/status',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._guard_evaluation_publisher = self.create_publisher(
                 topic="/hybrid_automaton/guard_evaluations",
-                msg_type=HybridAutomatonGuardEvaluations, # TODO: should rename this GuardsEvaluation to make it semantically correct
+                msg_type=AutomatonTransitionEvaluations, # TODO: should rename this GuardsEvaluation to make it semantically correct
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
             )
             self._dynamics_publisher = self.create_publisher(
-                msg_type=HybridAutomatonDynamics,
+                msg_type=AutomatonDynamicsEvaluation,
                 topic='/hybrid_automaton/dynamics',
                 qos_profile=QOS_PROFILE,
                 callback_group=ReentrantCallbackGroup()
@@ -395,7 +395,7 @@ class AutomatonLifecycleNode(LifecycleNode):
 
             self._guard_evaluation_subscriber = self.create_subscription(
                 topic="/hybrid_automaton/guards_evaluation",
-                msg_type=HybridAutomatonGuardEvaluations,
+                msg_type=AutomatonDynamicsEvaluation,
                 callback=lambda msg: transition_evaluation_callback(
                     lock=self._transition_eval_lock,
                     mode=self._mode,
@@ -425,7 +425,7 @@ class AutomatonLifecycleNode(LifecycleNode):
             # Should add script to move automaton to inactive mode to launch before starting mission manager.
             
             self._mode_subscription = self.create_subscription(
-                HybridAutomatonMode,
+                AutomatonMode,
                 '/hybrid_automaton/mode',
                 callback=lambda msg: on_mode_callback(
                     lock=self._mode_callback_lock,
@@ -456,13 +456,13 @@ class AutomatonLifecycleNode(LifecycleNode):
             # )
 
             self._invariant_timeout_guard_lock = threading.Lock()
-            self._trigger_invariant_timeout_guard:GuardCondition = self.create_guard_condition(
-                handle_invariant_timeout_guard,
-                callback_group=ReentrantCallbackGroup()
-            )
+            # self._trigger_invariant_timeout_guard:GuardCondition = self.create_guard_condition(
+            #     handle_invariant_timeout_guard,
+            #     callback_group=ReentrantCallbackGroup()
+            # )
 
             self._waypoints_publisher.publish(WaypointsState(waypoints=[self._goal_waypoint]))
-            self._mode_publisher.publish(HybridAutomatonMode(type=self._configuration['initial_mode'], stamp=self.get_clock().now().to_msg())) # TODO: Need to add some validation to ensure init is given validly.
+            self._mode_publisher.publish(AutomatonMode(type=self._configuration['initial_mode'], stamp=self.get_clock().now().to_msg())) # TODO: Need to add some validation to ensure init is given validly.
             
             # start timers
             # self._guards_evaluation_timer.reset()
