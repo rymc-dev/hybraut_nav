@@ -6,8 +6,8 @@ as expected through the lifecycle of build and runtime.
 """
 
 import pytest
-from colav_hybrid_automaton.automaton.invariants.invariant import InvariantABC
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton.invariants.invariant import InvariantABC
+from automaton._internal.types import InputSpec
 
 class MockInvariant(InvariantABC): 
     """Mock Implementation of InvariantABC for testing purposes."""

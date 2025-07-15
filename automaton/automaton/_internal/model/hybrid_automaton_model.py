@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type
 import yaml
 
-from colav_hybrid_automaton.automaton.guards import GuardABC
-from colav_hybrid_automaton.automaton.resets import ResetABC
-from colav_hybrid_automaton.automaton.invariants import InvariantABC
-from colav_hybrid_automaton.automaton.dynamics import DynamicsABC
+from automaton.guards import GuardABC
+from automaton.resets import ResetABC
+from automaton.invariants import InvariantABC
+from automaton.dynamics import DynamicsABC
 from rclpy.publisher import Publisher
 from rclpy.node import Node
 from rclpy.qos import QoSProfile

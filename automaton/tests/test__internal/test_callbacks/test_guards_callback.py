@@ -1,6 +1,6 @@
 # import rclpy
 # from rclpy.node import Node
-# from colav_hybrid_automaton.automaton._internal.callbacks.guards_callback import evaluate_guards_timer_callback
+# from automaton._internal.callbacks.guards_callback import evaluate_guards_timer_callback
 # import pytest
 # from hybrid_automaton_interfaces.msg import (
 #     HybridAutomatonGuardEvaluations,

@@ -6,8 +6,8 @@ as expected through the lifecycle of build and runtime.
 """
 
 import pytest
-from colav_hybrid_automaton.automaton.guards.guard import GuardABC
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton.guards.guard import GuardABC
+from automaton._internal.types import InputSpec
 
 
 class MockGuard(GuardABC):

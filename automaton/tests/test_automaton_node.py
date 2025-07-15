@@ -6,8 +6,6 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 import os
 
-
-
 import pytest
 import threading
 import rclpy

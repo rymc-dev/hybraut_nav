@@ -1,5 +1,5 @@
 import pytest
-from colav_hybrid_automaton.automaton.invariants import FailingInvariant, InvariantABC
+from automaton.invariants import FailingInvariant, InvariantABC
 
 @pytest.fixture
 def failing_invariant_instance():

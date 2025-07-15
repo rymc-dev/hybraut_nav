@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.guards import HeadingWithinToleranceGuard, GuardABC
+from automaton.guards import HeadingWithinToleranceGuard, GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,

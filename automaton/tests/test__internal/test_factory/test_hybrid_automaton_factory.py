@@ -1,9 +1,9 @@
 # import os
-# from colav_hybrid_automaton.automaton._internal.factory.hybrid_automaton_factory import hybrid_automaton_registry
-# from colav_hybrid_automaton.automaton._internal.utils import load_yml
+# from automaton._internal.factory.hybrid_automaton_factory import hybrid_automaton_registry
+# from automaton._internal.utils import load_yml
 # from ament_index_python.packages import get_package_share_directory
 
-# package_name = 'colav_hybrid_automaton'
+# package_name = 'automaton'
 # pkg_share_dir = get_package_share_directory(package_name)
 
 # default_config_path = os.path.join(pkg_share_dir, 'automaton', 'config', 'colav-famd.yml')

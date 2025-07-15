@@ -1,5 +1,5 @@
 import pytest
-from colav_hybrid_automaton.automaton.invariants import TrivialInvariant, InvariantABC
+from automaton.invariants import TrivialInvariant, InvariantABC
 
 @pytest.fixture
 def trivial_invariant_instance():

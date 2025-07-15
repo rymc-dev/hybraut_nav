@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.guards import VirtualWaypointsGuard, GuardABC
+from automaton.guards import VirtualWaypointsGuard, GuardABC
 import pytest
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 

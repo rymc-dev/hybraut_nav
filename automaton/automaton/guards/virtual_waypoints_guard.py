@@ -1,9 +1,9 @@
-from colav_hybrid_automaton.automaton.guards import GuardABC
+from automaton.guards import GuardABC
 from colav_interfaces.msg import (
     WaypointsState as ROSWaypointsState,     
     Waypoint as ROSWaypoint
 )
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 from typing import List
 
 

@@ -9,7 +9,7 @@ as expected through the lifecycle of build and runtime
 
 import pytest
 import math
-from colav_hybrid_automaton.automaton.dynamics import PIDControllerDynamics, DynamicsABC
+from automaton.dynamics import PIDControllerDynamics, DynamicsABC
 from colav_interfaces.msg import AgentState as ROSAgentState, WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 from geometry_msgs.msg import Point
 import numpy as np

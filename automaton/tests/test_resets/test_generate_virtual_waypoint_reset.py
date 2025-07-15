@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.resets import (
+from automaton.resets import (
     GenerateVirtualWaypointReset,
     ResetABC
 )

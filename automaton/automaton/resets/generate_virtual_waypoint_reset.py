@@ -8,8 +8,8 @@ from colav_interfaces.msg import (
 )
 from shapely import LineString, Polygon, Point  
 import numpy as np
-from colav_hybrid_automaton.automaton._internal.utils import quaternion_to_heading
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.utils import quaternion_to_heading
+from automaton._internal.types import InputSpec
 from std_msgs.msg import Float64MultiArray
 
 class GenerateVirtualWaypointReset(ResetABC):
