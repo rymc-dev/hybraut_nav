@@ -257,10 +257,55 @@ class TestAutomatonLifecycleNode():
         assert current_state.label == 'inactive'
 
     @pytest.mark.order(6)
-    def test_transition_to_inactive_and_innactive_state_attributes():
+    def validate_inactive_lifecycle_state(self, automaton_lifecycle_node: AutomatonLifecycleNode, automaton_lifecycle_cli_node: MockAutomatonLifecycleCLINode):
+        """
+        in this test we will validate the propertys of the inactive mode,
+        this mode should generate several publishers, subscriptions and inactive
+        timers, as well as waypoint parameters which can be utilized for defining the mission request for the 
+        automaton, we should also innitialize the action server in this mode.
+        """
+        from automaton._internal.model.hybrid_automaton_model import HybridAutomaton
+
+        assert isinstance(automaton_lifecycle_node.__getattribute__('automaton_model'), HybridAutomaton), \
+            'automaton model for the lifecycle node has not been initialized correctly'
+        
+        # lets do a simple validation of the automaton_models modes and such to ensure it was initialized correctly
+        automaton_model:HybridAutomaton = automaton_lifecycle_node.__getattribute__('automaton_model')
+        assert automaton_model.name == 'test_hybrid_automaton'
+        assert automaton_model.control_frequency_hz == 10.0
+        assert automaton_model.transition_evaluation_frequency_hz == 5.0
+        assert automaton_model.current_mode == automaton_model.initial_mode
+        assert len(automaton_model.modes) == 2
+        assert automaton_model.modes[0].name == 'test_mode'
+        assert len(automaton_model.modes[0].transitions) == 1
+        assert automaton_model.modes[1].name == 'goal_mode'
+        assert len(automaton_model.modes[1].transitions) == 0       
+
+        assert len(automaton_model.states) == 1
+        assert 'test_state' in automaton_model.states
+        from rclpy.publisher import Publisher
+        from rclpy.subscription import Subscription
+        assert isinstance(automaton_model.states['test_state'].publisher, Publisher)
+        # assert isinstance(automaton_lifecycle_node.get_subscriptions_info_by_topic(automaton_model.states['test_state'].topic)) 
+        automaton_lifecycle_cli_node.get_publisher_names_and_types_by_node(node_name='test_automaton_node', node_namespace=None)
+
+        publishers = automaton_lifecycle_node.get_publisher_names_and_types_by_node(
+            node_name='test_automaton_node',
+            node_namespace=''
+        )
+
+        subscriptions = automaton_lifecycle_node.get_subscriber_names_and_types_by_node(
+            node_name='test_automaton_node',
+            node_namespace=''
+        )
+
+
+        
+
+    def validate_inactive_lifecycle_state_params(self):
         pass
 
-    @pytest.mark.order()
+    @pytest.mark.order(7)
     def test_transition_to_shutdown():
         pass
 
@@ -293,6 +338,7 @@ def main():
         TestAutomatonLifecycleNode().validate_unconfigured_state_parameters(cli_node)
         TestAutomatonLifecycleNode().test_invalid_transition_to_inactive_invalid_famd_file_path(cli_node)
         TestAutomatonLifecycleNode().test_transition_to_active_and_active_state_attributes(cli_node)
+        TestAutomatonLifecycleNode().validate_inactive_lifecycle_state(lifecycle_node, cli_node)
         # TestAutomatonLifecycleNode().test_initialization(lifecycle_node, cli_node)
 
 

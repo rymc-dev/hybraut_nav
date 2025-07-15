@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 from glob import glob
 
-package_name = 'colav_hybrid_automaton'
+package_name = 'automaton'
 
 setup(
     name=package_name,
@@ -25,9 +25,9 @@ setup(
     license='MIT',
     entry_points={
         'console_scripts': [
-            "mission_manager = colav_hybrid_automaton.automaton_mission_manager:main",
-            "automaton = colav_hybrid_automaton.automaton.automaton_node:main",
-            "automaton_configure_client =  colav_hybrid_automaton.automaton_lifecycle_transition_cli:main"
+            "mission_manager = automaton.automaton_mission_manager:main",
+            "automaton = automaton.automaton.automaton_node:main",
+            "automaton_configure_client =  automaton.automaton_lifecycle_transition_cli:main"
         ],
     },
 )

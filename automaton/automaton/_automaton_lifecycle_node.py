@@ -34,6 +34,7 @@ from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, H
 from hybrid_automaton_interfaces.msg import HybridAutomatonInvariantsEvaluation
 from automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from hybrid_automaton_interfaces.action import ExecuteMission
+from automaton._internal.status_manager.status_fsm import StatusFSM
 
 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
@@ -111,7 +112,7 @@ class AutomatonLifecycleNode(LifecycleNode):
                 generate_mmd_diagrams=True
             )
             automaton_model.create_state_publishers(self)
-            automaton_model.create_state_publishers(self)
+            automaton_model.create_state_subscriptions(self)
 
             self.automaton_model = automaton_model
 
@@ -320,8 +321,7 @@ class AutomatonLifecycleNode(LifecycleNode):
         activates the hybrid automaton
         """
         self.get_logger().info(f"🔌 {self.get_name()}: {state.label} ➡️ activating")
-        from colav_hybrid_automaton.automaton._internal.status_manager.status_fsm import StatusFSM
-
+        
         try:
             automaton_watchdog_fsm = StatusFSM(
                 self.status_publisher,
@@ -342,8 +342,11 @@ class AutomatonLifecycleNode(LifecycleNode):
             for param_key in goal_waypoint_params.keys():
                 goal_waypoint_params[param_key] = get_param(param_key).value
 
+            # need to do some validation on the waypoint here, to ensure its not within distatce threshold 
+            # of agent state
+
             # validate values are not None for goal waypoint if they are return errror
-            self._goal_waypoint = Waypoint(
+            self._goal_waypoint = ROSWaypoint(
                 position=Point(x=goal_waypoint_params['waypoint_x'], y=goal_waypoint_params['waypoint_y']),
                 acceptance_radius=goal_waypoint_params['waypoint_acceptance_radius']
             )
