@@ -234,16 +234,16 @@ class TestAutomatonLifecycleNode():
         assert current_state.label == 'unconfigured'
     
     @pytest.mark.order(5)
-    def test_transition_to_active_and_active_state_attributes():
+    def test_transition_to_active_and_active_state_attributes(self, automaton_lifecycle_cli_node):
         # Send a invalid path to the famd file and attempt transition should stop the transition
-        os.path.join(os.path.dirname(__file__), )
+        test_famd_path = os.path.join(os.path.dirname(__file__), 'test_hybrid_automaton.famd.yaml')
         
         parameter_values = [
             Parameter(
                 name='famd_path',
                 value=ParameterValue(
                     type=ParameterType.PARAMETER_STRING,
-                    string_value="/invalid/path/to/famd.yml"
+                    string_value=test_famd_path
                 )
             )
         ]
@@ -251,10 +251,10 @@ class TestAutomatonLifecycleNode():
         assert set_param_results[0].successful == True
 
         transition_success: bool = automaton_lifecycle_cli_node.perform_lifecycle_transition(transition=Transition(id=Transition.TRANSITION_CONFIGURE, label='configure'))
-        assert transition_success == False
+        assert transition_success == True
         current_state: State = automaton_lifecycle_cli_node.get_lifecycle_state()
-        assert current_state.id == State.PRIMARY_STATE_UNCONFIGURED
-        assert current_state.label == 'unconfigured'
+        assert current_state.id == State.PRIMARY_STATE_INACTIVE
+        assert current_state.label == 'inactive'
 
     @pytest.mark.order(6)
     def test_transition_to_inactive_and_innactive_state_attributes():
@@ -292,6 +292,7 @@ def main():
         TestAutomatonLifecycleNode().validate_initial_lifecycle_state_is_unconfigured(cli_node)
         TestAutomatonLifecycleNode().validate_unconfigured_state_parameters(cli_node)
         TestAutomatonLifecycleNode().test_invalid_transition_to_inactive_invalid_famd_file_path(cli_node)
+        TestAutomatonLifecycleNode().test_transition_to_active_and_active_state_attributes(cli_node)
         # TestAutomatonLifecycleNode().test_initialization(lifecycle_node, cli_node)
 
 

@@ -105,7 +105,7 @@ class AutomatonLifecycleNode(LifecycleNode):
         self.get_logger().info(f"🔄 Node '{self.get_name()}' 📍 '{state.label}' ➡️ configure")
 
         try:
-            famd_path = self.get_parameter('configuration_path').value
+            famd_path = self.get_parameter('famd_path').value
             automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
                 automaton_famd_path=famd_path,
                 generate_mmd_diagrams=True
