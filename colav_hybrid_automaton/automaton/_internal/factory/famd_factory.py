@@ -15,9 +15,9 @@ from enum import Enum
 import logging
 import subprocess
 from pathlib import Path
-from colav_hybrid_automaton.automaton._internal.factory.famd_validator import FAMDValidator
-from colav_hybrid_automaton.automaton._internal.model import HybridAutomaton
-from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model_diagram_generator import HybridAutomatonModelDiagramGenerator
+from automaton._internal.factory.famd_validator import FAMDValidator
+from automaton._internal.model import HybridAutomaton
+from automaton._internal.model.hybrid_automaton_model_diagram_generator import HybridAutomatonModelDiagramGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

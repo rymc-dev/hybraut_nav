@@ -1,6 +1,6 @@
-from colav_hybrid_automaton.automaton.resets import ResetABC
+from automaton.resets import ResetABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 
 class RemoveVirtualWaypointReset(ResetABC):
     """

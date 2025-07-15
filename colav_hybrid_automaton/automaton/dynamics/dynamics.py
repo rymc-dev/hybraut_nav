@@ -3,7 +3,7 @@ from typing import Any, Dict, Type, List, Optional, ClassVar
 from dataclasses import dataclass, field
 from collections import namedtuple
 from rclpy.logging import get_logger
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 from collections import deque
 
 @dataclass

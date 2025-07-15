@@ -1,8 +1,11 @@
-# from .guard import GuardABC
 from colav_hybrid_automaton.automaton.guards import GuardABC
-from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
-from typing import List
+from colav_interfaces.msg import (
+    WaypointsState as ROSWaypointsState,     
+    Waypoint as ROSWaypoint
+)
 from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from typing import List
+
 
 class VirtualWaypointsGuard(GuardABC):
     """

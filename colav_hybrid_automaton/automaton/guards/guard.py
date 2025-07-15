@@ -22,7 +22,7 @@ Example Usage:
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, ClassVar
 from rclpy.logging import get_logger
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 
 class GuardABC(ABC):
     """

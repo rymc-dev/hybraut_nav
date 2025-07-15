@@ -1,4 +1,7 @@
-from colav_hybrid_automaton.automaton.guards import GuardABC
+from automaton.guards import GuardABC
+from automaton._internal.utils import euclidean_distance
+from automaton._internal.types import InputSpec
+
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
@@ -6,9 +9,7 @@ from colav_interfaces.msg import (
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
-from colav_hybrid_automaton.automaton._internal.utils import euclidean_distance
 from shapely.geometry import Polygon, LineString
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class LOSClearToWaypointGuard(GuardABC):
     """

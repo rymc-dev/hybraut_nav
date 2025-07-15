@@ -4,7 +4,7 @@ from typing import Optional, Dict, Tuple, List
 import subprocess
 from pathlib import Path
 import logging
-from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model import HybridAutomaton
+from automaton._internal.model.hybrid_automaton_model import HybridAutomaton
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

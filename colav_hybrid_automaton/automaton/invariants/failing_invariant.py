@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.invariants import InvariantABC
+from automaton.invariants import InvariantABC
 
 class FailingInvariant(InvariantABC):
     def __call__(self, **state_kwargs):

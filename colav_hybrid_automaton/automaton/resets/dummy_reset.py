@@ -1,5 +1,5 @@
 from .reset import ResetABC
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 from hybrid_automaton_interfaces.msg import TestState
 
 class DummyReset(ResetABC):

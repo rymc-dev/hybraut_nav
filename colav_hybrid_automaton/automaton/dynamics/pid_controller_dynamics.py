@@ -1,17 +1,17 @@
-from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsABC
-from typing import NamedTuple
+from automaton.dynamics.dynamics import DynamicsABC
+from automaton._internal.utils import quaternion_to_heading
+from automaton.dynamics.dynamics import DynamicsSpecBuilder
+from automaton._internal.types import InputSpec
+
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
-from colav_hybrid_automaton.automaton._internal.utils import quaternion_to_heading
 import math
 import time
 from collections import deque
-from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpec, DynamicsField
-from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpecBuilder
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from typing import NamedTuple
 
 class PIDControllerDynamics(DynamicsABC):
     """

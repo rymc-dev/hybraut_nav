@@ -11,7 +11,7 @@ import rclpy
 import os
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
-from colav_hybrid_automaton.automaton._internal.model.hybrid_automaton_model import HybridAutomaton
+from automaton._internal.model.hybrid_automaton_model import HybridAutomaton
                                            
 from hybrid_automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
@@ -29,22 +29,22 @@ from rclpy.guard_condition import GuardCondition
 
 from hybrid_automaton_interfaces.msg import HybridAutomatonModeState 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from colav_hybrid_automaton.automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
+from automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
 from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus, HybridAutomatonTransitionEvaluations
 from hybrid_automaton_interfaces.msg import HybridAutomatonInvariantsEvaluation
-from colav_hybrid_automaton.automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
+from automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from hybrid_automaton_interfaces.action import ExecuteMission
 
 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from colav_hybrid_automaton.automaton._internal.constants import QOS_PROFILE
+from automaton._internal.constants import QOS_PROFILE
 import sys  
 
-from colav_hybrid_automaton.automaton._internal.callbacks import (
+from automaton._internal.callbacks import (
     transition_evaluation_callback,
     on_mode_callback,
 )
-from colav_hybrid_automaton.automaton._internal.factory import (
+from automaton._internal.factory import (
     HybridAutomatonFactory
 )
 

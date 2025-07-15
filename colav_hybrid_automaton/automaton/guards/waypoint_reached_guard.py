@@ -1,11 +1,12 @@
-from colav_hybrid_automaton.automaton.guards import GuardABC
+from automaton.guards import GuardABC
+from automaton._internal.types import InputSpec
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
 from math import dist as euclidean_distance
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+
 
 class WaypointReachedGuard(GuardABC):
     """

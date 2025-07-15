@@ -10,7 +10,7 @@ from builtin_interfaces.msg import Time
 from rclpy.publisher import Publisher
 from typing import List, Tuple
 from hybrid_automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonMode
-from colav_hybrid_automaton.automaton._internal.model import HybridAutomaton
+from automaton._internal.model import HybridAutomaton
 from colav_interfaces.msg import Waypoint
 
 from hybrid_automaton_interfaces.msg import (

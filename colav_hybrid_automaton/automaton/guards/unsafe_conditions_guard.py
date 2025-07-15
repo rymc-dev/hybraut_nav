@@ -1,11 +1,12 @@
-from colav_hybrid_automaton.automaton.guards import GuardABC
+from automaton.guards import GuardABC
+from automaton._internal.types import InputSpec
+
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,
     UnsafeSetState as ROSUnsafeSetState
 )
 from shapely.geometry import Polygon, Point
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
 
 class UnsafeConditionsGuard(GuardABC):
     """

@@ -1,7 +1,7 @@
-from colav_hybrid_automaton.automaton.dynamics import DynamicsABC
+from automaton.dynamics import DynamicsABC
 from typing import NamedTuple
-from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpec, DynamicsField
-from colav_hybrid_automaton.automaton.dynamics.dynamics import DynamicsSpecBuilder
+from automaton.dynamics.dynamics import DynamicsSpec, DynamicsField
+from automaton.dynamics.dynamics import DynamicsSpecBuilder
 
 
 class NoOpControllerDynamics(DynamicsABC):

@@ -1,4 +1,4 @@
-from colav_hybrid_automaton.automaton.resets import ResetABC
+from automaton.resets import ResetABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     ObstaclesState as ROSObstaclesState,

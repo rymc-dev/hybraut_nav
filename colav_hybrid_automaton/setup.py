@@ -12,8 +12,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
-        ('share/' + package_name + '/automaton' + '/config', glob('colav_hybrid_automaton/automaton/colav-famd.yml')),
-        ('share/' + package_name + '/automaton' + '/schemas', glob('colav_hybrid_automaton/automaton/factory/schemas/famd.schema.json')) 
+        ('share/' + package_name + '/automaton' + '/config', glob('automaton/colav-famd.yml')),
+        ('share/' + package_name + '/automaton' + '/schemas', glob('automaton/factory/schemas/famd.schema.json')) 
     ],
     install_requires=['setuptools', 'launch_testing'],
     zip_safe=True,

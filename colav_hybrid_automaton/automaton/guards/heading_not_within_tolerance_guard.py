@@ -1,16 +1,15 @@
-# from .guard import GuardABC
-from colav_hybrid_automaton.automaton.guards.guard import GuardABC
+import math
+from automaton.guards.guard import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
-import math
-from colav_hybrid_automaton.automaton._internal.utils import (
+from automaton._internal.utils import (
     delta_heading,
     quaternion_to_heading,
 )
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 
 
 class HeadingNotWithinToleranceGuard(GuardABC):

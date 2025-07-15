@@ -1,9 +1,9 @@
-from colav_hybrid_automaton.automaton.invariants import InvariantABC
+from automaton.invariants import InvariantABC
 from colav_interfaces.msg import (
     WaypointsState as ROSWaypointsState,
     Waypoint as ROSWaypoint
 )
-from colav_hybrid_automaton.automaton._internal.types import InputSpec
+from automaton._internal.types import InputSpec
 
 class IsGoalWaypointInvariant(InvariantABC): 
 
