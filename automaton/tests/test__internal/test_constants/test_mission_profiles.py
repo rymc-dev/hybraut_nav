@@ -1,6 +1,6 @@
 # from colav_proto.constants import AutomatonStatusEnum as ProtoAutomatonStatusEnum
 # from automaton.constants import HybridAutomatonStatusEnum as PythonHybridAutomatonStatusEnum
-# from hybrid_automaton_interfaces.msg import HybridAutomatonStatus as ROSHybridAutomatonStatus
+# from automaton_interfaces.msg import HybridAutomatonStatus as ROSHybridAutomatonStatus
 # import pytest
 
 

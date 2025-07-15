@@ -13,7 +13,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from automaton._internal.model.hybrid_automaton_model import HybridAutomaton
                                            
-from hybrid_automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus
+from automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from colav_interfaces.msg import Waypoint as ROSWaypoint, WaypointsState
 from rclpy.action.server import ServerGoalHandle
@@ -27,13 +27,13 @@ import threading
 from lifecycle_msgs.srv import ChangeState
 from rclpy.guard_condition import GuardCondition
 
-from hybrid_automaton_interfaces.msg import HybridAutomatonModeState 
+from automaton_interfaces.msg import HybridAutomatonModeState 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
-from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus, HybridAutomatonTransitionEvaluations
-from hybrid_automaton_interfaces.msg import HybridAutomatonInvariantsEvaluation
+from automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus, HybridAutomatonTransitionEvaluations
+from automaton_interfaces.msg import HybridAutomatonInvariantsEvaluation
 from automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
-from hybrid_automaton_interfaces.action import ExecuteMission
+from automaton_interfaces.action import ExecuteMission
 from automaton._internal.status_manager.status_fsm import StatusFSM
 
 

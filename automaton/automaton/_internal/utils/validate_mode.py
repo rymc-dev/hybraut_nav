@@ -1,5 +1,5 @@
 from typing import List, Dict
-from hybrid_automaton_interfaces.msg import HybridAutomatonMode
+from automaton_interfaces.msg import HybridAutomatonMode
 
 def validate_mode(available_modes: Dict[int, str], mode: HybridAutomatonMode) -> str:
     if not isinstance(mode, HybridAutomatonMode):

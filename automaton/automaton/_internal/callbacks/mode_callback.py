@@ -1,8 +1,8 @@
 from threading import Lock
 from rclpy.publisher import Publisher
-from hybrid_automaton_interfaces.msg import HybridAutomatonModeState
+from automaton_interfaces.msg import HybridAutomatonModeState
 from automaton._internal.model import HybridAutomaton
-from hybrid_automaton_interfaces.msg import HybridAutomatonStatus
+from automaton_interfaces.msg import HybridAutomatonStatus
 
 def on_mode_callback(
     lock: Lock,

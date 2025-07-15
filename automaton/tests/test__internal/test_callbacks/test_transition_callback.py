@@ -13,7 +13,7 @@ from rclpy.qos import QoSProfile
 from automaton._internal.callbacks.transition_callbacks import transition_evaluation_callback
 from automaton._internal.factory import HybridAutomatonFactory
 
-from hybrid_automaton_interfaces.msg import (
+from automaton_interfaces.msg import (
     HybridAutomatonStatus,
     HybridAutomatonMode,
     HybridAutomatonTransitionEvaluations

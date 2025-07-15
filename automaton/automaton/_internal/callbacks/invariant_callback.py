@@ -7,7 +7,7 @@ from rclpy.publisher import Publisher
 from builtin_interfaces.msg import Time
 from automaton._internal.model import HybridAutomaton
 
-from hybrid_automaton_interfaces.msg import (
+from automaton_interfaces.msg import (
     HybridAutomatonInvariantsEvaluation, 
     HybridAutomatonInvariantStatus, 
     HybridAutomatonMode,  

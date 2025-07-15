@@ -6,7 +6,7 @@ import time
 import pytest
 from rclpy.executors import MultiThreadedExecutor
 import threading
-from hybrid_automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus, HybridAutomatonModeState
+from automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus, HybridAutomatonModeState
 from automaton._internal.factory import HybridAutomatonFactory
 import os
 

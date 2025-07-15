@@ -1,9 +1,9 @@
 from threading import Lock
 from builtin_interfaces.msg import Time
 from rclpy.publisher import Publisher
-from hybrid_automaton_interfaces.msg import HybridAutomatonMode 
+from automaton_interfaces.msg import HybridAutomatonMode 
 from automaton._internal.model import HybridAutomaton
-from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus
+from automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus
 
 
 def _validate_current_mode(automaton_model: HybridAutomaton) -> None:

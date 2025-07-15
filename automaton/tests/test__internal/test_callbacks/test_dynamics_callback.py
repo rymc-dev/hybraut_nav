@@ -10,7 +10,7 @@
 # from rclpy.node import Node
 # from rclpy.executors import MultiThreadedExecutor
 # from automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
-# from hybrid_automaton_interfaces.msg import HybridAutomatonMode
+# from automaton_interfaces.msg import HybridAutomatonMode
 # from colav_interfaces.msg import (
 #     AgentState,
 #     WaypointsState
@@ -18,7 +18,7 @@
 # import threading
 # from automaton._internal.model import HybridAutomaton
 # from automaton._internal.factory import HybridAutomatonFactory
-# from hybrid_automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus
+# from automaton_interfaces.msg import HybridAutomatonDynamicsEvaluation, HybridAutomatonStatus
 # from rclpy.qos import QoSProfile
 # import time
 # import os

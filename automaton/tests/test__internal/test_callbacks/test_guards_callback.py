@@ -2,7 +2,7 @@
 # from rclpy.node import Node
 # from automaton._internal.callbacks.guards_callback import evaluate_guards_timer_callback
 # import pytest
-# from hybrid_automaton_interfaces.msg import (
+# from automaton_interfaces.msg import (
 #     HybridAutomatonGuardEvaluations,
 #     HybridAutomatonStatus,
 #     HybridAutomatonMode

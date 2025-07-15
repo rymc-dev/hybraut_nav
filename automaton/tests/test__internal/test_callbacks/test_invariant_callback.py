@@ -4,7 +4,7 @@ from rclpy.node import Node
 import os
 from automaton._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from automaton._internal.factory import HybridAutomatonFactory
-from hybrid_automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonModeState, HybridAutomatonInvariantStatus, HybridAutomatonInvariantsEvaluation
+from automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonModeState, HybridAutomatonInvariantStatus, HybridAutomatonInvariantsEvaluation
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 import threading

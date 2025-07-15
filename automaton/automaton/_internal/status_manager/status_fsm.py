@@ -1,5 +1,5 @@
 from transitions import Machine
-from hybrid_automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonEvents
+from automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonEvents
 from rclpy.publisher import Publisher
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from builtin_interfaces.msg import Time
@@ -86,7 +86,7 @@ class StatusFSM:
 
 import rclpy
 from rclpy.node import Node
-from hybrid_automaton_interfaces.msg import HybridAutomatonEvents
+from automaton_interfaces.msg import HybridAutomatonEvents
 
 if __name__ == '__main__':
     rclpy.init()

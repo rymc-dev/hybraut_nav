@@ -1,6 +1,6 @@
 from .reset import ResetABC
 from automaton._internal.types import InputSpec
-from hybrid_automaton_interfaces.msg import TestState
+from automaton_interfaces.msg import TestState
 
 class DummyReset(ResetABC):
     """
