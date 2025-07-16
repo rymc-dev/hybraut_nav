@@ -111,18 +111,14 @@ class AutomatonLifecycleNode(LifecycleNode):
                 automaton_famd_path=famd_path,
                 generate_mmd_diagrams=True
             )
+            automaton_model.create_mode_publisher(self)
+            automaton_model.create_mode_subscription(self)
             automaton_model.create_state_publishers(self)
             automaton_model.create_state_subscriptions(self)
 
             self.automaton_model = automaton_model
 
             # # NOTE: should probably make status_publisher and mode publisher apart of the automaton_model
-            self.mode_publisher = self.create_publisher(
-                msg_type=AutomatonModeState,
-                topic='/hybrid_automaton/mode_state',
-                qos_profile=QOS_PROFILE,
-                callback_group=ReentrantCallbackGroup()
-            )
             self.status_publisher = self.create_publisher(
                 msg_type=AutomatonStatus,
                 topic='/hybrid_automaton/status',
@@ -308,8 +304,7 @@ class AutomatonLifecycleNode(LifecycleNode):
         self.get_logger().info('Returning result: {0}'.format(result.sequence))
 
         return result
-
-
+    
 
     def cancel_callback(self, goal):
         """Accept or reject a client request to cancel an action."""
@@ -424,27 +419,7 @@ class AutomatonLifecycleNode(LifecycleNode):
             # TODO: Then do invariants
             # Should add script to move automaton to inactive mode to launch before starting mission manager.
             
-            self._mode_subscription = self.create_subscription(
-                AutomatonMode,
-                '/hybrid_automaton/mode',
-                callback=lambda msg: on_mode_callback(
-                    lock=self._mode_callback_lock,
-                    node=self,
-                    available_modes=self._MODE_ENUM_MAP,
-                    current_mode=self._mode,
-                    mode=msg,
-                    mode_configuration=self._configuration['modes'],
-                    transition_configuration=self._configuration['transitions'],
-                    dynamics_configuration=self._configuration['dynamics'],
-                    invariants_configuration=self._configuration['invariants'],
-                    reset_configuration=self._configuration['resets'],
-                    guard_configuration=self._configuration['guards'],
-                    status_publisher=self._status_publisher,
-                    logger=self.get_logger()
-                ),
-                qos_profile=QOS_PROFILE,
-                callback_group=ReentrantCallbackGroup()
-            )
+            self._mode_subscription = 
 
             # Todo: Remove this when ready.
             # self._invariant_subscription = self.create_subscription(

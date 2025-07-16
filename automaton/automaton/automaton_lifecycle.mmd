@@ -1,91 +1,64 @@
 stateDiagram-v2
     direction LR
 
-    %% System Lifecycle States
-    [*] --> UNCONFIGURED
-    UNCONFIGURED --> INACTIVE: configure(famd_file_path)
-    UNCONFIGURED --> SHUTDOWN: shutdown_request
+    %% Entry point and exit point centralized on INACTIVE
+    [*] --> LIFECYCLE_UNCONFIGURED: init()
+    LIFECYCLE_UNCONFIGURED --> LIFECYCLE_FINALIZED: on_shutdown()
+    LIFECYCLE_UNCONFIGURED --> LIFECYCLE_INACTIVE: on_configure()
+    LIFECYCLE_INACTIVE --> LIFECYCLE_ACTIVE: on_activate()
+    LIFECYCLE_INACTIVE --> LIFECYCLE_FINALIZED: on_shutdown()
+    AUTOMATON_MISSION_COMPLETE --> LIFECYCLE_INACTIVE: on_deactivate()
+    LIFECYCLE_INACTIVE --> LIFECYCLE_UNCONFIGURED: on_cleanup()
+    LIFECYCLE_ACTIVE --> AUTOMATON_ACTIVE: initialize_automaton_watchdog
 
-    INACTIVE --> WATCHDOG_ACTIVE: activate_system()
-    INACTIVE --> UNCONFIGURED: reconfigure()
-    INACTIVE --> SHUTDOWN: shutdown_request
+    %% Main operational flow (horizontal)
+    AUTOMATON_ACTIVE --> AUTOMATON_TRANSITIONING: AutomatonEvent.TRANSITION_GUARD_ENABLED
+    AUTOMATON_TRANSITIONING --> AUTOMATON_ACTIVE: AutomatonEvent.TRANSITION_COMPLETE
+    AUTOMATON_ACTIVE --> AUTOMATON_MISSION_COMPLETE: AutomatonEvent.MISSION_COMPLETE
 
-    WATCHDOG_ACTIVE --> INACTIVE: mission_complete / cleanup
-    WATCHDOG_ACTIVE --> SHUTDOWN: emergency_shutdown
+    %% Error handling (shared async error trigger)
+    AUTOMATON_ACTIVE --> AUTOMATON_ERROR: AutomatonEvent.RECOVERABLE_ERROR
+    AUTOMATON_TRANSITIONING --> AUTOMATON_ERROR: AutomatonEvent.RECOVERABLE_ERROR
+    AUTOMATON_ERROR --> AUTOMATON_RECOVERING: AutomatonEvent.ATTEMPT_FIX
+    AUTOMATON_ERROR --> AUTOMATON_FATAL: AutomatonEvent.CRITICAL_FAILURE
+    AUTOMATON_RECOVERING --> AUTOMATON_ACTIVE: AutomatonEvent.RECOVERED
+    AUTOMATON_RECOVERING --> AUTOMATON_FATAL: AutomatonEvent.RECOVERY_FAILED
 
-    SHUTDOWN --> [*]: system_terminated
+    %% Terminal state
+    AUTOMATON_FATAL --> LIFECYCLE_FINALIZED: on_shutdown()
+    LIFECYCLE_FINALIZED --> [*]: destroy()
 
-    %% Active State - Mission Execution & Monitoring
-    state WATCHDOG_ACTIVE {
-        direction TB
-        
-        %% Entry point 
-        [*] --> ACTIVE
-        
-        %% Core operational states
-        ACTIVE --> TRANSITIONING: execute_transition
-        TRANSITIONING --> ACTIVE: transition_success
-        TRANSITIONING --> VALIDATING: validate_transition
-        VALIDATING --> ACTIVE: validation_passed
-        VALIDATING --> ERROR: validation_failed
-        
-        %% Mission management
-        ACTIVE --> MISSION_COMPLETE: all_objectives_met
-        MISSION_COMPLETE --> [*]: signal_completion
-        
-        %% Anomaly handling
-        ACTIVE --> WARNING: detect_anomaly
-        TRANSITIONING --> WARNING: anomaly_during_transition
-        WARNING --> ACTIVE: anomaly_cleared
-        WARNING --> ERROR: anomaly_escalated
-        
-        %% Error handling and recovery
-        ACTIVE --> ERROR: system_error
-        TRANSITIONING --> ERROR: transition_failed
-        VALIDATING --> ERROR: critical_validation_failure
-        
-        ERROR --> RECOVERING: initiate_recovery
-        ERROR --> FATAL: error_unrecoverable
-        
-        RECOVERING --> ACTIVE: recovery_successful
-        RECOVERING --> ERROR: recovery_failed / retry
-        RECOVERING --> FATAL: max_retries_exceeded
-        
-        %% Fatal state handling
-        FATAL --> [*]: force_shutdown
-        
-        %% Timeout handling
-        TRANSITIONING --> ERROR: timeout_exceeded
-        RECOVERING --> ERROR: recovery_timeout
-        WARNING --> ACTIVE: warning_timeout
-    }
+    %% Lifecycle notes
+    note left of LIFECYCLE_UNCONFIGURED
+        The node has been initialized, and the `famd_path` parameter is declared.  
+        Awaiting configuration.
+    end note
 
-    %% Enhanced styling with better color coordination
-    classDef unconfigured fill:#f5f5f5,stroke:#757575,stroke-width:2px,color:#424242;
-    classDef inactive fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#0d47a1;
-    classDef active fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#1b5e20;
-    classDef initializing fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c;
-    classDef operational fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#004d40;
-    classDef transition fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100;
-    classDef validation fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f;
-    classDef warning fill:#fffde7,stroke:#fbc02d,stroke-width:2px,color:#f57f17;
-    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#b71c1c;
-    classDef recovery fill:#fff8e1,stroke:#f9a825,stroke-width:2px,color:#ff8f00;
-    classDef fatal fill:#ffcdd2,stroke:#c62828,stroke-width:3px,color:#b71c1c;
-    classDef complete fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c;
-    classDef shutdown fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238;
+    note right of LIFECYCLE_INACTIVE
+        The automaton is loaded and converted into a runtime instance.  
+        Publishers, subscriptions, and the `execute_mission` Action Server are initialized.  
+        You may interact with the automaton via an action client or lifecycle manager CLI.
+    end note
 
-    %% Apply styles to states
-    class UNCONFIGURED unconfigured;
-    class INACTIVE inactive;
-    class ACTIVE active;
-    class INITIALIZING initializing;
-    class WATCHDOG_IDLE operational;
-    class TRANSITIONING transition;
-    class VALIDATING validation;
-    class WARNING warning;
-    class ERROR error;
-    class RECOVERING recovery;
-    class FATAL fatal;
-    class MISSION_COMPLETE complete;
-    class SHUTDOWN shutdown;
+    note right of LIFECYCLE_ACTIVE
+        Automaton callback timers and watchdog FSM are running.  
+        The node now listens for `AutomatonEvent`s to manage state transitions.
+    end note
+
+    note left of LIFECYCLE_FINALIZED
+        The automaton lifecycle has completed.  
+        The node will automatically proceed to destruction.
+    end note
+
+    %% Color styling
+    classDef lifecycleStates fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
+    classDef automatonStates fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef errorStates fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000
+    classDef terminalStates fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef successStates fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#000
+
+    %% Apply classes to states
+    class LIFECYCLE_UNCONFIGURED,LIFECYCLE_INACTIVE,LIFECYCLE_ACTIVE,LIFECYCLE_FINALIZED lifecycleStates
+    class AUTOMATON_ACTIVE,AUTOMATON_TRANSITIONING automatonStates
+    class AUTOMATON_ERROR,AUTOMATON_RECOVERING,AUTOMATON_FATAL errorStates
+    class AUTOMATON_MISSION_COMPLETE successStates

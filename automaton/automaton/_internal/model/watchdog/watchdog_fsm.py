@@ -5,7 +5,7 @@ from rclpy.impl.rcutils_logger import RcutilsLogger
 from builtin_interfaces.msg import Time
 import time
 
-class StatusFSM:
+class WatchdogFSM:
     state_name_map = {
         "ACTIVE": HybridAutomatonStatus.ACTIVE,
         "TRANSITIONING": HybridAutomatonStatus.TRANSITIONING,
@@ -35,7 +35,7 @@ class StatusFSM:
     def __init__(self, status_publisher: Publisher, logger: RcutilsLogger):
         self.machine = Machine(
             model=self,
-            states=StatusFSM.states,
+            states=WatchdogFSM.states,
             initial="ACTIVE",
             after_state_change=self.publish_status
         )
@@ -61,7 +61,7 @@ class StatusFSM:
         self.machine.add_transition("anomoly_resolved_or_timeout", "WARNING", "ACTIVE")
 
     def publish_status(self):
-        ros_enum = StatusFSM.state_name_map.get(self.state, HybridAutomatonStatus.FATAL)
+        ros_enum = WatchdogFSM.state_name_map.get(self.state, HybridAutomatonStatus.FATAL)
         self.logger.info(f"Publishing status: {self.state} ({ros_enum})")
         self.status_publisher.publish(HybridAutomatonStatus(
             type=ros_enum,
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         qos_profile=10
     )
 
-    status_fsm = StatusFSM(
+    status_fsm = WatchdogFSM(
         status_publisher=status_publisher,
         logger=mock_node.get_logger()
     )

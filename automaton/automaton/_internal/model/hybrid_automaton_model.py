@@ -12,6 +12,15 @@ from rclpy.publisher import Publisher
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from rclpy.callback_groups import ReentrantCallbackGroup, CallbackGroup
+from automaton_interfaces.msg import AutomatonModeState, AutomatonMode, AutomatonEvents
+from automaton._internal.callbacks.mode_callback import on_mode_callback
+from automaton._internal.callbacks.invariant_callback import invariant_enforcer_callback
+from automaton._internal.callbacks.transition_callback import transition_evaluation_callback
+from automaton._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
+import threading
+from rclpy.timer import Timer
+from rclpy.subscription import Subscription
+from automaton._internal.model.watchdog.watchdog_fsm import WatchdogFSM
 
 # Set up module logger
 type Logger = logging.Logger
@@ -32,31 +41,100 @@ def import_class(module_path: str, class_name: str) -> Type[Any]:
     except (ImportError, AttributeError) as e:
         raise ImportError(f"Cannot import '{class_name}' from '{module_path}': {e}")
 
-
 @dataclass
 class State:
-    topic: str
-    msg_type: Any
-    current_state: Optional[Any] = None
-    publisher: Optional[Publisher] = None
-    update_hz: float = -1.0
-    timeout_sec: float = -1.0
+    """
+    State is a blueprint for an instance of 
+    a hybrid automaton state as defined in the
+    Hybrid Automaton Famd, State has functionality 
+    for switching it on and off, actionition and deactionation
+    on activate state subscriptions and state publishers and enabled 
+    for a node passed in, deactivate simply frees up those resources
+    """
+    _name: str
+    _topic: str
+    _msg_type: Any
+    _current_state: Any
+    _state_publisher: Publisher 
+    _state_subscription: Subscription
+    _update_hz: int
+    _timeout_sec: float
+    _is_activated: bool = False
 
-    def update(self, value: Any) -> None:
+    def activate_state(self, node: Node, qos_profile: QoSProfile, callback_group: CallbackGroup) -> bool:
+        if self._is_activated:
+            raise RuntimeWarning("can't activate state because it is already active.")
+
+        self._create_state_publisher(node, qos_profile=qos_profile, callback_group=callback_group)
+        self._create_state_subscription(node, qos_profile=qos_profile, callback_group=callback_group)
+        self._is_activated = True
+        return True
+
+    def deactivate_state(self, node: Node) -> bool:
+        if not self._is_activated:
+            raise RuntimeWarning("can't deactivate state as it is not currently active")
+        
+        node.destroy_subscription(self._state_subscription)
+        node.destroy_publisher(self._state_publisher)
+        return True
+
+    def _update_state(self, state_msg: Any) -> None:
         """Update the current runtime state."""
-        self.current_state = value
-        logger.debug(f"State '{self.topic}' updated: {value}")
+        if not self._is_activated:
+            raise RuntimeWarning("can't publish a state update if state is not active")
 
+        if not isinstance(state_msg, self._msg_type):
+            raise TypeError(f"Expected message of type {self._msg_type}, got {type(state_msg)}")
+        
+        self._current_state = state_msg
+
+    def _publish_state(self, state_msg: Any) -> None:
+        if not self._is_activated:
+            raise RuntimeWarning("can't publish a state update if state is not active")
+
+        if not isinstance(state_msg, self._msg_type):
+            raise TypeError(f"Expected message of type {self._msg_type}, got {type(state_msg)}")
+        
+        if self._state_publisher:
+            self._state_publisher.publish(state_msg)
+        else:
+            raise RuntimeError('attempted to published, however state published is not activated')
+
+    def _create_state_publisher(self, node: Node, qos_profile: QoSProfile, callback_group: CallbackGroup):
+        self._state_publisher = node.create_publisher(
+            msg_type=self._msg_type,
+            topic=self._topic,
+            qos_profile=qos_profile,
+            callback_group=callback_group
+        )
+
+    def _create_state_subscription(self, node: Node, qos_profile: QoSProfile, callback_group: CallbackGroup):
+        """create state subscription for this state"""
+        self._state_subscription = node.create_subscription(
+            msg_type=self._msg_type,
+            topic=self._topic,
+            callback=lambda msg: self._update_state(msg),
+            qos_profile=qos_profile,
+            callback_group=callback_group
+        )
+
+    def __repr__(self):
+        pass
+    
+    def __str__(self):
+        pass
+    
     @classmethod
-    def from_famd(cls, data: Dict[str, Any]) -> "State":
-        pkg = data['type']['pkg']
-        msg = data['type']['msg']
-        msg_cls = import_class(pkg, msg)
+    def load_state_from_famd(cls, state_data: Dict[str, Any]) -> "State":
+        pkg = state_data['type']['pkg']
+        msg = state_data['type']['msg']
+        msg_cls = import_class(pkg, msg)  # import_class should return a type/class
         return cls(
-            topic=data.get('topic', ''),
-            msg_type=msg_cls,
-            update_hz=data.get('params', {}).get('update_hz', -1.0),
-            timeout_sec=data.get('params', {}).get('timeout_sec', -1.0),
+            _name=state_data.get('name', ''),
+            _topic=state_data.get('topic', ''),
+            _msg_type=msg_cls,
+            _update_hz=state_data.get('params', {}).get('update_hz', -1.0),
+            _timeout_sec=state_data.get('params', {}).get('timeout_sec', -1.0),
         )
 
 
@@ -68,8 +146,10 @@ class Transition:
     reset: Optional[ResetABC]
     priority: int = 0
 
+    
+
     @classmethod
-    def from_famd(
+    def load_transition_from_famd(
         cls,
         name: str,
         cfg: Dict[str, Any],
@@ -183,13 +263,26 @@ class HybridAutomaton:
     modes: Dict[int, Mode]
     initial_mode: int
     goal_modes: List[int]
+
     transition_evaluation_frequency_hz: float
     control_frequency_hz: float
 
-    current_mode: int
-    current_state: int
+    _current_mode: int
 
-    def set_mode(self, new_mode_id: int) -> bool:
+    _watchdog_fsm: WatchdogFSM
+    _mode_publisher: Publisher
+    _event_publisher: Publisher
+    _transition_evaluation_publisher: Publisher
+    _dynamic_evaluation_publisher: Publisher
+    _invariants_evaluation_publisher: Publisher
+
+    _transition_evaluator: Timer
+    _dynamic_evaluator: Timer
+    _invariant_evaluator: Timer
+
+    def activate_automaton(self, waypoint: Waypoint)
+
+    def _set_mode(self, new_mode_id: int) -> bool:
         try:
             mode_idx = new_mode_id
             if mode_idx not in self.modes.keys():
@@ -199,11 +292,55 @@ class HybridAutomaton:
         except Exception as e:
             raise Exception(f"exception occured during 'HybridAutomaton.update_mode': {str(e)}")
         
-
-    def get_mode(self) -> int:
+    def _get_mode(self) -> int:
         return self.current_mode
     
-    def create_state_subscriptions(self, node: Node, qos_profile = DEFAULT_QOS, callback_group = DEFAULT_CALLBACK_GROUP) -> None: 
+    def _create_mode_publisher(self, node: Node, qos_profile = DEFAULT_QOS, callback_group=DEFAULT_CALLBACK_GROUP) -> None:
+        """create the mode subscription for the automaton"""
+        node.create_publisher(
+          msg_type=AutomatonModeState,
+          topic='/automaton/mode',
+          qos_profile=qos_profile,
+          callback_group=callback_group
+        )
+
+    def _create_mode_subscription(self, node: Node, event_publisher: Publisher, qos_profile = DEFAULT_QOS, callback_group=DEFAULT_CALLBACK_GROUP):
+        """
+        creates a subscription to the hybrid automaton mode
+        """
+        node.create_subscription(
+                AutomatonMode,
+                '/automaton/mode',
+                callback=lambda msg: on_mode_callback(
+                    lock=threading.Lock,
+                    rcv_mode_state_msg=msg,
+                    automaton_model=self,
+                    event_publisher=event_publisher
+                ),
+                qos_profile=qos_profile,
+                callback_group=callback_group
+            )
+        
+    def _create_event_publisher(self, node: Node, qos_profile = DEFAULT_QOS, callback_group = DEFAULT_CALLBACK_GROUP):
+        """
+        creates the event publisher which is utilized for viewing events for the hybrid automaton in real time.
+        """
+        node.create_publisher(
+            msg_type=AutomatonEvents,
+            topic='/automaton/events',
+            qos_profile=qos_profile,
+            callback_group=callback_group
+        )
+    
+    def _start_automaton_watchdog(self, node: Node, qos_profile = DEFAULT_QOS, callback_group = DEFAULT_CALLBACK_GROUP):
+        """this starts the automaton watchdog"""
+        
+        self._watchdog = WatchdogFSM(
+          self.status_publisher,
+          logger=self.get_logger()
+        )
+
+    def _create_state_subscriptions(self, node: Node, qos_profile = DEFAULT_QOS, callback_group = DEFAULT_CALLBACK_GROUP) -> None: 
         """ 
         Attach ROS 2 subscriptions to each State object, enabling runtime updates 
         to their `current_state` attribute via incoming messages.
@@ -221,7 +358,7 @@ class HybridAutomaton:
                 qos_profile=qos_profile
             )
 
-    def create_state_publishers(self, node: Node, qos_profile: QoSProfile = DEFAULT_QOS, callback_group:CallbackGroup = DEFAULT_CALLBACK_GROUP) -> None: 
+    def _create_state_publishers(self, node: Node, qos_profile: QoSProfile = DEFAULT_QOS, callback_group:CallbackGroup = DEFAULT_CALLBACK_GROUP) -> None: 
       """
       Create and assign ROS 2 publishers for each State object, enabling outgoing
       messages from the hybrid automaton model.
@@ -240,6 +377,8 @@ class HybridAutomaton:
               callback_group=callback_group,
               qos_profile=qos_profile
           )
+
+
 
     @classmethod
     def from_famd(cls, famd: Dict[str, Any]) -> "HybridAutomaton":

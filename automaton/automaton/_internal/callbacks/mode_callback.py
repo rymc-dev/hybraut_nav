@@ -2,13 +2,15 @@ from threading import Lock
 from rclpy.publisher import Publisher
 from automaton_interfaces.msg import AutomatonModeState
 from automaton._internal.model import HybridAutomaton
-from automaton_interfaces.msg import AutomatonStatus
+from automaton_interfaces.msg import AutomatonEvents
+from rclpy.impl.rcutils_logger import RcutilsLogger
 
 def on_mode_callback(
     lock: Lock,
     rcv_mode_state_msg: AutomatonModeState,
     automaton_model: HybridAutomaton,
-    status_publisher: Publisher
+    event_publisher: Publisher,
+    logger: RcutilsLogger
 ):
     """
     Callback for hybrid automaton mode subscription.
@@ -37,30 +39,26 @@ def on_mode_callback(
                 # Get mode names safely with fallback
                 prev_mode_name = automaton_model.modes[previous_mode].name
                 new_mode_name = automaton_model.modes[rcv_mode_state_msg.current_mode_id].name
-                status_msg = AutomatonStatus(
-                type=AutomatonStatus.STATUS_ACTIVE_MODE,
-                message=f"Mode transition: {previous_mode}.{prev_mode_name} -> {rcv_mode_state_msg.current_mode_id}.{new_mode_name}"
+                status_msg = AutomatonEvents(
+                    type=AutomatonEvents.TRANSITION_COMPLETE,
+                    message=f"Mode transition: {previous_mode}.{prev_mode_name} -> {rcv_mode_state_msg.current_mode_id}.{new_mode_name}"
                 )
-                status_publisher.publish(status_msg)
+                event_publisher.publish(status_msg)
             else:
                 # Log that mode is already active (optional)
-                status_msg = AutomatonStatus(
-                type=AutomatonStatus.STATUS_INFO,
-                message=f"Mode {rcv_mode_state_msg.current_mode_id}.{automaton_model.modes[rcv_mode_state_msg.current_mode_id].name} already active")
-                status_publisher.publish(status_msg)
-
+                logger.warning(f"Mode {rcv_mode_state_msg.current_mode_id}.{automaton_model.modes[rcv_mode_state_msg.current_mode_id].name} received, but already active.")  
     except ValueError as e:
-        status_msg = AutomatonStatus(
-        type=AutomatonStatus.STATUS_ERROR,
+        status_msg = AutomatonEvents(
+        type=AutomatonEvents.RECOVERABLE_ERROR,
         message=f"Mode validation error in on_mode_callback: {e}"
         )
-        status_publisher.publish(status_msg)
+        event_publisher.publish(status_msg)
     except Exception as e:
-        status_msg = AutomatonStatus(
-        type=AutomatonStatus.STATUS_FATAL,
-        message=f"Unexpected error in on_mode_callback: {e}"
+        status_msg = AutomatonEvents(
+            type=AutomatonEvents.RECOVERABLE_ERROR,
+            message=f"Unexpected error in on_mode_callback: {e}"
         )
-        status_publisher.publish(status_msg)
+        event_publisher.publish(status_msg)
 
 
 import rclpy
