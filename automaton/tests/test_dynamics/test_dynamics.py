@@ -8,10 +8,10 @@ as expected through the lifecycle of build and runtime
 
 
 import pytest
-from automaton.dynamics.dynamics import DynamicsABC
+from automaton.core_interfaces.dynamics_abc import DynamicsABC
 from typing import NamedTuple
-from automaton.dynamics.dynamics import DynamicsSpecBuilder
-from automaton._internal.types import InputSpec
+from automaton.core_interfaces.dynamics_abc import DynamicsSpecBuilder
+from nodes._internal.types import InputSpec
 import pytest
 
 class MockDynamics(DynamicsABC):

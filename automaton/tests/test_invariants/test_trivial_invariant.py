@@ -1,5 +1,5 @@
 import pytest
-from automaton.invariants import TrivialInvariant, InvariantABC
+from nodes.invariants import TrivialInvariant, InvariantABC
 
 @pytest.fixture
 def trivial_invariant_instance():

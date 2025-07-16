@@ -1,4 +1,4 @@
-from automaton.resets import (
+from nodes.resets import (
     GenerateVirtualWaypointReset,
     ResetABC
 )

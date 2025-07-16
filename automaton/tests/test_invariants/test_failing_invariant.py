@@ -1,5 +1,5 @@
 import pytest
-from automaton.invariants import FailingInvariant, InvariantABC
+from nodes.invariants import FailingInvariant, InvariantABC
 
 @pytest.fixture
 def failing_invariant_instance():

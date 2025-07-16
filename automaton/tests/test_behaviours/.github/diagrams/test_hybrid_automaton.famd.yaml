@@ -1,0 +1,100 @@
+# ============================================================================
+# Minimal Test Hybrid Automaton (FAMD)
+# ============================================================================
+automaton_name: "test_hybrid_automaton"
+automaton_description: "Minimal automaton for unit testing guards, resets, invariants, and dynamics"
+transition_evaluation_frequency_hz: 5.0
+control_frequency_hz: 10.0
+
+# ============================================================================
+# Continuous States (X)
+# ============================================================================
+states:
+  test_state:
+    topic: "/test/state"
+    type:
+      pkg: "hybrid_automaton_interfaces.msg"
+      msg: "TestState"
+    params:
+      update_hz: 1.0
+      timeout_sec: 2.0
+
+# ============================================================================
+# Guard Conditions (G)
+# ============================================================================
+guards:
+  always_true_guard:
+    module: colav_hybrid_automaton.automaton.guards
+    class_name: DummyGuard
+
+# ============================================================================
+# Reset Functions (R)
+# ============================================================================
+resets:
+  dummy_reset:
+    module: colav_hybrid_automaton.automaton.resets
+    class_name: DummyReset
+
+# ============================================================================
+# Invariants (Inv)
+# ============================================================================
+invariants:
+  trivial_invariant:
+    module: colav_hybrid_automaton.automaton.invariants
+    class_name: TrivialInvariant
+  
+  failing_invariant:
+    module: colav_hybrid_automaton.automaton.invariants
+    class_name: FailingInvariant
+
+# ============================================================================
+# Dynamics (F)
+# ============================================================================
+dynamics:
+  no_op_controller:
+    module: colav_hybrid_automaton.automaton.dynamics
+    class_name: NoOpControllerDynamics
+
+# ============================================================================
+# Transitions (E)
+# ============================================================================
+transitions:
+  test_transition:
+    target_mode: 1
+    guards: 
+      always_true_guard
+    resets: 
+      dummy_reset
+
+# ============================================================================
+# Modes (Q)
+# ============================================================================
+modes:
+  0:
+    name: test_mode
+    description: "Initial test mode with trivial invariant and transition"
+    dynamics: no_op_controller
+    invariants:
+      - trivial_invariant
+    transitions:
+      - test_transition:
+          priority: 0
+
+  1:
+    name: goal_mode
+    description: "Goal mode reached"
+    dynamics: no_op_controller
+    invariants:
+      - failing_invariant
+    transitions: []
+
+# ============================================================================
+# Goal Modes (Q_goal)
+# ============================================================================
+goal_modes:
+  - 1
+
+# ============================================================================
+# Initial Mode (Init)
+# ============================================================================
+initial_mode: 0

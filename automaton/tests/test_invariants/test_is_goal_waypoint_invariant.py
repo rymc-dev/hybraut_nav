@@ -1,4 +1,4 @@
-from automaton.invariants import IsGoalWaypointInvariant, InvariantABC
+from nodes.invariants import IsGoalWaypointInvariant, InvariantABC
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 import pytest
 from geometry_msgs.msg import Pose, Point

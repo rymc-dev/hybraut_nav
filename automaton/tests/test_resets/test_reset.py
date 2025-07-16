@@ -8,8 +8,8 @@ as expected through the lifecycle of build and runtime.
 import pytest
 from typing import Dict, Any
 
-from automaton.resets import ResetABC
-from automaton._internal.types import InputSpec
+from nodes.resets import ResetABC
+from nodes._internal.types import InputSpec
 
 
 class MockReset(ResetABC):

@@ -1,5 +1,5 @@
 import pytest
-from automaton._automaton_lifecycle_node import AutomatonLifecycleNode
+from nodes._automaton_lifecycle_node import AutomatonLifecycleNode
 import threading
 import rclpy
 from rclpy.node import Node
@@ -11,7 +11,7 @@ import threading
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
-from automaton._automaton_lifecycle_node import AutomatonLifecycleNode
+from nodes._automaton_lifecycle_node import AutomatonLifecycleNode
 from rcl_interfaces.srv import GetParameters, ListParameters, DescribeParameters, GetParameterTypes, SetParameters
 from rcl_interfaces.msg import Parameter
 from lifecycle_msgs.srv import ChangeState, GetState
@@ -262,7 +262,7 @@ class TestAutomatonLifecycleNode():
         timers, as well as waypoint parameters which can be utilized for defining the mission request for the 
         automaton, we should also innitialize the action server in this mode.
         """
-        from automaton._internal.model.hybrid_automaton_model import HybridAutomaton
+        from nodes._internal.automaton.hybrid_automaton_model import HybridAutomaton
 
         assert isinstance(automaton_lifecycle_node.__getattribute__('automaton_model'), HybridAutomaton), \
             'automaton model for the lifecycle node has not been initialized correctly'

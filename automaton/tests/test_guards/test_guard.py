@@ -6,8 +6,8 @@ as expected through the lifecycle of build and runtime.
 """
 
 import pytest
-from automaton.guards.guard import GuardABC
-from automaton._internal.types import InputSpec
+from automaton.core_interfaces.guard_abc import GuardABC
+from nodes._internal.types import InputSpec
 
 
 class MockGuard(GuardABC):

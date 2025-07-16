@@ -6,8 +6,8 @@ as expected through the lifecycle of build and runtime.
 """
 
 import pytest
-from automaton.invariants.invariant import InvariantABC
-from automaton._internal.types import InputSpec
+from automaton.core_interfaces.invariant_abc import InvariantABC
+from nodes._internal.types import InputSpec
 
 class MockInvariant(InvariantABC): 
     """Mock Implementation of InvariantABC for testing purposes."""

@@ -10,8 +10,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 # import pytest
-from automaton._internal.callbacks.transition_callbacks import transition_evaluation_callback
-from automaton._internal.factory import HybridAutomatonFactory
+from nodes._internal.callbacks.transition_callbacks import transition_evaluation_callback
+from nodes._internal.factory import HybridAutomatonFactory
 
 from automaton_interfaces.msg import (
     HybridAutomatonStatus,
@@ -19,7 +19,7 @@ from automaton_interfaces.msg import (
     HybridAutomatonTransitionEvaluations
 )
 import threading
-from automaton._internal.model import HybridAutomaton
+from nodes._internal.automaton import HybridAutomaton
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 

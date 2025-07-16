@@ -3,7 +3,7 @@ test class for UnsafeConditionsGuard which is a implementaion of the abstract cl
 for use specifcally as a guard within the colav hybrid automaton model.
 """
 
-from automaton.guards import UnsafeConditionsGuard, GuardABC
+from nodes.guards import UnsafeConditionsGuard, GuardABC
 import pytest
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,

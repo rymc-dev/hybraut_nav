@@ -6,7 +6,7 @@ for COLAV Hybrid Automaton
 import pytest
 import math
 from geometry_msgs.msg import Pose, Point, Quaternion
-from automaton.guards import HeadingNotWithinToleranceGuard, GuardABC
+from nodes.guards import HeadingNotWithinToleranceGuard, GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,

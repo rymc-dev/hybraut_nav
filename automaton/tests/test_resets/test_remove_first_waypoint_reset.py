@@ -12,7 +12,7 @@ from typing import Dict, Any
 # Import the classes under test
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 from geometry_msgs.msg import Point
-from automaton.resets import RemoveVirtualWaypointReset, ResetABC # Replace with actual import path
+from nodes.resets import RemoveVirtualWaypointReset, ResetABC # Replace with actual import path
 
 @pytest.fixture
 def reset_instance():
