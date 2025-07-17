@@ -6,6 +6,7 @@ from automaton_interfaces.msg import AutomatonReset as Reset, AutomatonResets
 from utils.now_to_ros_time_msg import now_to_ros_time_msg
 from typing import Dict
 
+@dataclass
 class ResetWrapper:
     _reset: ResetInterface
 
