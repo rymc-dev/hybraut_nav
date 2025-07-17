@@ -66,6 +66,9 @@ class ResetInterface(HybridAutomatonComponentInterface):
         self._validate_reset_targets()
 
     @abstractmethod
+    def _evaluate(self, **state_kwargs) -> Dict[str, Any]:
+        return super()._evaluate(**state_kwargs)
+
     def __call__(self, **state_kwargs) -> Dict[str, Any]:
         """
         Execute the reset function with current state inputs.
@@ -100,10 +103,13 @@ class ResetInterface(HybridAutomatonComponentInterface):
                 }
         """
         # Call parent validation
-        super().__call__(**state_kwargs)
+        return super().__call__(**state_kwargs)
         
         # Subclasses should implement the actual reset logic after calling super()
         # and return a dictionary of {name: value} pairs
+
+    def _validate_evaluation_output(self, output):
+        self._validate_reset_output(output)
 
     def _validate_reset_targets(self) -> None:
         """
