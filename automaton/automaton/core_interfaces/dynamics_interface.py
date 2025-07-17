@@ -249,6 +249,7 @@ class DynamicsSpecBuilder:
                 .add_field("velocity", float, unit="m/s", description="Velocity in meters per second")
                 .add_field("yaw_rate", float, unit="rad/s", description="Yaw rate in radians per second"))
 
+
 class DynamicsInterface(HybridAutomatonComponentInterface):
     """
     Dynamics interface for hybrid automaton components.
@@ -257,6 +258,7 @@ class DynamicsInterface(HybridAutomatonComponentInterface):
     """
 
     _dynamic_output_spec: ClassVar['DynamicsSpec'] = None
+    _component_type = 'Dynamics'
 
     # Update init, dynamic_output_spec is a class varianble that is not optional it must be assigned on 
     # implenetation of this interface
@@ -317,6 +319,12 @@ class DynamicsInterface(HybridAutomatonComponentInterface):
         """Exponential moving average for time delta smoothing."""
         self._avg_dt = alpha * current_dt + (1 - alpha) * self._avg_dt
 
+    @abstractmethod
+    def _evaluate(self, **state_kwargs):
+        """this contains the implementation of the runtime dynamics evaluation
+        """
+        pass
+
     def __call__(self, **state_kwargs) -> Any:
         """call function for dynamics, this will
         generate the dynamics evaluation output for this inerface,
@@ -325,7 +333,10 @@ class DynamicsInterface(HybridAutomatonComponentInterface):
         Returns:
             Any: _description_
         """
-        super().__call__(**state_kwargs)
+        return super().__call__(**state_kwargs)
+    
+    def _validate_evaluation_output(self, output):
+        self._validate_output(output)
 
     @classmethod
     def dynamic_output_spec_name(cls) -> str:
@@ -361,11 +372,8 @@ class DynamicsInterface(HybridAutomatonComponentInterface):
 
         return info
 
-    def _get_component_type(self) -> str:
-        return "Dynamics"
-
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(output_type={self.output_type.__name__}, initialized={self.is_initialized})"
 
     def __str__(self) -> str:
-        return f"Dynamics Function: {self.__class__.__name__} (Output: {self.output_type.__name__})"
+        return f"Hybrid Automaton Dynamics: {self.__class__.__name__} (Output: {self.output_type.__name__})"
