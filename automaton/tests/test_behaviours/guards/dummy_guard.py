@@ -1,4 +1,4 @@
-from ....automaton.core_interfaces.guard_abc import GuardABC
+from ....automaton.core_interfaces.guard_interface import GuardABC
 
 class DummyGuard(GuardABC):
     """

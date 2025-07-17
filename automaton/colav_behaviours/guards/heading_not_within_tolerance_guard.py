@@ -1,5 +1,5 @@
 import math
-from automaton.core_interfaces.guard_abc import GuardABC
+from automaton.core_interfaces.guard_interface import GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,

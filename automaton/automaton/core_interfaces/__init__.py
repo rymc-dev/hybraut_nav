@@ -1,11 +1,13 @@
-from .dynamics_abc import DynamicsABC
-from .reset_abc import ResetABC
-from .guard_abc import GuardABC
-from .invariant_abc import InvariantABC
+from .dynamics_interface import DynamicsInterface
+from .reset_interface import ResetInterface
+from .invariant_interface import InvariantInterface
+from .guard_interface import GuardInterface
+from .io_spec import IOSpec
 
 __all__ = [
-    'DynamicsABC',
-    'ResetABC',
-    'GuardABC',
-    'InvariantABC'
+    "DynamicsInterface",
+    "ResetInterface",
+    "InvariantInterface",
+    "GuardInterface",
+    "IOSpec"
 ]

@@ -1,8 +1,8 @@
-from dataclasses import dataclass
+# from dataclasses import dataclass
 
-class States:
-    pass
+# class States:
+#     pass
 
-@dataclass
-class State:
-    pass
+# @dataclass
+# class State:
+#     pass

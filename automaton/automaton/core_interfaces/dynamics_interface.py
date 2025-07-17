@@ -3,8 +3,9 @@ from typing import Any, Dict, Type, List, Optional, ClassVar
 from dataclasses import dataclass, field
 from collections import namedtuple
 from rclpy.logging import get_logger
-from nodes._internal.types import InputSpec
+from .io_spec import IOSpec
 from collections import deque
+from .hybrid_automaton_component_interface import HybridAutomatonComponentInterface
 
 @dataclass
 class DynamicsField:
@@ -248,282 +249,123 @@ class DynamicsSpecBuilder:
                 .add_field("velocity", float, unit="m/s", description="Velocity in meters per second")
                 .add_field("yaw_rate", float, unit="rad/s", description="Yaw rate in radians per second"))
 
-class DynamicsABC(ABC):
+class DynamicsInterface(HybridAutomatonComponentInterface):
     """
-    Abstract base class for hybrid automaton dynamics functions.
-    
-    Dynamics functions define how the system evolves over time in a given mode,
-    based on current system state and possibly control inputs.
-    
-    Subclasses must implement the __call__ method to compute the output.
+    Dynamics interface for hybrid automaton components.
+
+    Defines a contract for components that evolve state over time.
     """
 
-    _init_input_spec: ClassVar[List[InputSpec]] = []
-    _state_input_spec: ClassVar[List[InputSpec]] = []
-    _state_buffer_spec: dict[str, deque]
-    _dynamic_output_spec: ClassVar[Optional[DynamicsSpec]] = None
+    _dynamic_output_spec: ClassVar['DynamicsSpec'] = None
 
-    def __init__(self, output_spec: Optional[DynamicsSpec] = None, **init_kwargs):
+    # Update init, dynamic_output_spec is a class varianble that is not optional it must be assigned on 
+    # implenetation of this interface
+
+    def __init__(self, **init_kwargs):
         """
-        Initialize the dynamics function with the required output structure.
-        
+        Initialize the dynamics interface.
+
         Args:
-            output_spec: DynamicsSpec defining the expected output structure.
-            **init_kwargs: Additional configuration parameters.
+            output_spec (DynamicsSpec, optional): The output specification.
+            **init_kwargs: Initialization keyword arguments.
         """
-        self.logger = get_logger(self.__class__.__name__)
-        self.is_initialized = False
-        
-        # Use class-level spec if no instance-level spec provided
-        if output_spec is None:
-            output_spec = self._dynamic_output_spec
-        
-        if output_spec is None:
-            raise ValueError(f"{self.__class__.__name__} requires an output specification")
-        
-        self.output_spec = output_spec
-        self.output_type = output_spec.create_namedtuple()
-        
-        self._validate_initialization(**init_kwargs)
-        self._set_instance_initialization(**init_kwargs)
-        self._set_instance_state_buffers()
-        self.is_initialized = True
+        # Set output spec before calling parent
         self._dt = 0.1
-
-    def _avg_dt_calc(self, current_dt: float, alpha: float = 0.1):
-        """this functions averages the dt
-
-        Args:
-            current_dt (float): _description_
-            alpha (float, optional): _description_. Defaults to 0.1.
+        self._avg_dt = self._dt  # initialize average dt
+        self._output_spec = self._dynamic_output_spec.create_namedtuple()
+        super().__init__(**init_kwargs)
+    
+    def _post_init_hook(self) -> None:
         """
-        self._avg_dt = alpha * current_dt + (1 - alpha) * self._avg_dt 
-
-    def _set_instance_state_buffers(self):
-        """creates buffers for states which can be utilized by the dynamic __call__ function.
+        Hook for subclasses to create state buffers after init.
         """
         self._state_buffer: Dict[str, deque] = {}
-
         for state_input in self._state_input_spec:
             self._state_buffer[state_input.name] = deque(maxlen=state_input.buffer_size)
 
-    def _set_instance_initialization(self, **init_kwargs) -> None:
-        """Set instance attributes from initialization kwargs."""
-        for key, value in init_kwargs.items():
-            setattr(self, key, value)
-
-    @abstractmethod
-    def __call__(self, **state_kwargs) -> Any:
-        """
-        Compute the dynamics output based on the current system state.
-        
-        Args:
-            **state_kwargs: Keyword arguments representing state inputs.
-        
-        Returns:
-            An instance of the configured output_type.
-        
-        Raises:
-            RuntimeError: If not initialized
-            ValueError / TypeError: If state inputs are invalid
-        """
-        if not self.is_initialized:
-            raise RuntimeError(f"{self.__class__.__name__} must be initialized before calling")
-
-        self._validate_states(**state_kwargs)
-        # Implementation logic should return self.output_type(...)
-    
-    def _validate_initialization(self, **init_kwargs) -> None:
-        """Validate static initialization parameters."""
-        # Validate against _init_input_spec if defined
-        if self._init_input_spec:
-            for spec in self._init_input_spec:
-                # Raise KeyError if required parameter is missing
-                if spec.name not in init_kwargs:
-                    raise KeyError(f"Missing required initialization parameter: '{spec.name}'")
-
-                value = init_kwargs[spec.name]
-                if not isinstance(value, spec.type):
-                    raise TypeError(f"Parameter '{spec.name}' must be of type {spec.type.__name__}")
-    
-    def _validate_output(self, output):
-        """Validate the output against the output specification."""
-        if not isinstance(output, self.output_type):
-            raise TypeError(f"Output must be of type {self.output_type.__name__}")
-        
-        # Create a dict from the namedtuple for validation
-        output_dict = output._asdict()
-        errors = self.output_spec.validate_data(output_dict)
-        
-        if errors:
-            error_msgs = [f"{field}: {msg}" for field, msg in errors.items()]
-            raise ValueError(f"Output validation failed: {'; '.join(error_msgs)}")
-
-    def _validate_states(self, **state_kwargs) -> None:
-        """Validate state inputs against the state input specification."""
-        if not self.is_initialized:
-            raise RuntimeError(f"{self.__class__.__name__} is not initialized")
-
-        if self._state_input_spec:
-            for spec in self._state_input_spec:
-                # Raise KeyError if required parameter is missing
-                if spec.name not in state_kwargs:
-                    raise KeyError(f"Missing required state parameter: '{spec.name}'")
-
-                value = state_kwargs[spec.name]
-                if not isinstance(value, spec.type):
-                    raise TypeError(f"State parameter '{spec.name}' must be of type {spec.type.__name__}")
-
     def create_output(self, **kwargs) -> Any:
         """
-        Create an output instance with validation.
-        
-        Args:
-            **kwargs: Field values for the output
-            
+        Create a validated dynamics output namedtuple.
+
         Returns:
-            Validated output instance
+            NamedTuple: Instance of output_type.
         """
-        # Fill in defaults
         output_data = {}
         for field in self.output_spec.fields:
             value = kwargs.get(field.name)
             output_data[field.name] = field.get_value_or_default(value)
-        
-        # Validate the data
+
         errors = self.output_spec.validate_data(output_data)
         if errors:
-            error_msgs = [f"{field}: {msg}" for field, msg in errors.items()]
+            error_msgs = [f"{k}: {v}" for k, v in errors.items()]
             raise ValueError(f"Output creation failed: {'; '.join(error_msgs)}")
-        
-        # Create the output
+
         output = self.output_type(**output_data)
         self._validate_output(output)
         return output
 
-    @classmethod
-    def init_input_spec_names(cls) -> List[InputSpec]:
-        """Return a list of initialization inputs expected for the __init__, names and types"""
-        return [init_input.name for init_input in cls._init_input_spec]
+    def _validate_output(self, output: Any):
+        if not isinstance(output, self.output_type):
+            raise TypeError(f"Output must be of type {self.output_type.__name__}, got {type(output).__name__}")
 
-    @classmethod
-    def init_input_spec_types(cls) -> List[str]:
-        """returns a list of initialization input names passed for the __init__"""
-        return [init_input.type for init_input in cls._init_input_spec]
+        errors = self.output_spec.validate_data(output._asdict())
+        if errors:
+            error_msgs = [f"{k}: {v}" for k, v in errors.items()]
+            raise ValueError(f"Output validation failed: {'; '.join(error_msgs)}")
 
-    @classmethod
-    def state_input_spec_names(cls) -> List[InputSpec]:
-        """Return a list of state inputs expected for the __call__, names and types"""
-        return [state_input.name for state_input in cls._state_input_spec]
+    def _avg_dt_calc(self, current_dt: float, alpha: float = 0.1):
+        """Exponential moving average for time delta smoothing."""
+        self._avg_dt = alpha * current_dt + (1 - alpha) * self._avg_dt
 
-    @classmethod
-    def state_input_spec_types(cls) -> List[str]:
-        """Returns a list of state input types required for the __call__, just names"""
-        return [state_input.type for state_input in cls._state_input_spec]
+    def __call__(self, **state_kwargs) -> Any:
+        """call function for dynamics, this will
+        generate the dynamics evaluation output for this inerface,
+        must return the spec type defined in classes dynamics_output_spec
+
+        Returns:
+            Any: _description_
+        """
+        super().__call__(**state_kwargs)
 
     @classmethod
     def dynamic_output_spec_name(cls) -> str:
-        return cls._dynamic_output_spec.name
+        return cls._dynamic_output_spec.name if cls._dynamic_output_spec else "Undefined"
 
     @classmethod
     def dynamic_output_spec_description(cls) -> str:
-        return cls._dynamic_output_spec.description
+        return cls._dynamic_output_spec.description if cls._dynamic_output_spec else "No description"
 
     @classmethod
     def dynamic_output_spec_names(cls) -> List[str]:
-        """
-        Return the list of output field names from the current dynamic output specification.
-
-        Returns:
-            List of field names defined in the current _dynamic_output_spec.
-        """
-        if cls._dynamic_output_spec is None:
-            return []
-        return [field.name for field in cls._dynamic_output_spec.fields]
+        return [f.name for f in cls._dynamic_output_spec.fields] if cls._dynamic_output_spec else []
 
     @classmethod
     def dynamic_output_spec_types(cls) -> List[str]:
-        if cls._dynamic_output_spec is None:
-            return []
-        return [field.dtype for field in cls._dynamic_output_spec.fields]
-    
+        return [f.dtype.__name__ for f in cls._dynamic_output_spec.fields] if cls._dynamic_output_spec else []
+
     @classmethod
     def dynamic_output_spec_units(cls) -> List[str]:
-        if cls._dynamic_output_spec is None:
-            return []
-        return [field.unit for field in cls._dynamic_output_spec.fields]
+        return [f.unit for f in cls._dynamic_output_spec.fields] if cls._dynamic_output_spec else []
 
-    def get_dynamics_info(self) -> Dict[str, Any]:
-        """Get information about this dynamics function."""
+    def get_component_info(self) -> Dict[str, Any]:
+        """Return introspection information about this dynamics component."""
+        info: Dict[str, Any] = super().get_component_info()
         class_doc = self.__class__.__doc__
-        return {
-            'class_name': self.__class__.__name__,
-            'module': self.__class__.__module__,
-            'is_initialized': self.is_initialized,
-            'init_input_spec_names': self.init_input_spec_names(),
-            'init_input_spec_types': self.init_input_spec_types(),
-            'state_input_spec_names': self.init_input_spec_names(),
-            'state_input_spec_types': self.init_input_spec_types(),
+        info.update({
             'output_spec_name': self.dynamic_output_spec_name(),
-            'output_spec_description': self.dynamic_output_spec_description(), 
+            'output_spec_description': self.dynamic_output_spec_description(),
             'output_spec_param_names': self.dynamic_output_spec_names(),
             'output_spec_param_types': self.dynamic_output_spec_types(),
             'output_spec_param_units': self.dynamic_output_spec_units(),
-            'description': class_doc.strip().split('\n')[0] if class_doc else "No description",
-        }
+        })
+
+        return info
+
+    def _get_component_type(self) -> str:
+        return "Dynamics"
 
     def __repr__(self) -> str:
-        output_name = self.output_type.__name__ if hasattr(self, 'output_type') else "Unknown"
-        return f"{self.__class__.__name__}(output_type={output_name}, initialized={self.is_initialized})"
+        return f"{self.__class__.__name__}(output_type={self.output_type.__name__}, initialized={self.is_initialized})"
 
     def __str__(self) -> str:
-        output_name = self.output_type.__name__ if hasattr(self, 'output_type') else "Unknown"
-        return f"Dynamics Function: {self.__class__.__name__} (Output: {output_name})"
-
-
-# Example implementation
-class SimpleDynamics(DynamicsABC):
-    """Example dynamics function for demonstration."""
-    
-    _dynamic_output_spec = DynamicsSpecBuilder.create_derivatives()
-    
-    def __call__(self, velocity: float, yaw_rate: float, position_x: float, position_y: float) -> Any:
-        """Simple dynamics implementation."""
-        super().__call__(velocity=velocity, yaw_rate=yaw_rate, position_x=position_x, position_y=position_y)
-        
-        # Simple dynamics: derivatives are just the current values
-        return self.create_output(
-            velocity_dot=0.0,  # No acceleration
-            yaw_rate_dot=0.0,  # No angular acceleration
-            x_dot=velocity,    # Forward velocity
-            y_dot=0.0         # No lateral movement
-        )
-
-
-# Example usage demonstration
-if __name__ == "__main__":
-    # Create a dynamics function
-    dynamics = SimpleDynamics()
-    
-    # Use it
-    result = dynamics(velocity=10.0, yaw_rate=0.1, position_x=0.0, position_y=0.0)
-    print(f"Result: {result}")
-    
-    # Get info
-    info = dynamics.get_dynamics_info()
-    print(f"Dynamics Info: {info}")
-    
-    # Create custom specifications
-    custom_spec = (DynamicsSpec("CustomOutput")
-                   .add_field("force", float, "N", description="Applied force")
-                   .add_field("torque", float, "Nm", description="Applied torque"))
-    
-    # Create a custom dynamics class
-    class CustomDynamics(DynamicsABC):
-        def __call__(self, mass: float, moment: float) -> Any:
-            super().__call__(mass=mass, moment=moment)
-            return self.create_output(force=mass * 9.81, torque=moment * 0.1)
-    
-    custom_dynamics = CustomDynamics(output_spec=custom_spec)
-    custom_result = custom_dynamics(mass=10.0, moment=5.0)
-    print(f"Custom Result: {custom_result}")
+        return f"Dynamics Function: {self.__class__.__name__} (Output: {self.output_type.__name__})"
