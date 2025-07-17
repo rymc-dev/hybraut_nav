@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from rclpy.logging import get_logger
 from typing import NamedTuple, Any, Optional, ClassVar, Dict, Type
-from .io_spec import IOSpec
+from ..spec.io_spec import IOSpec
 
 
 class HybridAutomatonComponentInterface(ABC):
@@ -32,7 +32,7 @@ class HybridAutomatonComponentInterface(ABC):
     _component_type: str = ""
     _init_input_spec: ClassVar[List[IOSpec]] = []
     _state_input_spec: ClassVar[List[IOSpec]] = []
-    _evaluation_output_type: Any = None
+    _evaluation_output_spec: Any = None
     
     def __init__(self, **init_kwargs):
         """

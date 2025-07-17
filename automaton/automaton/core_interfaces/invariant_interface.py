@@ -26,6 +26,7 @@ Example Usage:
 
 from abc import abstractmethod
 from .hybrid_automaton_component_interface import  HybridAutomatonComponentInterface
+from ..spec.io_spec import IOSpec
 
 
 class InvariantInterface(HybridAutomatonComponentInterface):

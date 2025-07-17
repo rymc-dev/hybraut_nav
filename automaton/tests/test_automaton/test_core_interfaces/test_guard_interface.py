@@ -7,7 +7,7 @@ as expected through the lifecycle of build and runtime.
 
 import pytest
 from automaton.core_interfaces.guard_interface import GuardInterface
-from automaton.core_interfaces.io_spec import IOSpec
+from automaton.spec.io_spec import IOSpec
 from enum import Enum, auto
 from _pytest.fixtures import FixtureRequest
 

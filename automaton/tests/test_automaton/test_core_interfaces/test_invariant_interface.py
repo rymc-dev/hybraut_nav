@@ -7,7 +7,7 @@ as expected through the lifecycle of build and runtime.
 
 import pytest
 from automaton.core_interfaces.invariant_interface import InvariantInterface
-from automaton.core_interfaces.io_spec import IOSpec
+from automaton.spec.io_spec import IOSpec
 from _pytest.fixtures import FixtureRequest
 
 class MockInvariant(InvariantInterface):
