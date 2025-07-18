@@ -1,5 +1,4 @@
 from automaton.core_interfaces.dynamics_interface import DynamicsInterface
-from utils import quaternion_to_heading
 from automaton.core_interfaces.dynamics_interface import DynamicsSpecBuilder
 from automaton.spec import IOSpec
 from colav_interfaces.msg import (
@@ -12,6 +11,13 @@ import time
 from collections import deque
 from typing import NamedTuple, Dict, Any
 
+
+def quaternion_to_heading(qx, qy, qz, qw) -> float:
+    """Convert quaternion to heading angle in radians."""
+    # Yaw (Z-axis rotation)
+    siny_cosp = 2.0 * (qw * qz + qx * qy)
+    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+    return math.atan2(siny_cosp, cosy_cosp)
 
 class PIDControllerDynamics(DynamicsInterface):
     """

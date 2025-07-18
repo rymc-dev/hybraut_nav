@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from rclpy.logging import get_logger
 from typing import NamedTuple, Any, Optional, ClassVar, Dict, Type
-from ..spec.io_spec import IOSpec
+from automaton.spec.io_spec import IOSpec
 
 
 class HybridAutomatonComponentInterface(ABC):

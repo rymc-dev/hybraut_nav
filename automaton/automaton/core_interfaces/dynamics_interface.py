@@ -3,7 +3,7 @@ from typing import Any, Dict, Type, List, Optional, ClassVar
 from dataclasses import dataclass, field
 from collections import namedtuple
 from rclpy.logging import get_logger
-from ..spec.io_spec import IOSpec
+from automaton.spec.io_spec import IOSpec
 from collections import deque
 from .hybrid_automaton_component_interface import HybridAutomatonComponentInterface
 
@@ -283,7 +283,7 @@ class DynamicsInterface(HybridAutomatonComponentInterface):
         """
         self._state_buffer: Dict[str, deque] = {}
         for state_input in self._state_input_spec:
-            self._state_buffer[state_input.name] = deque(maxlen=state_input.buffer_size)
+            self._state_buffer[state_input.name] = deque(maxlen=100)
 
     def create_output(self, **kwargs) -> Any:
         """
@@ -293,24 +293,24 @@ class DynamicsInterface(HybridAutomatonComponentInterface):
             NamedTuple: Instance of output_type.
         """
         output_data = {}
-        for field in self.output_spec.fields:
+        for field in self._dynamic_output_spec.fields:
             value = kwargs.get(field.name)
             output_data[field.name] = field.get_value_or_default(value)
 
-        errors = self.output_spec.validate_data(output_data)
+        errors = self._dynamic_output_spec.validate_data(output_data)
         if errors:
             error_msgs = [f"{k}: {v}" for k, v in errors.items()]
             raise ValueError(f"Output creation failed: {'; '.join(error_msgs)}")
 
-        output = self.output_type(**output_data)
+        output = self._output_spec(**output_data)
         self._validate_output(output)
         return output
 
     def _validate_output(self, output: Any):
-        if not isinstance(output, self.output_type):
-            raise TypeError(f"Output must be of type {self.output_type.__name__}, got {type(output).__name__}")
+        if not isinstance(output, self._output_spec):
+            raise TypeError(f"Output must be of type {self._dynamic_output_spec.__name__}, got {type(output).__name__}")
 
-        errors = self.output_spec.validate_data(output._asdict())
+        errors = self._dynamic_output_spec.validate_data(output._asdict())
         if errors:
             error_msgs = [f"{k}: {v}" for k, v in errors.items()]
             raise ValueError(f"Output validation failed: {'; '.join(error_msgs)}")

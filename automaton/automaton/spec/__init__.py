@@ -1,4 +1,4 @@
-from io_spec import IOSpec
+from .io_spec import IOSpec
 
 __all__ = [
     'IOSpec'
