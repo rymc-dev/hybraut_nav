@@ -99,12 +99,17 @@ class WrapperInterface(ABC):
             raise RuntimeError('tried to evaluate the component is not activated')
 
     @abstractmethod
-    def evaluate(self, context: EvaluationContext) -> Any:
+    def _evaluate(self, context: EvaluationContext) -> Any:
         """
         Abstract method that must be implemented by subclasses to perform evaluation logic.
         """
-        self.__pre_evaluate_hook__(self, context)
+        self.__pre_evaluate_hook__(context)
         ...
+
+    def __call__(self, context) -> Any:
+        self.__pre_evaluate_hook__(context)
+        result = self._evaluate(context)
+        return result
 
     def activate(self):
         """
@@ -134,8 +139,10 @@ class WrapperInterface(ABC):
 @dataclass
 class GuardWrapper(WrapperInterface):
 
-    def evaluate(self, context: EvaluationContext) -> AutomatonGuardEvaluation:
-        pass
+    def _evaluate(self, context: EvaluationContext) -> AutomatonGuardEvaluation:
+        super()._evaluate(context=context)
+        print ('hello there')
+        return AutomatonGuardEvaluation()
         
     @classmethod
     def load_guard_from_famd(cls, guard_name:str, guard_dict: Dict[str, Any]) -> 'GuardWrapper':
@@ -161,6 +168,7 @@ if __name__ == '__main__':
 
     guard_wrapper: GuardWrapper = GuardWrapper.load_guard_from_famd(guard_name='los_clear_to_waypoint', guard_dict=guard)
     guard_wrapper.activate()
+    guard_wrapper(context='context')
     print (guard_wrapper)
 
 
