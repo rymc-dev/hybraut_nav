@@ -1,11 +1,9 @@
-from typing import Set, List
+from typing import Set, List, Optional
+from dataclasses import dataclass
 
 
 class ValidationResult:
     pass
-
-
-
 
 class EventBus: 
     pass
