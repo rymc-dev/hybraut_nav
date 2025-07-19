@@ -1,73 +1,365 @@
 from typing import Dict, List
-from .automaton_wrappers import (
-    InvariantWrapper, 
-    ResetWrapper,
-    GuardWrapper,
-)
+# from .automaton_wrappers import (
+#     InvariantWrapper, 
+#     ResetWrapper,
+#     GuardWrapper,
+# )
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set
 from rclpy.node import Node
-from .automaton_components import State
+from automaton.automaton_components import State
 # class ComponentRegistryInterface(ABC):
 #     _component_registry: Dict[]
 
 from rclpy.qos import QoSProfile
 from rclpy.callback_groups import CallbackGroup
 from typing import Optional, Type
+from dataclasses import dataclass, field
+from typing import Any
+import logging
 
+
+logger = logging.getLogger(__name__)
+
+@dataclass
 class StateRegistry:
-    _states: Set[State]
-    _are_state_active: bool = False
+    """
+    Central registry for managing multiple State instances.
+    
+    This class implements the Registry pattern to provide centralized management
+    of multiple states, including bulk operations for activation/deactivation
+    and convenient access methods.
+    
+    Attributes:
+        _states (Dict[str, State]): Dictionary of state instances keyed by name
+        _are_states_active (bool): Whether all states are currently active
+    
+    Raises:
+        KeyError: When requesting non-existent states
+        RuntimeError: When attempting invalid state transitions
+    """
+    _states: Dict[str, State] = field(default_factory=dict)
+    _are_states_active: bool = False
 
+    def get_current_states_by_name(self, state_names: List[str]) -> Dict[str, Any]:
+        """
+        Retrieve current state messages for specified states.
+        
+        Args:
+            state_names (List[str]): List of state names to retrieve
+            
+        Returns:
+            Dict[str, Any]: Mapping of state names to their current messages
+            
+        Raises:
+            KeyError: If any state name is not found in the registry
+        """
+        current_states = {}
+        missing_states = []
+        
+        for name in state_names:
+            if name in self._states:
+                current_states[name] = self._states[name].current_state
+            else:
+                missing_states.append(name)
+        
+        if missing_states:
+            raise KeyError(f"States not found in registry: {missing_states}")
+            
+        logger.debug(f"Retrieved current states for: {state_names}")
+        return current_states
 
-    def validate_state_dependencies(self, state_names: List[str], state_types: List[Type]) -> None:
-        """components can utilize this function to """
+    def get_all_current_states(self) -> Dict[str, Any]:
+        """
+        Retrieve current state messages for all registered states.
+        
+        Returns:
+            Dict[str, Any]: Mapping of all state names to their current messages
+        """
+        return self.get_current_states_by_name(list(self._states.keys()))
+
+    def validate_state_dependencies(self, required_states: List[str], 
+                                  required_types: Optional[List[Type]] = None) -> bool:
+        """
+        Validate that required states exist and optionally match expected types.
+        
+        This method can be used by components to verify their state dependencies
+        before attempting to use them.
+        
+        Args:
+            required_states (List[str]): List of required state names
+            required_types (Optional[List[Type]]): Expected message types (same order)
+            
+        Returns:
+            bool: True if all dependencies are satisfied
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        missing_states = [name for name in required_states if name not in self._states]
+        if missing_states:
+            raise ValueError(f"Missing required states: {missing_states}")
+        
+        if required_types and len(required_types) == len(required_states):
+            type_mismatches = []
+            for state_name, expected_type in zip(required_states, required_types):
+                actual_type = self._states[state_name]._msg_type
+                if actual_type != expected_type:
+                    type_mismatches.append(f"{state_name}: expected {expected_type}, got {actual_type}")
+            
+            if type_mismatches:
+                raise ValueError(f"State type mismatches: {type_mismatches}")
+        
+        logger.debug(f"State dependencies validated: {required_states}")
+        return True
 
     def get_state_names(self) -> List[str]:
-        """returns a list of state names in a life from the set"""
-        states_names = []
-        for state in self._states:
-            states_names.append(state._name)
+        """
+        Get a list of all registered state names.
+        
+        Returns:
+            List[str]: List of state names
+        """
+        return list(self._states.keys())
 
     def get_state_msg_types(self) -> List[Type]:
-        """returns a list of state types in a list from the set"""
-        state_types = []
-        for state in self._states:
-            state_types.append(state._msg_type)
+        """
+        Get a list of all registered state message types.
+        
+        Returns:
+            List[Type]: List of message types in the same order as state names
+        """
+        return [state._msg_type for state in self._states.values()]
 
-    def activate_states(self, node: Node, qos: Optional[QoSProfile], cb_group: Optional[CallbackGroup]) -> None:
-        """activate states, this is for whhen hybrid automaton model moves to activate state"""
-        if not self._are_state_active:
-            raise RuntimeError('attempted to activate states but they are already active')
+    def get_state(self, name: str) -> State:
+        """
+        Get a specific state by name.
         
-        for state in self._states:
-            state.activate_state(node, qos, cb_group)
+        Args:
+            name (str): Name of the state to retrieve
+            
+        Returns:
+            State: The requested state instance
+            
+        Raises:
+            KeyError: If state name is not found
+        """
+        if name not in self._states:
+            raise KeyError(f"State '{name}' not found in registry")
+        return self._states[name]
+
+    def activate_states(self, node: Node, qos: Optional[QoSProfile] = None, 
+                       cb_group: Optional[CallbackGroup] = None) -> None:
+        """
+        Activate all registered states.
         
-    def deactivate_states(self, node:Node, qos: Optional[QoSProfile] = None, cb_group: Optional[CallbackGroup] = None) -> None:
-        """deactivate the states, this is for when hybrid automaton model moves to inactive state"""
-        if self._are_state_active:
-            raise RuntimeError('attemped to deactivate states but they are already active.')
+        This method creates publishers and subscribers for all states,
+        transitioning the entire registry to active status.
         
-        for state in self._states:
-            state.deactivate_state(node)
-    
+        Args:
+            node (Node): ROS2 node to attach publishers/subscribers to
+            qos (Optional[QoSProfile]): Quality of Service profile for all states
+            cb_group (Optional[CallbackGroup]): Callback group for all states
+            
+        Raises:
+            RuntimeError: If states are already active
+        """
+        if self._are_states_active:
+            raise RuntimeError('States are already active')
+
+        logger.info(f"Activating {len(self._states)} states")
+        
+        activated_states = []
+        try:
+            for state_name, state in self._states.items():
+                state.activate_state(node, qos, cb_group)
+                activated_states.append(state_name)
+                
+            self._are_states_active = True
+            logger.info(f"Successfully activated all states: {activated_states}")
+            
+        except Exception as e:
+            # Rollback: deactivate any states that were successfully activated
+            logger.error(f"Failed to activate states, rolling back: {e}")
+            for state_name in activated_states:
+                try:
+                    self._states[state_name].deactivate_state(node)
+                except Exception as rollback_error:
+                    logger.error(f"Rollback failed for state '{state_name}': {rollback_error}")
+            raise
+
+    def deactivate_states(self, node: Node) -> None:
+        """
+        Deactivate all registered states.
+        
+        This method cleans up publishers and subscribers for all states,
+        transitioning the entire registry to inactive status.
+        
+        Args:
+            node (Node): ROS2 node containing the publishers/subscribers
+            
+        Raises:
+            RuntimeError: If states are not currently active
+        """
+        if not self._are_states_active:
+            raise RuntimeError('States are not currently active')
+        
+        logger.info(f"Deactivating {len(self._states)} states")
+        
+        deactivation_errors = []
+        for state_name, state in self._states.items():
+            try:
+                state.deactivate_state(node)
+            except Exception as e:
+                error_msg = f"Failed to deactivate state '{state_name}': {e}"
+                logger.error(error_msg)
+                deactivation_errors.append(error_msg)
+        
+        self._are_states_active = False
+        
+        if deactivation_errors:
+            logger.warning(f"Some states failed to deactivate properly: {len(deactivation_errors)} errors")
+        else:
+            logger.info("Successfully deactivated all states")
+
+    def get_registry_status(self) -> Dict[str, Any]:
+        """
+        Get comprehensive status information about the registry.
+        
+        Returns:
+            Dict[str, Any]: Status information including state count, 
+                           activation status, and individual state info
+        """
+        return {
+            "total_states": len(self._states),
+            "states_active": self._are_states_active,
+            "state_names": self.get_state_names(),
+            "states_info": {name: state.get_state_info() for name, state in self._states.items()},
+            "error_states": [name for name, state in self._states.items() if state._error_count > 0]
+        }
+
     @classmethod
-    def register_state(cls, state_name: str, state_dict) -> State:
+    def register_state(cls, state_name: str, state_dict: Dict[str, Any]) -> State:
+        """
+        Create a single State instance from configuration.
+        
+        Args:
+            state_name (str): Name for the new state
+            state_dict (Dict[str, Any]): State configuration dictionary
+            
+        Returns:
+            State: Newly created State instance
+        """
         return State.load_state_from_famd(state_name, state_dict)
 
     @classmethod
-    def register_states(cls, state_dict: dict) -> Set[State]:
-        state_set = set()
-        if state_dict is not None:
-            for state_name, state_value in state_dict.items():
-                set.add(cls.register_state)
+    def register_states(cls, states_dict: Dict[str, Any]) -> Dict[str, State]:
+        """
+        Create multiple State instances from configuration dictionary.
+        
+        Args:
+            states_dict (Dict[str, Any]): Dictionary mapping state names to configurations
+            
+        Returns:
+            Dict[str, State]: Dictionary of created State instances
+        """
+        state_registry = {}
+        if states_dict:
+            logger.info(f"Registering {len(states_dict)} states")
+            for state_name, state_config in states_dict.items():
+                try:
+                    state_registry[state_name] = cls.register_state(state_name, state_config)
+                    logger.debug(f"Registered state '{state_name}'")
+                except Exception as e:
+                    logger.error(f"Failed to register state '{state_name}': {e}")
+                    raise
+        
+        return state_registry
 
-        return state_set
+    @classmethod
+    def load_state_registry_from_famd(cls, states_dict: Dict[str, Any]) -> 'StateRegistry':
+        """
+        Create a StateRegistry from FAMD configuration.
+        
+        This factory method creates a complete registry with all specified states
+        from a configuration dictionary, typically loaded from external files.
+        
+        Args:
+            states_dict (Dict[str, Any]): Configuration dictionary mapping 
+                                         state names to their configurations
+        
+        Returns:
+            StateRegistry: Fully configured StateRegistry instance
+            
+        Example:
+            >>> config = {
+            ...     "pose_state": {
+            ...         "topic": "/robot/pose",
+            ...         "type": {"pkg": "geometry_msgs.msg", "msg": "Pose"},
+            ...         "params": {"update_hz": 10.0}
+            ...     }
+            ... }
+            >>> registry = StateRegistry.load_state_registry_from_famd(config)
+        """
+        logger.info("Loading StateRegistry from FAMD configuration")
+        states = cls.register_states(states_dict)
+        
+        registry = cls(_states=states)
+        logger.info(f"Created StateRegistry with {len(states)} states")
+        return registry
 
-    def load_state_registry_from_famd(cls, states_dict: dict) -> 'StateRegistry':
-        return StateRegistry(
-            _states=cls.register_states(states_dict)
-        )
+if __name__ == '__main__':
+            
+    states = {
+        "pose_state": {
+            "topic": "/state/pose",
+            "description": "Pose of the agent including position and orientation.",
+            "type": {
+                "pkg": "geometry_msgs.msg",
+                "msg": "Pose"
+            },
+            "params": {
+                "update_hz": 10.0,
+                "timeout_sec": 0.5
+            }
+        },
+        "twist_state": {
+            "topic": "/state/twist",
+            "description": "Twist of the agent including linear and angular velocity.",
+            "type": {
+                "pkg": "geometry_msgs.msg",
+                "msg": "Twist"
+            },
+            "params": {
+                "update_hz": 10.0,
+                "timeout_sec": 0.5
+            }
+        }
+    }
+
+    import rclpy
+    from rclpy.node import Node
+    import threading
+    from rclpy.executors import MultiThreadedExecutor
+
+    rclpy.init()
+
+    node = Node('test_node')
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
+
+    thread = threading.Thread(target=executor.spin)
+    thread.start()
+
+    _state_registry: StateRegistry = StateRegistry.load_state_registry_from_famd(states_dict=states)
+    _state_registry.activate_states(node)
+    import time
+    time.sleep(2.0)
+    state_names = _state_registry.get_state_names()
+    current_states = _state_registry.get_current_states_by_name(state_names)
+    _state_registry.deactivate_states(node)
+
+    rclpy.shutdown()
 
 
 # class InvariantRegistry:
