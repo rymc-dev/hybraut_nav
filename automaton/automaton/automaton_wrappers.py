@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from automaton.core_interfaces import (
     GuardInterface,
     ResetInterface,
@@ -6,13 +6,17 @@ from automaton.core_interfaces import (
     DynamicsInterface
 )
 from builtin_interfaces.msg import Time
-from typing import Optional, Dict, Any
-from automaton_interfaces.msg import AutomatonGuardEvaluation, AutomatonReset, AutomatonInvariantStatus, AutomatonDynamicsEvaluation
+from typing import Optional, Dict, Any, Type, List
+from automaton_interfaces.msg import (
+    AutomatonGuardEvaluation, 
+    AutomatonReset, 
+    AutomatonInvariantStatus, 
+    AutomatonDynamicsEvaluation
+)
 from abc import ABC, abstractmethod
-from typing import Type
 import importlib
-from typing import List, Type
 from automaton.core_interfaces.hybrid_automaton_component_interface import HybridAutomatonComponentInterface
+from builtin_interfaces.msg import Time, Duration
 
 def import_class(module_path: str, class_name: str) -> Type[Any]:
     """
@@ -24,8 +28,35 @@ def import_class(module_path: str, class_name: str) -> Type[Any]:
     except (ImportError, AttributeError) as e:
         raise ImportError(f"Cannot import '{class_name}' from '{module_path}': {e}")
 
-class EvaluationContext():
-    pass
+from .automaton_registrys import StateRegistry
+
+@dataclass
+class EvaluationContext:
+    """
+    Context class that holds evaluation state and parameters.
+    initialized on automaton evaluation time, and passed to evaluation
+    functions.
+    """
+    states: StateRegistry
+    current_mode: int
+    stamp: Time
+    metadata: Dict[str, Any]
+
+    def get_state_values(state_names) -> Dict[str, Any]:
+        pass
+
+    def get_state_age(state_name) -> Duration:
+        pass
+
+
+    def get_event_history() -> None:
+        """not sure how to implement this yet."""
+        pass
+
+
+
+
+
 
 @dataclass
 class ComponentPath:
@@ -39,14 +70,10 @@ class ComponentPath:
     @classmethod
     def load_component_from_famd(cls, component_dict: dict):
         return cls(
-            _module = component_dict['module'],
-            _class_name = component_dict['class_name']
+            _module=component_dict['module'],
+            _class_name=component_dict['class_name']
         )
 
-from dataclasses import dataclass, field
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, Type, List
-from builtin_interfaces.msg import Time  # Replace with your actual source
 
 @dataclass
 class WrapperInterface(ABC):
@@ -96,19 +123,44 @@ class WrapperInterface(ABC):
         Subclasses may override this to perform schema checks or consistency validation.
         """
         if not self._is_activated:
-            raise RuntimeError('tried to evaluate the component is not activated')
+            raise RuntimeError('Tried to evaluate but the component is not activated')
+
+    def _is_cache_valid(self, context: EvaluationContext) -> bool:
+        """
+        Check if cached result is still valid based on TTL and context.
+        """
+        if not self._cache_enabled or self._last_evaluation_time is None:
+            return False
+        
+        if context.current_time is None:
+            return False
+            
+        # Simple TTL check - in real implementation you'd convert Time to seconds
+        time_diff = context.current_time.sec - self._last_evaluation_time.sec
+        return time_diff < self._cache_ttl
 
     @abstractmethod
     def _evaluate(self, context: EvaluationContext) -> Any:
         """
         Abstract method that must be implemented by subclasses to perform evaluation logic.
         """
-        self.__pre_evaluate_hook__(context)
-        ...
+        pass
 
-    def __call__(self, context) -> Any:
+    def __call__(self, context: EvaluationContext) -> Any:
         self.__pre_evaluate_hook__(context)
+        
+        # Check cache first
+        if self._is_cache_valid(context):
+            return self._last_evaluation
+        
+        # Perform evaluation
         result = self._evaluate(context)
+        
+        # Update cache
+        if self._cache_enabled:
+            self._last_evaluation = result
+            self._last_evaluation_time = context.current_time
+        
         return result
 
     def activate(self):
@@ -137,86 +189,140 @@ class WrapperInterface(ABC):
 
 
 @dataclass
+class InvariantWrapper(WrapperInterface):
+    """
+    Wrapper for invariant components that evaluate conditions that must hold within a state.
+    """
+    _component_class: Type[InvariantInterface]
+
+    def _evaluate(self, context: EvaluationContext) -> AutomatonInvariantStatus:
+        if self._component_instance is None:
+            raise RuntimeError("Component instance is None. Call activate() first.")
+        
+        # Delegate to the actual component instance
+        result = self._component_instance(context)
+        
+        # Ensure we return the correct message type
+        if isinstance(result, AutomatonInvariantStatus):
+            return result
+        else:
+            # Convert or wrap the result if needed
+            status = AutomatonInvariantStatus()
+            # Set appropriate fields based on result
+            return status
+    
+    @classmethod
+    def load_invariant_from_famd(cls, invariant_name: str, invariant_dict: dict):
+        component_path = ComponentPath.load_component_from_famd(invariant_dict)
+        configuration = invariant_dict.get('configuration', None)
+        component_class = component_path.get_component_class()
+        return cls(
+            _name=invariant_name,
+            _component_class=component_class,
+            _configuration=configuration
+        )
+
+
+@dataclass
 class GuardWrapper(WrapperInterface):
+    """
+    Wrapper for guard components that evaluate transition conditions.
+    """
+    _component_class: Type[GuardInterface]
 
     def _evaluate(self, context: EvaluationContext) -> AutomatonGuardEvaluation:
-        super()._evaluate(context=context)
-        print ('hello there')
-        return AutomatonGuardEvaluation()
+        if self._component_instance is None:
+            raise RuntimeError("Component instance is None. Call activate() first.")
+        
+        # Delegate to the actual component instance
+        result = self._component_instance(context)
+        
+        # Ensure we return the correct message type
+        if isinstance(result, AutomatonGuardEvaluation):
+            return result
+        else:
+            # Convert or wrap the result if needed
+            evaluation = AutomatonGuardEvaluation()
+            # Set appropriate fields based on result
+            return evaluation
         
     @classmethod
-    def load_guard_from_famd(cls, guard_name:str, guard_dict: Dict[str, Any]) -> 'GuardWrapper':
-        # assign component class in here
-        
-        component_path:ComponentPath= ComponentPath.load_component_from_famd(guard_dict)
+    def load_guard_from_famd(cls, guard_name: str, guard_dict: Dict[str, Any]) -> 'GuardWrapper':
+        component_path = ComponentPath.load_component_from_famd(guard_dict)
         component_class = component_path.get_component_class()
         configuration = guard_dict.get('configuration', None)
         return cls( 
             _name=guard_name,
             _component_class=component_class,
-            _configuration = configuration
+            _configuration=configuration
         )
 
-if __name__ == '__main__':
-    guard = {
-        "module": "automaton.common_behaviours.guards.boolean_flag_guard",
-        "class_name": "BooleanFlagGuard",
-        "configuration": {
-            "expected_flag": True
-        }
-    }
 
-    guard_wrapper: GuardWrapper = GuardWrapper.load_guard_from_famd(guard_name='los_clear_to_waypoint', guard_dict=guard)
-    guard_wrapper.activate()
-    guard_wrapper(context='context')
-    print (guard_wrapper)
+@dataclass
+class ResetWrapper(WrapperInterface):
+    """
+    Wrapper for reset components that handle state transitions.
+    """
+    _component_class: Type[ResetInterface]
 
-
-# @dataclass
-# class ResetWrapper(WrapperInterface):
-#     _reset: ResetInterface
-    
-#     def evaluate(self, context: EvaluationContext) -> AutomatonReset:
-#         pass
+    def _evaluate(self, context: EvaluationContext) -> AutomatonReset:
+        if self._component_instance is None:
+            raise RuntimeError("Component instance is None. Call activate() first.")
         
-#     @classmethod
-#     def load_reset_from_famd(cls, reset_dict: Dict[str, Any]) -> 'ResetWrapper':
-#         pass
-
-# @dataclass
-# class InvariantWrapper(WrapperInterface):
-#     _invariant: InvariantInterface
-    
-#     def evaluate(self, context: EvaluationContext) -> AutomatonInvariantStatus:
-#         pass
+        # Delegate to the actual component instance
+        result = self._component_instance(context)
         
-#     @classmethod
-#     def load_reset_from_famd(cls, reset_dict: Dict[str, Any]) -> 'InvariantWrapper':
-#         pass
-
-# @dataclass
-# class DynamicsWrapper(WrapperInterface):
-#     _invariant: InvariantInterface
-    
-#     def evaluate(self, context: EvaluationContext) -> AutomatonDynamicsEvaluation:
-#         pass
+        # Ensure we return the correct message type
+        if isinstance(result, AutomatonReset):
+            return result
+        else:
+            # Convert or wrap the result if needed
+            reset = AutomatonReset()
+            # Set appropriate fields based on result
+            return reset
         
-#     @classmethod
-#     def load_dynamics_from_from_famd(cls, reset_dict: Dict[str, Any]) -> 'InvariantWrapper':
-#         pass
-
-# # class InvariantWrapper:
-#     - name: str
-#     - invariant: InvariantInterface
-#     - violation_count: int
-#     - max_violations: int
-#     + evaluate_invariant(context: EvaluationContext) bool
-#     + reset_violation_count()
-#     + load_invariant_from_famd(data: Dict[str, Any]) InvariantWrapper
+    @classmethod
+    def load_reset_from_famd(cls, reset_name: str, reset_dict: Dict[str, Any]) -> 'ResetWrapper':
+        component_path = ComponentPath.load_component_from_famd(reset_dict)
+        component_class = component_path.get_component_class()
+        configuration = reset_dict.get('configuration', None)
+        return cls( 
+            _name=reset_name,
+            _component_class=component_class,
+            _configuration=configuration
+        )
 
 
-# class DynamicsWrapper:
-#     - name: str
-#     - dynamics: DynamicsInterface
-#     + evaluate_dynamics(context: EvaluationContext) Any
-#     + load_dynamics_from_famd(data: Dict[str, Any]) DynamicsWrapper
+@dataclass
+class DynamicsWrapper(WrapperInterface):
+    """
+    Wrapper for dynamics components that handle continuous evolution within states.
+    """
+    _component_class: Type[DynamicsInterface]
+
+    def _evaluate(self, context: EvaluationContext) -> AutomatonDynamicsEvaluation:
+        if self._component_instance is None:
+            raise RuntimeError("Component instance is None. Call activate() first.")
+        
+        # Delegate to the actual component instance
+        result = self._component_instance(context)
+        
+        # Ensure we return the correct message type
+        if isinstance(result, AutomatonDynamicsEvaluation):
+            return result
+        else:
+            # Convert or wrap the result if needed
+            evaluation = AutomatonDynamicsEvaluation()
+            # Set appropriate fields based on result
+            return evaluation
+
+    @classmethod
+    def load_dynamics_from_famd(cls, dynamics_name: str, dynamics_dict: Dict[str, Any]) -> 'DynamicsWrapper':
+        component_path = ComponentPath.load_component_from_famd(dynamics_dict)
+        component_class = component_path.get_component_class()
+        configuration = dynamics_dict.get('configuration', None)
+        return cls( 
+            _name=dynamics_name,
+            _component_class=component_class,
+            _configuration=configuration
+        )
