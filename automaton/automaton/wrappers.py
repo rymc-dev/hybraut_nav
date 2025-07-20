@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 import importlib
 from automaton.core_interfaces.hybrid_automaton_component_interface import HybridAutomatonComponentInterface
 from builtin_interfaces.msg import Time, Duration
-from .evaluation_context
+from .evaluation_context import EvaluationContext
 
 def import_class(module_path: str, class_name: str) -> Type[Any]:
     """
