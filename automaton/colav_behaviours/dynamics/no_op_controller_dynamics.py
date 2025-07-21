@@ -1,5 +1,5 @@
-from automaton.core_interfaces import DynamicsABC
-from automaton.core_interfaces.dynamics_interface import DynamicsSpecBuilder
+from automaton_models.hybrid.aci_interfaces import DynamicsABC
+from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
 
 
 class NoOpControllerDynamics(DynamicsABC):

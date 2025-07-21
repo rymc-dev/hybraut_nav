@@ -8,9 +8,9 @@ as expected through the lifecycle of build and runtime
 
 
 import pytest
-from automaton.core_interfaces.dynamics_interface import DynamicsABC
+from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsABC
 from typing import NamedTuple
-from automaton.core_interfaces.dynamics_interface import DynamicsSpecBuilder
+from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
 from nodes._internal.types import InputSpec
 import pytest
 

@@ -1,6 +1,6 @@
-from automaton.core_interfaces.dynamics_interface import DynamicsABC
+from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsABC
 from nodes._internal.utils import quaternion_to_heading
-from automaton.core_interfaces.dynamics_interface import DynamicsSpecBuilder
+from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
 from nodes._internal.types import InputSpec
 
 from colav_interfaces.msg import (

@@ -1,4 +1,5 @@
-from ...automaton.core_interfaces.guard_interface import GuardABC
+
+from ...automaton_models.hybrid.aci_interfaces.guard_interface import GuardABC
 from ...tests.test_common_behaviours.guards.dummy_guard import DummyGuard
 from .heading_not_within_tolerance_guard import HeadingNotWithinToleranceGuard
 from .heading_within_tolerance_guard import HeadingWithinToleranceGuard

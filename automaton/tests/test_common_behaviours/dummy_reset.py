@@ -1,4 +1,5 @@
-from ...automaton.core_interfaces.reset_interface import ResetABC
+
+from ...automaton_models.hybrid.aci_interfaces.reset_interface import ResetABC
 from nodes._internal.types import InputSpec
 from automaton_interfaces.msg import TestState
 

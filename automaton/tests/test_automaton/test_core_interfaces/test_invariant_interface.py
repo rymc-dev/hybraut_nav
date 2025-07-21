@@ -6,7 +6,7 @@ as expected through the lifecycle of build and runtime.
 """
 
 import pytest
-from automaton.core_interfaces.invariant_interface import InvariantInterface
+from automaton_models.hybrid.aci_interfaces.invariant_interface import InvariantInterface
 from automaton.spec.io_spec import IOSpec
 from _pytest.fixtures import FixtureRequest
 
