@@ -1,6 +1,5 @@
 from typing import NamedTuple, Any
 
-
 class IOSpec(NamedTuple):
     name: str 
     type: Any

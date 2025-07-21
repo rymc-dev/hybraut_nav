@@ -12,7 +12,7 @@ from typing import NamedTuple, Any, Optional, ClassVar, Dict, Type
 from automaton.spec.io_spec import IOSpec
 
 
-class HybridAutomatonComponentInterface(ABC):
+class HybridComponentInterface(ABC):
     """
     Base interface for all hybrid automaton components.
     

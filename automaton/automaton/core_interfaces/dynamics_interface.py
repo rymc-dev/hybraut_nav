@@ -5,7 +5,7 @@ from collections import namedtuple
 from rclpy.logging import get_logger
 from automaton.spec.io_spec import IOSpec
 from collections import deque
-from .hybrid_automaton_component_interface import HybridAutomatonComponentInterface
+from .hybrid_automaton_component_interface import HybridComponentInterface
 
 @dataclass
 class DynamicsField:
@@ -250,7 +250,7 @@ class DynamicsSpecBuilder:
                 .add_field("yaw_rate", float, unit="rad/s", description="Yaw rate in radians per second"))
 
 
-class DynamicsInterface(HybridAutomatonComponentInterface):
+class DynamicsInterface(HybridComponentInterface):
     """
     Dynamics interface for hybrid automaton components.
 

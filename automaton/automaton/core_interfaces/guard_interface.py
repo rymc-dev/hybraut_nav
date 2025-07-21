@@ -29,10 +29,10 @@ Example Usage:
 """
 
 from abc import abstractmethod
-from .hybrid_automaton_component_interface import HybridAutomatonComponentInterface
+from .hybrid_automaton_component_interface import HybridComponentInterface
 
 
-class GuardInterface(HybridAutomatonComponentInterface):
+class GuardInterface(HybridComponentInterface):
     """
     Interface for hybrid automaton guard functions.
     

@@ -33,10 +33,10 @@ Example Usage:
 
 from abc import abstractmethod
 from typing import Any, Dict, List, ClassVar, Type
-from .hybrid_automaton_component_interface import IOSpec, HybridAutomatonComponentInterface
+from .hybrid_automaton_component_interface import IOSpec, HybridComponentInterface
 
 
-class ResetInterface(HybridAutomatonComponentInterface):
+class ResetInterface(HybridComponentInterface):
     """
     Interface for hybrid automaton reset functions.
     

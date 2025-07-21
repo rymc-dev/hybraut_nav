@@ -25,11 +25,11 @@ Example Usage:
 """
 
 from abc import abstractmethod
-from .hybrid_automaton_component_interface import  HybridAutomatonComponentInterface
+from .hybrid_automaton_component_interface import  HybridComponentInterface
 from automaton.spec.io_spec import IOSpec
 
 
-class InvariantInterface(HybridAutomatonComponentInterface):
+class InvariantInterface(HybridComponentInterface):
     """
     Interface for hybrid automaton invariant functions.
     

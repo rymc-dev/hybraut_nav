@@ -6,40 +6,15 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.callback_groups import CallbackGroup
 from rclpy.subscription import Subscription
 from rclpy.publisher import Publisher
-import importlib
 from builtin_interfaces.msg import Time
 import logging
 from typing import List, Dict
 from dataclasses import dataclass, field
+from utils import import_class
+from automaton_types import MsgType
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)
-
-@dataclass
-class MsgType:
-    """Helper class for message type specification."""
-    pkg: str
-    msg: str
-
-def import_class(pkg_name: str, class_name: str) -> Type:
-    """
-    Dynamically import a class from a package.
-    
-    Args:
-        pkg_name (str): Package name (e.g., 'geometry_msgs.msg')
-        class_name (str): Class name (e.g., 'PolygonStamped')
-    
-    Returns:
-        Type: The imported class
-        
-    Raises:
-        ImportError: If the package or class cannot be imported
-    """
-    try:
-        module = importlib.import_module(pkg_name)
-        return getattr(module, class_name)
-    except (ImportError, AttributeError) as e:
-        raise ImportError(f"Cannot import {class_name} from {pkg_name}: {e}")
 
 
 @dataclass
@@ -81,7 +56,7 @@ class State:
     _state_subscription: Optional[Subscription] = None
     
     # Configuration parameters
-    _update_hz: Optional[float] = None
+    _update_hz: Optional[int] = None
     _timeout_sec: Optional[float] = None
     
     # Status tracking
@@ -375,7 +350,7 @@ class State:
         try:
             # Extract and validate message type
             msg_type_info = MsgType(**state_dict['type'])
-            msg_type = import_class(msg_type_info.pkg, msg_type_info.msg)
+            msg_type = msg_type_info.import_msg_type()
             
             # Extract optional parameters
             params = state_dict.get('params', {})
@@ -402,7 +377,6 @@ class State:
             error_msg = f"Failed to load state '{name}' from FAMD: {e}"
             logger.error(error_msg)
             raise
-
 
 # import threading
 # import rclpy
