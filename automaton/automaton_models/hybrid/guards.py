@@ -1,3 +1,10 @@
+from .component_interfaces import WrapperInterface
+from .context import EvaluationContext
+from  .aci_interfaces import GuardInterface
+from automaton_interfaces.msg import GuardEvaluationMSG 
+from dataclasses import dataclass
+from typing import Type, Dict, Any
+
 @dataclass
 class GuardWrapper(WrapperInterface):
     """
@@ -5,7 +12,7 @@ class GuardWrapper(WrapperInterface):
     """
     _component_class: Type[GuardInterface]
 
-    def _evaluate(self, context: EvaluationContext) -> AutomatonGuardEvaluation:
+    def _evaluate(self, context: EvaluationContext) -> GuardEvaluationMSG:
         if self._component_instance is None:
             raise RuntimeError("Component instance is None. Call activate() first.")
         
@@ -13,11 +20,11 @@ class GuardWrapper(WrapperInterface):
         result = self._component_instance(context)
         
         # Ensure we return the correct message type
-        if isinstance(result, AutomatonGuardEvaluation):
+        if isinstance(result, GuardEvaluationMSG):
             return result
         else:
             # Convert or wrap the result if needed
-            evaluation = AutomatonGuardEvaluation()
+            evaluation = GuardEvaluationMSG()
             # Set appropriate fields based on result
             return evaluation
         

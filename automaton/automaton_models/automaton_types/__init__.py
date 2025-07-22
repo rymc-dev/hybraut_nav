@@ -1,5 +1,5 @@
 from .component_path import ComponentPath
-from .msg_type import MsgType
+from ..hybrid.automaton_types.msg_type import MsgType
 
 __all__ =[
     'ComponentPath',

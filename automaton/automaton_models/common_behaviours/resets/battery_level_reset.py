@@ -1,6 +1,6 @@
 from automaton_models.hybrid.aci_interfaces import ResetInterface
 from automaton.spec import IOSpec
-from std_msgs.msg import Float64, Int32
+from std_msgs.msg import Float64, Int32, Bool
 from typing import Dict, Any
 
 
@@ -24,10 +24,10 @@ class BatteryLevelReset(ResetInterface):
     ]
     
     _reset_targets_spec = [
-        IOSpec.create_io_spec("power_save_mode", bool),
-        IOSpec.create_io_spec("max_performance_factor", float),
-        IOSpec.create_io_spec("battery_status", int),
-        IOSpec.create_io_spec("return_to_base_required", bool)
+        IOSpec.create_io_spec("power_save_mode", Bool),
+        IOSpec.create_io_spec("max_performance_factor", Float64),
+        IOSpec.create_io_spec("battery_status", Int32),
+        IOSpec.create_io_spec("return_to_base_required", Bool)
     ]
     
     def _evaluate(self, **state_kwargs) -> Dict[str, Any]:
@@ -52,10 +52,10 @@ class BatteryLevelReset(ResetInterface):
             return_to_base_required = False
         
         return {
-            'power_save_mode': power_save_mode,
-            'max_performance_factor': max_performance_factor,
-            'battery_status': battery_status,
-            'return_to_base_required': return_to_base_required
+            'power_save_mode': Bool(_data=power_save_mode),
+            'max_performance_factor': Float64(_data=max_performance_factor),
+            'battery_status': Int32(_data=battery_status),
+            'return_to_base_required': Bool(_data=return_to_base_required)
         }
     
 
