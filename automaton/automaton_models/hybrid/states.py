@@ -178,7 +178,9 @@ class State:
             subscription_callback=self.update_state,
         )
         self._is_active = False
-
+        self._current_state = None
+        self._error_count = 0
+        self._last_update = None
         # set up your logger
         self._logger = logging.getLogger(f"{__name__}.State.{self._name}")
 
@@ -312,6 +314,11 @@ class State:
             "current_state_summary": str(self._current_state)[:100] if self._current_state else None,
         }
 
+
+    @property
+    def state_bus(self) -> StateBus:
+        return self._state_bus
+
     @property
     def current_state(self) -> Any:
         """Get the current state message (read-only property)."""
@@ -426,9 +433,9 @@ class StateRegistry(ComponentRegistry['State']):
         return components
         
     @classmethod
-    def load_state_registry_from_famd(cls, states_dict: Dict[str, Any]) -> 'StateRegistry':
+    def load_state_registry_from_famd(cls, node: Node, states_dict: Dict[str, Any]) -> 'StateRegistry':
         logger.info("Loading StateRegistry from FAMD configuration")
-        states = cls.register(states_dict)
+        states = cls.register(node=node, config_dict=states_dict)
         registry = cls(_components=states)
         logger.info(f"Created StateRegistry with {len(states)} states")
         return registry
@@ -483,7 +490,7 @@ if __name__ == '__main__':
     thread.start()
 
     try:
-        _state_registry: StateRegistry = StateRegistry.load_state_registry_from_famd(states_dict=states)
+        _state_registry: StateRegistry = StateRegistry.load_state_registry_from_famd(node=node, states_dict=states)
         
         logger.info(f"Registry status before activation: {_state_registry}")
         _state_registry.activate_components(node)

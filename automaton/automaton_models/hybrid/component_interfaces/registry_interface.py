@@ -267,7 +267,7 @@ class ComponentRegistry(Registry[T]):
         try:
             for component_name, component in self._components.items():
                 self._logger.debug(f"Activating {self._component_type_name.lower()}: {component_name}")
-                component.activate(node, qos, cb_group)
+                component.activate()
                 activated_components.append(component_name)
                 
             self._are_components_active = True
@@ -305,7 +305,7 @@ class ComponentRegistry(Registry[T]):
         for component_name, component in self._components.items():
             try:
                 self._logger.debug(f"Deactivating {self._component_type_name.lower()}: {component_name}")
-                component.deactivate(node)
+                component.deactivate()
             except Exception as e:
                 error_msg = f"Failed to deactivate {self._component_type_name.lower()} '{component_name}': {e}"
                 self._logger.error(error_msg)
@@ -372,7 +372,7 @@ class ComponentRegistry(Registry[T]):
             },
             f"error_{self._component_type_name.lower()}s": [
                 name for name, component in self._components.items() 
-                if component.error_count > 0
+                if component._error_count > 0
             ]
         }
         
