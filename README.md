@@ -1,4 +1,5 @@
-# colav_hybrid_eval
+# hybraut_ros2
+
 
 This package contains implementations of COLAV's hybrid automaton Guard conditions dynamics and resets, It provides services for requesting the states of each of these different components which make the automaton.
 
