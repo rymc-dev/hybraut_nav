@@ -12,7 +12,6 @@ log/
 htmlcov/
 .coverage
 
-
 # Virtual environment
 .venv/
 venv/

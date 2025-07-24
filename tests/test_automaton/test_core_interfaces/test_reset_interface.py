@@ -8,8 +8,8 @@ as expected through the lifecycle of build and runtime.
 import pytest
 from typing import Dict, Any
 
-from automaton_models.hybrid.aci_interfaces import ResetInterface
-from automaton_models.hybrid.aci_interfaces import IOSpec
+from automaton_models.hybraut_model.aci_interfaces import ResetInterface
+from automaton_models.hybraut_model.aci_interfaces import IOSpec
 
 
 class MockReset(ResetInterface):

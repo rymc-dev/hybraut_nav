@@ -1,3 +1,4 @@
+
 """
 Test class for DynamicsABC abstract class
 
@@ -8,9 +9,9 @@ as expected through the lifecycle of build and runtime
 
 
 import pytest
-from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsABC
+from automaton_models.hybraut_model.aci_interfaces.dynamics_interface import DynamicsABC
 from typing import NamedTuple
-from automaton_models.hybrid.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
+from automaton_models.hybraut_model.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
 from nodes._internal.types import InputSpec
 import pytest
 

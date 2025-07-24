@@ -1,6 +1,6 @@
 FROM ros:humble-ros-core-jammy
 
-LABEL project='colav_hybrid_automaton'
+LABEL project='hybraut_ros2'
 LABEL maintainer='Ryan McKee <r.mckee@qub.ac.uk>'
 LABEL version='0.0.1'
 LABEL description='ROS-based container for the colav_hybrid_automaton application, providing a UDP-ROS bridge and managing control flow within the colav_gateway namespace.'
