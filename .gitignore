@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Ignore coverage report directory
+htmlcov/
+.coverage
+
+
 # Virtual environment
 .venv/
 venv/
