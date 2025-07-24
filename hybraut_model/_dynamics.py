@@ -4,7 +4,7 @@ from typing import Type, Dict, Any
 
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 
-from hybraut_model.aci_interfaces.dynamics_interface import DynamicsInterface
+from hybraut_aci_interfaces import DynamicsInterface
 from hybraut_model.context.evaluation_context import EvaluationContext
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
 from hybraut_model.automaton_types.component_path import ComponentPath

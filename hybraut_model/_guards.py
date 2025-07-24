@@ -6,9 +6,9 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, qos_profile_default
 
-from automaton_interfaces.msg import GuardEvaluationMSG, InvariantEvaluationsMSG
+from hybraut_interfaces.msg import GuardEvaluationMSG, InvariantEvaluationsMSG
 
-from hybraut_model.aci_interfaces import GuardInterface
+from hybraut_aci_interfaces import GuardInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.context import EvaluationContext

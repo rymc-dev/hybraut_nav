@@ -1,6 +1,6 @@
 from typing import Any, Type, Optional, Dict, List
 from dataclasses import dataclass, field
-from automaton.utils import import_class
+from utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
 from context.evaluation_context import EvaluationContext
