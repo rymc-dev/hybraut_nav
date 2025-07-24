@@ -5,7 +5,7 @@ file containing the implementation of the invariant callback for the hybrid auto
 import threading
 from rclpy.publisher import Publisher
 from builtin_interfaces.msg import Time
-from nodes._internal.automaton import HybridAutomaton
+from hybraut_lifecycle._internal.automaton import HybridAutomaton
 
 from automaton_interfaces.msg import (
     AutomatonInvariantsEvaluation, 

@@ -7,14 +7,14 @@ from rclpy.qos import QoSProfile, qos_profile_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.publisher import Publisher
 
-from automaton_interfaces.msg import AutomatonReset, AutomatonResets
-from automaton_types.component_path import ComponentPath
+from hybraut_interfaces.msg import AutomatonReset, AutomatonResets
 
-from aci_interfaces.reset_interface import ResetInterface
-from component_interfaces.registry_interface import ComponentRegistry
-from component_interfaces.wrapper_interface import WrapperInterface
+from hybraut_model.automaton_types.component_path import ComponentPath
+from hybraut_model.aci_interfaces.reset_interface import ResetInterface
+from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
+from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
 
-from context import EvaluationContext
+from hybraut_model.context import EvaluationContext
 from utils import now_to_ros_time_msg
 
 # Set up module-level logger
@@ -274,7 +274,7 @@ if __name__ == '__main__':
             }
         }
     }
-    from states import StateRegistry
+    from hybraut_model._states import StateRegistry
     state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
     state_registry.activate_components(node)
     # state_registry._components['battery_level'].current_state = Float64(_data=80.5)

@@ -4,7 +4,7 @@ from automaton.utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
 from context.evaluation_context import EvaluationContext
-from aci_interfaces.hybrid_automaton_component_interface import HybridComponentInterface
+from hybraut_aci_interfaces._hybrid_automaton_component_interface import HybridComponentInterface
 
 
 @dataclass

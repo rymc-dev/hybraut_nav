@@ -4,7 +4,7 @@ from typing import Optional, Dict, Tuple, List
 import subprocess
 from pathlib import Path
 import logging
-from nodes._internal.automaton.hybrid_automaton_model import HybridAutomaton
+from hybraut_lifecycle._internal.automaton.hybrid_automaton_model import HybridAutomaton
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

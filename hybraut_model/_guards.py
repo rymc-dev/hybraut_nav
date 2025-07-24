@@ -6,11 +6,12 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, qos_profile_default
 
-from aci_interfaces import GuardInterface
 from automaton_interfaces.msg import GuardEvaluationMSG, InvariantEvaluationsMSG
-from automaton_types.component_path import ComponentPath
-from component_interfaces import WrapperInterface
-from context import EvaluationContext
+
+from hybraut_model.aci_interfaces import GuardInterface
+from hybraut_model.automaton_types.component_path import ComponentPath
+from hybraut_model.component_interfaces import WrapperInterface
+from hybraut_model.context import EvaluationContext
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)
@@ -171,7 +172,7 @@ if __name__ == '__main__':
             }
         }
     }
-    from states import StateRegistry
+    from hybraut_model._states import StateRegistry
     state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
     state_registry.activate_components(node)
 

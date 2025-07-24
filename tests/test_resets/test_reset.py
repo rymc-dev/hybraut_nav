@@ -8,8 +8,8 @@ as expected through the lifecycle of build and runtime.
 import pytest
 from typing import Dict, Any
 
-from nodes.resets import ResetABC
-from nodes._internal.types import InputSpec
+from hybraut_lifecycle.resets import ResetABC
+from hybraut_lifecycle._internal.types import InputSpec
 
 
 class MockReset(ResetABC):

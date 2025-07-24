@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from context.evaluation_context import EvaluationContext
-from component_interfaces.wrapper_interface import WrapperInterface
-from typing import Type, Dict, Any
-from aci_interfaces.dynamics_interface import DynamicsInterface
 
-from automaton_interfaces.msg import AutomatonDynamicsEvaluation
-from automaton_types.component_path import ComponentPath
-from automaton_interfaces.msg import AutomatonDynamicsEvaluation
+from typing import Type, Dict, Any
+
+from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
+
+from hybraut_model.aci_interfaces.dynamics_interface import DynamicsInterface
+from hybraut_model.context.evaluation_context import EvaluationContext
+from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
+from hybraut_model.automaton_types.component_path import ComponentPath
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class DynamicsWrapper(WrapperInterface):
     
 
 from component_interfaces.registry_interface import ComponentRegistry
-from aci_interfaces.dynamics_interface import DynamicsInterface
+from hybraut_aci_interfaces._dynamics_interface import DynamicsInterface
 
 class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
     """Registry specialized for managing dynamics"""
@@ -167,7 +168,7 @@ if __name__ == '__main__':
         }
     }
 
-    from states import StateRegistry
+    from hybraut_model._states import StateRegistry
     state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
     state_registry.activate_components(node)
 

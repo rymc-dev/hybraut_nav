@@ -1,6 +1,6 @@
 
 from ...automaton_models.hybraut_model.aci_interfaces.reset_interface import ResetABC
-from nodes._internal.types import InputSpec
+from hybraut_lifecycle._internal.types import InputSpec
 from automaton_interfaces.msg import TestState
 
 class DummyReset(ResetABC):

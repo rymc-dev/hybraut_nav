@@ -10,8 +10,8 @@ from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, qos_profile_default
 from rclpy.subscription import Subscription
 
-from automaton_types.msg_type import MsgType
-from component_interfaces.registry_interface import ComponentRegistry
+from hybraut_model.automaton_types.msg_type import MsgType
+from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)

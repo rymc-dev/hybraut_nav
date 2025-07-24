@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from context.evaluation_context import EvaluationContext
-from transitions import Transition
+from hybraut_model.context.evaluation_context import EvaluationContext
+from hybraut_model._transitions import Transition
 
 
 @dataclass

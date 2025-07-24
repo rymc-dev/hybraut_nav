@@ -6,12 +6,12 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
-from guards import GuardRegistry
-from invariants import InvariantRegistry
-from modes import ModeRegistry
-from resets import ResetRegistry
-from states import StateRegistry
-from transitions import TransitionRegistry
+from hybraut_model._guards import GuardRegistry
+from hybraut_model._invariants import InvariantRegistry
+from hybraut_model._modes import ModeRegistry
+from hybraut_model._resets import ResetRegistry
+from hybraut_model._states import StateRegistry
+from hybraut_model._transitions import TransitionRegistry
 
 
 @dataclass

@@ -2,8 +2,8 @@ import pytest
 import rclpy
 from rclpy.node import Node
 import os
-from nodes._internal.callbacks.invariant_callback import invariants_evaluation_callback
-from nodes._internal.factory import HybridAutomatonFactory
+from hybraut_lifecycle._internal.callbacks.invariant_callback import invariants_evaluation_callback
+from hybraut_lifecycle._internal.factory import HybridAutomatonFactory
 from automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonModeState, HybridAutomatonInvariantStatus, HybridAutomatonInvariantsEvaluation
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup

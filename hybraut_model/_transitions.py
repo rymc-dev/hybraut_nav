@@ -5,11 +5,11 @@ from rclpy.callback_groups import CallbackGroup
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, qos_profile_default
 
-from automaton_interfaces.msg import TransitionEvaluationMSG
-from component_interfaces.registry_interface import ComponentRegistry
-from constants.urgency import UrgencyEnums
-from context import EvaluationContext
-from guards import GuardWrapper
+from hybraut_interfaces.msg import TransitionEvaluationMSG
+from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
+from hybraut_model.constants.urgency import UrgencyEnums
+from hybraut_model.context import EvaluationContext
+from hybraut_model._guards import GuardWrapper
 
 
 

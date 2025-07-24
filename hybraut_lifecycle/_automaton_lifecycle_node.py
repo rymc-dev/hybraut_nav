@@ -11,7 +11,7 @@ import rclpy
 import os
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
-from nodes._internal.automaton.hybrid_automaton_model import HybridAutomaton
+from hybraut_lifecycle._internal.automaton.hybrid_automaton_model import HybridAutomaton
                                            
 from automaton_interfaces.msg import AutomatonMode, AutomatonStatus
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
@@ -29,23 +29,23 @@ from rclpy.guard_condition import GuardCondition
 
 from automaton_interfaces.msg import AutomatonModeState 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from nodes._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
+from hybraut_lifecycle._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
 from automaton_interfaces.msg import AutomatonDynamicsEvaluation, AutomatonStatus, AutomatonTransitionEvaluations
 from automaton_interfaces.msg import AutomatonInvariantsEvaluation
-from nodes._internal.callbacks.invariant_callback import invariants_evaluation_callback
+from hybraut_lifecycle._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from automaton_interfaces.action import ExecuteMission
-from nodes._internal.status_manager.status_fsm import StatusFSM
+from hybraut_lifecycle._internal.status_manager.status_fsm import StatusFSM
 
 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from nodes._internal.constants import QOS_PROFILE
+from hybraut_lifecycle._internal.constants import QOS_PROFILE
 import sys  
 
-from nodes._internal.callbacks import (
+from hybraut_lifecycle._internal.callbacks import (
     transition_evaluation_callback,
     on_mode_callback,
 )
-from nodes._internal.factory import (
+from hybraut_lifecycle._internal.factory import (
     HybridAutomatonFactory
 )
 

@@ -2,7 +2,7 @@ from threading import Lock
 from builtin_interfaces.msg import Time
 from rclpy.publisher import Publisher
 from automaton_interfaces.msg import AutomatonMode 
-from nodes._internal.automaton import HybridAutomaton
+from hybraut_lifecycle._internal.automaton import HybridAutomaton
 from automaton_interfaces.msg import AutomatonDynamicsEvaluation, AutomatonStatus
 
 

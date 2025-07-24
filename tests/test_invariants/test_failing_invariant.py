@@ -1,5 +1,5 @@
 import pytest
-from nodes.invariants import FailingInvariant, InvariantABC
+from hybraut_lifecycle.invariants import FailingInvariant, InvariantABC
 
 @pytest.fixture
 def failing_invariant_instance():

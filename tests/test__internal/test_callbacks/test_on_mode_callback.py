@@ -1,4 +1,4 @@
-from nodes._internal.callbacks import on_mode_callback
+from hybraut_lifecycle._internal.callbacks import on_mode_callback
 from threading import Lock
 import rclpy
 from rclpy.node import Node
@@ -7,7 +7,7 @@ import pytest
 from rclpy.executors import MultiThreadedExecutor
 import threading
 from automaton_interfaces.msg import HybridAutomatonMode, HybridAutomatonStatus, HybridAutomatonModeState
-from nodes._internal.factory import HybridAutomatonFactory
+from hybraut_lifecycle._internal.factory import HybridAutomatonFactory
 import os
 
 

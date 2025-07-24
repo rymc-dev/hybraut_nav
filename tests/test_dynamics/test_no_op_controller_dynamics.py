@@ -7,7 +7,7 @@ as expected through the lifecycle of build and runtime
 """
 
 import pytest
-from nodes.dynamics import NoOpControllerDynamics, DynamicsABC
+from hybraut_lifecycle.dynamics import NoOpControllerDynamics, DynamicsABC
 
 @pytest.fixture
 def no_op_controller_dynamics_instance():

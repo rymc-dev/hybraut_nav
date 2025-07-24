@@ -1,4 +1,4 @@
-from nodes.guards import VirtualWaypointsGuard, GuardABC
+from hybraut_lifecycle.guards import VirtualWaypointsGuard, GuardABC
 import pytest
 from colav_interfaces.msg import WaypointsState as ROSWaypointsState, Waypoint as ROSWaypoint
 

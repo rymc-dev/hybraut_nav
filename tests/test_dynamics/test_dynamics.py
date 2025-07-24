@@ -12,7 +12,7 @@ import pytest
 from automaton_models.hybraut_model.aci_interfaces.dynamics_interface import DynamicsABC
 from typing import NamedTuple
 from automaton_models.hybraut_model.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
-from nodes._internal.types import InputSpec
+from hybraut_lifecycle._internal.types import InputSpec
 import pytest
 
 class MockDynamics(DynamicsABC):

@@ -3,7 +3,7 @@ test file for WaypointReachedGuard which is an implementation of the GuardABC ab
 for utilization within the COLAV Hybrid Automaton model
 """
 
-from nodes.guards import WaypointReachedGuard, GuardABC
+from hybraut_lifecycle.guards import WaypointReachedGuard, GuardABC
 import pytest
 from colav_interfaces.msg import (
     WaypointsState as ROSWaypointsState,

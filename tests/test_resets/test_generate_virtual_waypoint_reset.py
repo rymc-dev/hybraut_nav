@@ -1,4 +1,4 @@
-from nodes.resets import (
+from hybraut_lifecycle.resets import (
     GenerateVirtualWaypointReset,
     ResetABC
 )

@@ -1,11 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Dict, Type, List, Optional, ClassVar
 from dataclasses import dataclass, field
 from collections import namedtuple
-from rclpy.logging import get_logger
-from automaton.spec.io_spec import IOSpec
 from collections import deque
-from .hybrid_automaton_component_interface import HybridComponentInterface
+from ._hybrid_automaton_component_interface import HybridComponentInterface
 
 @dataclass
 class DynamicsField:

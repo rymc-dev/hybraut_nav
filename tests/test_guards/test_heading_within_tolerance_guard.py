@@ -1,4 +1,4 @@
-from nodes.guards import HeadingWithinToleranceGuard, GuardABC
+from hybraut_lifecycle.guards import HeadingWithinToleranceGuard, GuardABC
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,

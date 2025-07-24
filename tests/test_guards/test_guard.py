@@ -7,7 +7,7 @@ as expected through the lifecycle of build and runtime.
 
 import pytest
 from automaton_models.hybraut_model.aci_interfaces.guard_interface import GuardABC
-from nodes._internal.types import InputSpec
+from hybraut_lifecycle._internal.types import InputSpec
 
 
 class MockGuard(GuardABC):

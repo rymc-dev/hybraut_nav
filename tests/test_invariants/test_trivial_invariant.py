@@ -1,5 +1,5 @@
 import pytest
-from nodes.invariants import TrivialInvariant, InvariantABC
+from hybraut_lifecycle.invariants import TrivialInvariant, InvariantABC
 
 @pytest.fixture
 def trivial_invariant_instance():
