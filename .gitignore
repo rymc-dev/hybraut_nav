@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+log/
+
 # Ignore coverage report directory
 htmlcov/
 .coverage
