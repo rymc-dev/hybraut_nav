@@ -13,7 +13,7 @@ from hybraut_aci_interfaces import InvariantInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_model.context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class InvariantWrapper(WrapperInterface):
     def load_invariant_from_amdl(cls, invariant_name: str, invariant_dict: Dict[str, Any]) -> 'InvariantWrapper':
         component_path = ComponentPath.load_component_from_famd(invariant_dict)
         component_class = component_path.get_component_class()
-        configuration = invariant_dict.get('configuration', None)
+        configuration = invariant_dict.get('configuration', {})
 
         return cls(
             _name = invariant_name,
@@ -113,20 +113,41 @@ class InvariantRegistry(ComponentRegistry['InvariantWrapper']):
         if invariant_name in self._components.keys():
             return self._components[invariant_name]
         
-    def evaluate_invariant_by_name(self, invariant_name: str, evaluation_context: EvaluationContext) -> InvariantEvaluationMSG:
+    def evaluate_invariant_by_name(self, invariant_name: str, ctx: EvaluationContext) -> InvariantEvaluationMSG:
         """evaluate guard by name"""
         invariant = self.get_invariant_by_name(invariant_name)
         try:
-            return invariant._evaluate(evaluation_context)
+            return invariant._evaluate(ctx)
         except Exception as e:
             logger.info(f"{str(e)}")
 
-    def evaluate_invariants_by_name(self, invariant_names: List[str], evaluation_context: EvaluationContext) -> List[InvariantEvaluationMSG]:
-        invariant_evaluation_msgs = []
-        for invariant_name in invariant_names:
-            invariant_evaluation_msgs.append(self.evaluate_invariant_by_name(invariant_name, evaluation_context))
+    def evaluate_invariants_by_name(self, invariant_names: List[str], ctx: EvaluationContext) -> List[InvariantEvaluationsMSG]:
+        invariant_evaluations_msg: InvariantEvaluationsMSG = InvariantEvaluationsMSG(
+            current_mode = ctx.current_mode,
+            stamp = ctx.stamp
+        )
 
-        return invariant_evaluation_msgs
+        invariant_evaluation_msgs: List[InvariantEvaluationMSG] = []
+        for invariant_name in invariant_names:
+            invariant_evaluation_msgs.append(self.evaluate_invariant_by_name(invariant_name, ctx))
+        
+        error = False
+        error_messages = []
+        for invariant_evaluation in invariant_evaluation_msgs:
+            if invariant_evaluation.error == True:
+                error = True
+                error_messages.append(invariant_evaluation.message)
+
+        overall_holds = True
+        for invariant_evaluation in invariant_evaluation_msgs:
+            if not invariant_evaluation.holds:
+                overall_holds = False
+
+        invariant_evaluations_msg.overall_holds = overall_holds
+        invariant_evaluations_msg.error = error
+        invariant_evaluations_msg.message = " ".join(error_messages)
+
+        return invariant_evaluations_msg
 
     @classmethod
     def _component_class(cls) -> Type[InvariantWrapper]:
@@ -196,7 +217,6 @@ if __name__ == '__main__':
     state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
     state_registry.activate_components(node)
 
-    from context.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

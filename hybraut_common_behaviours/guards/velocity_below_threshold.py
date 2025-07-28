@@ -1,6 +1,5 @@
 
-from automaton_models.hybraut_model.aci_interfaces import GuardInterface
-from automaton.spec import IOSpec
+from hybraut_aci_interfaces import GuardInterface, IOSpec
 from geometry_msgs.msg import TwistStamped
 import math
 

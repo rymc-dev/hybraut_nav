@@ -14,7 +14,7 @@ from hybraut_aci_interfaces import ResetInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
 
-from hybraut_model.context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 from utils import now_to_ros_time_msg
 
 # Set up module-level logger
@@ -168,13 +168,14 @@ class ResetRegistry(ComponentRegistry['ResetWrapper']):
     @classmethod
     def register(cls, reset_dict: Dict[str, Any]) -> Dict[str, ResetWrapper]:
         components = {}
-        for name, conf in reset_dict.items():
-            try:
-                component_cls = cls._component_class()
-                component = component_cls.load_reset_wrapper_from_amdl(reset_name=name, reset_dict=conf)
-                components[name] = component
-            except Exception as e: 
-                logging.getLogger(__name__).error(f"Failed to import component '{name}': {e}")
+        if reset_dict is not None:
+            for name, conf in reset_dict.items():
+                try:
+                    component_cls = cls._component_class()
+                    component = component_cls.load_reset_wrapper_from_amdl(reset_name=name, reset_dict=conf)
+                    components[name] = component
+                except Exception as e: 
+                    logging.getLogger(__name__).error(f"Failed to import component '{name}': {e}")
             
         return components
     

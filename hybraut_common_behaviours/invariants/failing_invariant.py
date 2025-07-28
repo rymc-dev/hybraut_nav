@@ -1,4 +1,4 @@
-from automaton_models.hybraut_model.aci_interfaces import InvariantInterface
+from hybraut_aci_interfaces import InvariantInterface
 
 
 class FailingInvariant(InvariantInterface):

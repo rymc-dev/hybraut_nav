@@ -3,9 +3,8 @@ from dataclasses import dataclass
 from typing import Any
 from builtin_interfaces.msg import Time, Duration
 from typing import Dict, Any, List
-# from guards import GuardRegistry
-# from resets import ResetRegistry
-# from invariants import InvariantRegistry
+
+from typing import Any
 
 @dataclass
 class EvaluationContext:
@@ -18,9 +17,9 @@ class EvaluationContext:
     current_mode: int
     stamp: Time
     metadata: Dict[str, Any]
-    # guard_registry: GuardRegistry
-    # reset_registry: ResetRegistry
-    # invariant_registry: InvariantRegistry
+    guard_registry: Any
+    reset_registry: Any
+    invariant_registry: Any
 
     def get_state_values(self, state_names: List[str]) -> Dict[str, Any]:
         return self.states.get_current_states(state_names)

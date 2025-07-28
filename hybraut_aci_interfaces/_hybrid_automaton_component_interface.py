@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from rclpy.logging import get_logger
 from typing import Any, ClassVar, Dict, Type
-from hybraut_aci_interfaces._io_spec import IOSpec
+from ._io_spec import IOSpec
 
 
 class HybridComponentInterface(ABC):

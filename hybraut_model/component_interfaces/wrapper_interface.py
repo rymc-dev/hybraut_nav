@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
-from context.evaluation_context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 from hybraut_aci_interfaces._hybrid_automaton_component_interface import HybridComponentInterface
 
 
@@ -25,8 +25,6 @@ class WrapperInterface(ABC):
         Called automatically after dataclass initialization.
         Validates the component configuration against the expected constructor arguments.
         """
-        if self._configuration is None:
-            raise ValueError("Configuration must be provided to initialize the wrapper.")
 
         expected_names: List[str] = self._component_class.get_init_input_spec_names()
         expected_types: List[Type] = self._component_class.get_init_input_spec_types()
@@ -123,8 +121,6 @@ class WrapperInterface(ABC):
         Instantiates the component using the provided configuration dictionary.
         Sets the `_is_initialized` flag to True.
         """
-        if not self._configuration:
-            raise RuntimeError("Cannot activate component without valid configuration.")
         self._component_instance = self._component_class(**self._configuration)
         self._is_initialized = True
 

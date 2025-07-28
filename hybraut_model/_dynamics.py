@@ -5,7 +5,7 @@ from typing import Type, Dict, Any
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 
 from hybraut_aci_interfaces import DynamicsInterface
-from hybraut_model.context.evaluation_context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 import logging
@@ -57,7 +57,7 @@ class DynamicsWrapper(WrapperInterface):
         )
     
 
-from component_interfaces.registry_interface import ComponentRegistry
+from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_aci_interfaces._dynamics_interface import DynamicsInterface
 
 class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
@@ -77,7 +77,7 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
         if dynamics_name in self._components.keys():
             return self._components[dynamics_name]
         
-    def evaluate_dynamics_by_name(self, dynamic_name: str, ctx: EvaluationContext) -> AutomatonDynamicsEvaluation:
+    def evaluate_dynamics_by_name(self, dynamics_name: str, ctx: EvaluationContext) -> AutomatonDynamicsEvaluation:
         dynamics = self.get_dynamics_by_name(dynamics_name)
         try:
             return dynamics._evaluate(ctx)
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
     state_registry.activate_components(node)
 
-    from context.evaluation_context import EvaluationContext
+    from hybraut_model._evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

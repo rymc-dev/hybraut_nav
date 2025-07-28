@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from hybraut_model.context.evaluation_context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 from hybraut_model._transitions import Transition
 
 
@@ -10,7 +10,7 @@ class Mode:
     _id: int = field(init=True)
     _name: str = field(init=True)
     _dynamics_ref: str = field(init=True)
-    _invariants_ref: List[str] = field(init=True)
+    _invariants_refs: List[str] = field(init=True)
 
     _description: str = field(init=True, default="no description")
     _transitions_ref: Dict[int, Transition] = field(init=True, default=None)
@@ -26,6 +26,15 @@ class Mode:
     
     def get_enabled_transition_refs(self) -> List[str]:
         ...
+
+    def get_dynamics_ref(self) -> str:
+        return self._dynamics_ref
+
+    def get_transition_refs(self) -> List[str]:
+        return self._transitions_ref
+    
+    def get_invariant_refs(self) -> List[str]:
+        return self._invariants_refs
 
     @classmethod
     def load_mode_from_amdl(cls, mode_idx, mode_dict):
@@ -44,7 +53,7 @@ class Mode:
             _name=name,
             _description=description,
             _dynamics_ref=dynamics,
-            _invariants_ref=invariants,
+            _invariants_refs=invariants,
             _transitions_ref=transitions,
             _entry_actions=entry_actions,
             _exit_actions=exit_actions,
@@ -61,8 +70,8 @@ class ModeRegistry():
     def register_mode(cls, mode: Mode):
         pass
 
-    def get_mode(self):
-        ...
+    def get_mode(self, mode_id: int):
+        return self._modes.get(mode_id)
 
     def get_reachable_modes(self, from_mode: int) -> Mode:
         ...

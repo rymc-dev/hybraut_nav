@@ -1,64 +1,41 @@
 from transitions import Machine
-from automaton_interfaces.msg import HybridAutomatonStatus, HybridAutomatonEvents
 from rclpy.publisher import Publisher
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from builtin_interfaces.msg import Time
 import time
+from .constants import StatusEnum
+from .comm import StatusBus, EventBus
 
-class WatchdogFSM:
-    state_name_map = {
-        "ACTIVE": HybridAutomatonStatus.ACTIVE,
-        "TRANSITIONING": HybridAutomatonStatus.TRANSITIONING,
-        "WARNING": HybridAutomatonStatus.WARNING,
-        "ERROR": HybridAutomatonStatus.ERROR,
-        "RECOVERING": HybridAutomatonStatus.RECOVERING,
-        "FATAL": HybridAutomatonStatus.FATAL,
-        "MISSION_COMPLETE": HybridAutomatonStatus.MISSION_COMPLETE,
-    }
-    states = list(state_name_map.keys())
+class HybrautWatchdogFSM:
+    states = [status for status in StatusEnum]
 
-    event_triggers = {
-        HybridAutomatonEvents.TRANSITION_GUARD_ENABLED: "transition_guard_enabled",
-        HybridAutomatonEvents.TRANSITION_FAILURE: "transition_failure",
-        HybridAutomatonEvents.TRANSITION_COMPLETE: "transition_complete",
-        HybridAutomatonEvents.NON_BLOCKING_ANOMALY: "non_blocking_anomoly",
-        HybridAutomatonEvents.ANOMALY_RESOLVED_OR_TIMEOUT: "anomoly_resolved_or_timeout",
-        HybridAutomatonEvents.RECOVERABLE_ERROR: "recoverable_error",
-        HybridAutomatonEvents.ATTEMPT_FIX: "attempt_fix",
-        HybridAutomatonEvents.RECOVERED: "recovered",
-        HybridAutomatonEvents.CRITICAL_FAILURE: "critical_failure",
-        HybridAutomatonEvents.MISSION_COMPLETE: "mission_complete",
-        HybridAutomatonEvents.RECOVERY_FAILED: "recovery_failed",
-        HybridAutomatonEvents.SHUTDOWN: "shutdown"
-    }
 
-    def __init__(self, status_publisher: Publisher, logger: RcutilsLogger):
+    def __init__(self, node: Node):
         self.machine = Machine(
             model=self,
-            states=WatchdogFSM.states,
-            initial="ACTIVE",
+            states=self.states,
+            initial=StatusEnum.ACTIVE,
             after_state_change=self.publish_status
         )
         self.status_publisher = status_publisher
-        self.logger = logger
+        self.logger = node.get_logger()
+
+        status_bus: StatusBus = StatusBus()
+        event_bus: EventBus = EventBus()
 
         # Normal operational flow
-        self.machine.add_transition("transition_guard_enabled", "ACTIVE", "TRANSITIONING")
-        self.machine.add_transition("transition_complete", "TRANSITIONING", "ACTIVE")
-        self.machine.add_transition("mission_complete", "ACTIVE", "MISSION_COMPLETE") 
+        self.machine.add_transition("transition_guard_enabled", StatusEnum.ACTIVE, StatusEnum.TRANSITIONING)
+        self.machine.add_transition("transition_complete", StatusEnum.TRANSITIONING, StatusEnum.ACTIVE)
+        self.machine.add_transition("mission_complete", StatusEnum.ACTIVE, StatusEnum.MISSION_COMPLETE) 
 
         # Error handling
-        self.machine.add_transition("recoverable_error", "ACTIVE", "ERROR")
-        self.machine.add_transition("transition_failure", "TRANSITIONING", "ERROR")
-        self.machine.add_transition("attempt_fix", "ERROR", "RECOVERING")
-        self.machine.add_transition("recovered", "RECOVERING", "ACTIVE")
-        self.machine.add_transition("recovery_failed", "RECOVERING", "ERROR")
-        self.machine.add_transition("critical_failure", "ERROR", "FATAL")
+        self.machine.add_transition("recoverable_error", StatusEnum.ACTIVE, StatusEnum.ERROR)
+        self.machine.add_transition("transition_failure", StatusEnum.TRANSITIONING, StatusEnum.ERROR)
+        self.machine.add_transition("attempt_fix", StatusEnum.ERROR, StatusEnum.RECOVERING)
+        self.machine.add_transition("recovered", StatusEnum.RECOVERING, StatusEnum.ACTIVE)
+        self.machine.add_transition("recovery_failed", "RECOVERING", StatusEnum.ERROR)
+        self.machine.add_transition("critical_failure", StatusEnum.ERROR, StatusEnum.FATAL)
         self.machine.add_transition("shutdown", "FATAL", None)  # Terminal
-
-        # Warning branch
-        self.machine.add_transition("non_blocking_anomoly", "ACTIVE", "WARNING")
-        self.machine.add_transition("anomoly_resolved_or_timeout", "WARNING", "ACTIVE")
 
     def publish_status(self):
         ros_enum = WatchdogFSM.state_name_map.get(self.state, HybridAutomatonStatus.FATAL)

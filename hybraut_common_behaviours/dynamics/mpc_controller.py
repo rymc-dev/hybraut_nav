@@ -1,6 +1,5 @@
-from automaton_models.hybraut_model.aci_interfaces.dynamics_interface import DynamicsInterface
-from automaton_models.hybraut_model.aci_interfaces.dynamics_interface import DynamicsSpecBuilder
-from automaton.spec.io_spec import IOSpec
+from hybraut_aci_interfaces import DynamicsInterface, IOSpec
+from hybraut_aci_interfaces._dynamics_interface import DynamicsSpecBuilder
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,

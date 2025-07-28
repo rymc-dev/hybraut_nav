@@ -1,6 +1,4 @@
-
-from automaton_models.hybraut_model.aci_interfaces import InvariantInterface
-from automaton.spec import IOSpec
+from hybraut_aci_interfaces import InvariantInterface, IOSpec
 import time
 from std_msgs.msg import Float64
 

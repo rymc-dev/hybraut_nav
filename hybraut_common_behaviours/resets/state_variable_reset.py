@@ -1,5 +1,4 @@
-from automaton_models.hybraut_model.aci_interfaces import ResetInterface
-from automaton.spec import IOSpec
+from hybraut_aci_interfaces import ResetInterface, IOSpec
 from std_msgs.msg import Bool
 from typing import Dict, Any
 

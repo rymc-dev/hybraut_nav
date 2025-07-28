@@ -1,6 +1,5 @@
 
-from automaton_models.hybraut_model.aci_interfaces import GuardInterface
-from automaton.spec import IOSpec
+from hybraut_aci_interfaces import GuardInterface, IOSpec
 from std_msgs.msg import Bool
 
 class BooleanFlagGuard(GuardInterface):

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
 from rclpy.callback_groups import CallbackGroup
 from rclpy.publisher import Publisher
@@ -9,10 +9,13 @@ from hybraut_interfaces.msg import TransitionEvaluationMSG
 
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.constants.urgency import UrgencyEnums
-from hybraut_model.context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 from hybraut_model._guards import GuardWrapper
 
+import logging
 
+# Set up module-level logger
+logger = logging.getLogger(__name__)
 
 # @dataclass 
 # class TransitionEvaluationBus:
@@ -23,21 +26,6 @@ from hybraut_model._guards import GuardWrapper
 #         default='/automaton/transition_evaluation'
 #     )
     
-
-class TransitionRegistry(ComponentRegistry):
-
-    @classmethod
-    def load_transition_registry_from_amdl(cls, transition_dict: dict):
-        transitions: Dict[str, Transition] = {}
-        for transition_name, transition_value in transition_dict.items():
-            transitions[transition_name] = Transition.load_transition_from_amdl(
-                transition_name=transition_name,
-                transition_value=transition_value
-            )
-
-        return cls(
-            cls(_components=transitions)
-        )
 
 @dataclass
 class Transition:
@@ -130,3 +118,110 @@ class Transition:
         This executes the transition, performing the reset and publishing the new mode.
         """
         pass
+
+from hybraut_model.guards import GuardWrapper
+from hybraut_interfaces.msg import GuardEvaluationMSG 
+from hybraut_interfaces.msg import TransitionEvaluationMSG
+from hybraut_interfaces.msg import TransitionEvaluationsMSG
+from utils import now_to_ros_time_msg
+
+
+class TransitionRegistry(ComponentRegistry):
+
+    _components: dict[str, Transition]
+
+    def evaluate_transitions(self, transitions: Dict[int, str], ctx: EvaluationContext) -> TransitionEvaluationsMSG:
+        """
+        Evaluate the given transitions based on their associated guards,
+        and return a TransitionEvaluationsMSG summarizing the results.
+
+        Args:
+            transitions (Dict[int, str]): Mapping from priority to transition name.
+            ctx (EvaluationContext): Context containing current mode and registries.
+
+        Returns:
+            TransitionEvaluationsMSG: Evaluation results for each transition.
+        """
+        transition_evaluations_msg = TransitionEvaluationsMSG(
+            mode=ctx.current_mode,
+            stamp=now_to_ros_time_msg()
+        )
+
+        # Extract names and priorities, preserving order
+        sorted_items = sorted(transitions.items())
+        transition_names = [name for _, name in sorted_items]
+        transition_priorities = [priority for priority, _ in sorted_items]
+
+        # Get transition components
+        transition_components: Dict[str, Transition] = self.get_components_by_names(transition_names)
+
+        # Evaluate each transition
+        for transition_name, priority in zip(transition_names, transition_priorities):
+            transition = transition_components[transition_name]
+            transition_msg = TransitionEvaluationMSG(
+                name=transition_name,
+                target_mode=transition._target_mode,
+                priority=priority
+            )
+
+            # Handle guard references (could be a list or single string)
+            guard_refs = transition._guard_refs
+            if not isinstance(guard_refs, list):
+                guard_refs = [guard_refs]
+
+            # Evaluate guards
+            has_transition = False
+            has_exception = False
+            exception_messages = []
+
+            guards: Dict[str, GuardWrapper] = ctx.guard_registry.get_components_by_names(guard_refs)
+            for guard in guards.values():
+                guard_eval: GuardEvaluationMSG = guard._evaluate(context=ctx)
+                transition_msg.guards.append(guard_eval)
+
+                if guard_eval.guard_evaluation:
+                    has_transition = True
+                if guard_eval.error:
+                    has_exception = True
+                    exception_messages.append(guard_eval.message)
+
+            # Set overall transition result
+            transition_msg.should_transition = has_transition
+            transition_msg.expected_resets = []  # TODO: Fill in expected resets if needed
+            transition_msg.error = has_exception
+            transition_msg.message = "\n".join(exception_messages)
+
+            transition_evaluations_msg.transition_evaluations.append(transition_msg)
+
+        return transition_evaluations_msg
+   
+    @classmethod
+    def _component_class(cls) -> Type[Transition]:
+        return Transition
+    
+    @classmethod
+    def register(cls: Type['ComponentRegistry'], config_dict: Dict[str, Any]) -> Dict[str, Transition]:
+        components = {}
+        
+        for name, conf in config_dict.items():
+            try:
+                component_cls = cls._component_class()
+                component = component_cls.load_transition_from_amdl(
+                    transition_name=name, 
+                    transition_value=conf
+                )
+                components[name] = component
+            except Exception as e:
+                logging.getLogger(__name__).error(f"Failed to load component '{name}': {e}")
+                raise
+        return components
+
+
+    @classmethod
+    def load_transition_registry_from_amdl(cls, transition_dict: dict):
+        logging.info("Loading TransitionRegistry")
+        transitions = cls.register(transition_dict)
+        registry = cls(_components=transitions)
+        logger.info(f"Created TransitionRegistry with {len(transitions)} transitions")
+
+        return registry

@@ -11,7 +11,7 @@ from hybraut_interfaces.msg import GuardEvaluationMSG, InvariantEvaluationsMSG
 from hybraut_aci_interfaces import GuardInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
-from hybraut_model.context import EvaluationContext
+from hybraut_model._evaluation_context import EvaluationContext
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)
@@ -56,7 +56,8 @@ class GuardWrapper(WrapperInterface):
             raise RuntimeError("Component instance is None. Call activate() first.")
         
         msg: GuardEvaluationMSG = GuardEvaluationMSG()
-        states = context.get_state_values(self._component_instance.get_state_input_spec_names())
+        state_names = self._component_instance.get_state_input_spec_names()
+        states = context.get_state_values(state_names)
         component_info = self._component_instance.get_component_info()
         msg.guard_name = component_info['class_name']
 
@@ -80,7 +81,8 @@ class GuardWrapper(WrapperInterface):
             _configuration=configuration
         )
 
-from component_interfaces.registry_interface import ComponentRegistry
+
+from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 
 class GuardRegistry(ComponentRegistry['GuardWrapper']):
     """Registry specialized for managing guard components"""
@@ -176,7 +178,7 @@ if __name__ == '__main__':
     state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
     state_registry.activate_components(node)
 
-    from context.evaluation_context import EvaluationContext
+    from hybraut_model._evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

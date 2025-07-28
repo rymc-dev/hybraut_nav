@@ -4,8 +4,7 @@ from typing import Dict, Any, List
 from geometry_msgs.msg import Point, Pose, Twist
 from std_msgs.msg import Bool, Float64, Int32
 from nav_msgs.msg import Path
-from automaton_models.hybraut_model.aci_interfaces import ResetInterface
-from automaton.spec.io_spec import IOSpec
+from hybraut_aci_interfaces import ResetInterface, IOSpec
 
 
 class WaypointAdvanceReset(ResetInterface):
