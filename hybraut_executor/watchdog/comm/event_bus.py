@@ -1,4 +1,3 @@
-from enum import Enum
 from hybraut_interfaces.msg import AutomatonEvents
 from dataclasses import dataclass, field
 from typing import Callable
@@ -9,11 +8,7 @@ from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__))))
-from constants import EventEnum
+from hybraut_executor.watchdog.constants import EventEnum
 
 
 @dataclass

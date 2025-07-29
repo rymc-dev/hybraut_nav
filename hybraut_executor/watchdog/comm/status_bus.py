@@ -8,12 +8,7 @@ from typing import Type, Callable, Optional, Any
 from hybraut_interfaces.msg import AutomatonStatus
 from enum import Enum
 
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__))))
-
-from constants import StatusEnum
+from hybraut_executor.watchdog.constants import StatusEnum
 
 
 @dataclass
@@ -41,7 +36,7 @@ class StatusBus:
         self.subscription = self.node.create_subscription(
             self.msg_type,
             self.topic,
-            self.event_callback,
+            self.status_callback,
             self.qos,
             callback_group=self.cb_group,
         )

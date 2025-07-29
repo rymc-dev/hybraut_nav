@@ -33,8 +33,8 @@ from builtin_interfaces.msg import Time
 from hybraut_interfaces.msg import AutomatonEvents, AutomatonStatus
 
 # Local imports
-from .constants import StatusEnum, EventEnum
-from .comm import StatusBus, EventBus
+from hybraut_executor.watchdog.constants import StatusEnum, EventEnum
+from hybraut_executor.watchdog.comm import StatusBus, EventBus
 
 
 class HybrautWatchdogFSM:
@@ -62,10 +62,6 @@ class HybrautWatchdogFSM:
         # TODO: placeholder for when status are recieved.
         ...
 
-    def event_callback():
-        # TODO: placehold for when events are received.
-        ...
-
     def __init__(
         self,
         node: Node,
@@ -85,7 +81,10 @@ class HybrautWatchdogFSM:
             node=node, status_callback=None, cb_group=cb_group, qos=qos
         )
         self.event_bus: EventBus = EventBus(
-            node=node, event_callback=None, cb_group=cb_group, qos=qos
+            node=node,
+            event_callback=self.trigger_transition,
+            cb_group=cb_group,
+            qos=qos,
         )
 
         # Normal operational flow
@@ -122,50 +121,93 @@ class HybrautWatchdogFSM:
         self.logger.info(f"Publishing status: {self.state}")
         # TODO: Implement status publishing logic
 
-    def perform_event_driven_transition(self, event_msg: AutomatonEvents):
-        event_type = event_msg.type
-        trigger_name = self.event_triggers.get(event_type, None)
+    def perform_event_driven_transition(self, event: EventEnum):
+        """
+        performs a transition based on the enum value for event msg
+        """
+        if not isinstance(event, EventEnum):
+            raise ValueError(
+                f"HybrautWathdog::perform_event_driven_transition: invalid envent type, "
+                f"got: `{type(event)}`, expected: `wathdog.constants.EventEnum`"
+            )
 
-        if trigger_name is None:
-            self.logger.error(f"Unknown event type: {event_type}")
-            return
+        transition_func_name = self.transition_function_map.get(event)
 
-        self.logger.info(
-            f"Event received: {event_type}, invoking trigger: {trigger_name}"
-        )
+        if transition_func_name is None:
+            raise ValueError(
+                f"HybrautWatchdog::perform_event_driven_transition: event not mapped to transition function"
+            )
 
         try:
-            getattr(self, trigger_name)()
+            transition_func = self.__getattribute__(transition_func_name)
+            transition_func()
         except Exception as e:
             self.logger.error(
                 f"Transition failed on '{trigger_name}' from '{self.state}': {e}"
             )
 
+    def trigger_transition(self, event: AutomatonEvents):
+        """triggers a watchdog fsm transition utilizing a AutomatonEvents msg published
+        via ros2 topic `/automaton/events`
+
+        Args:
+            event (AutomatonEvents): ros2 interface from `hybraut_interfaces.msg` pkg
+
+        Raises:
+            TypeError: if event is invalid type
+            Exception: if event driven transitions exception thrown
+        """
+        if not isinstance(event, AutomatonEvents):
+            raise TypeError(
+                f"HybrautWathdog::trigger_transition: event received invalid type: got: {type(event)}"
+                "exepcted watchdog.contstants.event.EventEnum"
+            )
+
+        from typing import Dict
+
+        enum_dict: Dict[int, EventEnum] = {enum.value: enum for enum in EventEnum}
+        if not event.type in enum_dict.keys():
+            raise AttributeError(
+                f"HybrautWatchdog::trigger_transition: event type received: `{event.type}`"
+                "invalid, not within event options for watchdog fsm"
+            )
+        try:
+            self.perform_event_driven_transition(enum_dict.get(event.type))
+            import time
+
+            time.sleep(0.02)
+        except Exception as e:
+            raise Exception(f"HybrautWatchdog::trigger_transition: {str(e)}")
+
+        self.node.get_logger().info(
+            f"transition completed, current_state: {self.state}"
+        )
+
 
 if __name__ == "__main__":
     rclpy.init()
     mock_node = Node("test_node")
-    status_publisher = mock_node.create_publisher(
-        AutomatonStatus, "/automaton/status", qos_profile=10
+    event_publisher = mock_node.create_publisher(
+        AutomatonEvents, "/automaton/event", qos_profile=qos_profile_system_default
+    )
+
+    def status_callback(msg):
+        mock_node.get_logger().info(f"new status received: {msg}")
+
+    status_subscription = mock_node.create_subscription(
+        msg_type=AutomatonStatus,
+        topic="/automaton/status",
+        qos_profile=qos_profile_system_default,
+        callback_group=ReentrantCallbackGroup(),
+        callback=lambda msg: status_callback(msg),
     )
 
     status_fsm = HybrautWatchdogFSM(node=mock_node)
-
-    # Simulate transitions
-    def trigger(event_type):
-        status_fsm.perform_event_driven_transition(
-            AutomatonEvents(type=event_type, message="")
+    status_fsm.trigger_transition(
+        AutomatonEvents(
+            type=AutomatonEvents.TRANSITION_GUARD_ENABLED,
+            stamp=mock_node.get_clock().now().to_msg(),
         )
-        time.sleep(0.1)
-
-    # Example event triggers using EventEnum values
-    from .constants import EventEnum
-
-    trigger(EventEnum.TRANSITION_GUARD_ENABLED.value)
-    trigger(EventEnum.TRANSITION_COMPLETE.value)
-    trigger(EventEnum.RECOVERABLE_ERROR.value)
-    trigger(EventEnum.ATTEMPT_FIX.value)
-    trigger(EventEnum.RECOVERED.value)
-    trigger(EventEnum.MISSION_COMPLETE.value)
+    )
 
     rclpy.shutdown()
