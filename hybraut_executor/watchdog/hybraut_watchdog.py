@@ -176,12 +176,59 @@ class HybrautWatchdogFSM:
             import time
 
             time.sleep(0.02)
+            # UPDATE THE CURRENT STATE
+            try:
+                state_value = self.state.value
+                self.status_bus.publish(status=self.state, message="")
+            except Exception as e:
+                print(e)  # TODO: improve debugging.
+            # self.status_bus.publish()
         except Exception as e:
             raise Exception(f"HybrautWatchdog::trigger_transition: {str(e)}")
 
         self.node.get_logger().info(
             f"transition completed, current_state: {self.state}"
         )
+
+    """TRANSITION FUNCTIONS"""
+
+    def transition_complete(self):
+        """transition function on transition from STATE.TRANSITIONING to STATE.ACTIVE"""
+        ...
+
+    def recoverable_error(self):
+        """transition function STATE.* to STATE.ERROR"""
+        ...
+
+    def attempt_fix(self):
+        """transition to STATE.ERROR to STATE.RECOVERING"""
+        ...
+
+    def recovered(self):
+        """transition from state.RECOVERY to state.ACTIVE"""
+        ...
+
+    def recovery_failed(self):
+        """transition from state.RECOVERY to state.FATAL, which triggers
+        auto transition to TERMINAL [*] state which should shutdown the hybraut lifecycle
+        """
+        ...
+
+    def critical_failure(self):
+        """"""
+        ...
+
+    def mission_complete(self):
+        """
+        transition from state.[q_goals] to terminal state [*] which will
+        trigger the lifecycle transition for the hybrauts lifecycle node from
+
+        """
+        ...
+
+    def shutdown(self):
+        """transition from state.FATAL to terminal [*]"""
+        ...
 
 
 if __name__ == "__main__":
