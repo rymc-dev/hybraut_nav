@@ -192,6 +192,12 @@ class HybrautWatchdogFSM:
 
     """TRANSITION FUNCTIONS"""
 
+    def transition_to_active(self):
+        """auto transition"""
+
+    def transition_guard_enabled(self):
+        """occurs when automaton guard transition in enabled."""
+
     def transition_complete(self):
         """transition function on transition from STATE.TRANSITIONING to STATE.ACTIVE"""
         ...
@@ -215,14 +221,18 @@ class HybrautWatchdogFSM:
         ...
 
     def critical_failure(self):
-        """"""
+        """
+        transition from State.[RECOVERY, ERROR] to terminal state [*]
+        this occurs when a critical exception occurs, something that the
+        actions of the RECOVERY state can't deal with.
+        """
         ...
 
     def mission_complete(self):
         """
         transition from state.[q_goals] to terminal state [*] which will
         trigger the lifecycle transition for the hybrauts lifecycle node from
-
+        LIFECYCLE_STATE.ACTIVE to LIFECYCLE_STATE.INACTIVE
         """
         ...
 
