@@ -168,6 +168,8 @@ class FSM:
             TypeError: if event is invalid type
             Exception: if event driven transitions exception thrown
         """
+        print (f'event received: {event}')
+
         if not isinstance(event, AutomatonEvents):
             raise TypeError(
                 f"HybrautWathdog::trigger_transition: event received invalid type: got: {type(event)}"
@@ -191,54 +193,64 @@ class FSM:
 
 
 
-if __name__ == "__main__":
+def main():
+    """
+    Main function to demonstrate the usage of EventBus.
+    """
+    import rclpy
+    from rclpy.executors import MultiThreadedExecutor, Executor
+    import os
+    import threading
+    from rclpy.callback_groups import ReentrantCallbackGroup
+    
     rclpy.init()
-    mock_node = Node("test_node")
-    event_publisher = mock_node.create_publisher(
-        AutomatonEvents, "/automaton/event", qos_profile=qos_profile_system_default
-    )
-
-    def status_callback(msg):
-        mock_node.get_logger().info(f"new status received: {msg}")
-
-    status_subscription = mock_node.create_subscription(
-        msg_type=AutomatonStatus,
-        topic="/automaton/status",
-        qos_profile=qos_profile_system_default,
-        callback_group=ReentrantCallbackGroup(),
-        callback=lambda msg: status_callback(msg),
-    )
-
-    status_fsm = FSM(node=mock_node)
-    status_fsm.trigger_transition(
-        AutomatonEvents(
-            type=AutomatonEvents.TRANSITION_GUARD_ENABLED,
-            stamp=mock_node.get_clock().now().to_msg(),
+    executor: Executor = MultiThreadedExecutor(num_threads=os.cpu_count())
+    node = Node("mock_node")
+    executor.add_node(node)
+    
+    # Start executor in background thread
+    thread = threading.Thread(target=executor.spin, daemon=True)
+    thread.start()
+    
+    try:
+        event_bus: EventBus = EventBus(
+            node=node,
+            event_callback=lambda msg: print(
+                f"Received event: {msg.type}, Message: {msg.message}"
+            ),
+            cb_group=ReentrantCallbackGroup()
         )
-    )
 
-    import time
-
-    time.sleep(0.1)
-
-    status_fsm.trigger_transition(
-        AutomatonEvents(
-            type=AutomatonEvents.TRANSITION_COMPLETE
+        status_bus: StatusBus = StatusBus(
+            node=node,
+            status_callback=lambda msg: print(
+                f"Received status: {msg.type}, Message: {msg.message}"
+            ),
+            cb_group=ReentrantCallbackGroup(),
         )
-    )
+        
+        # Wait for connections
+        import time
+        time.sleep(1.0)
+        
+        print("Publishing events...")
+        event_bus.publish(EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated")
+        time.sleep(0.5)
+        
+        event_bus.publish(EventEnum.TRANSITION_COMPLETE, "transition completed")
+        time.sleep(0.5)
+        
+        event_bus.publish(EventEnum.RECOVERY_FAILED, "mode guard deactivated")
+        time.sleep(1.0)  # Give time for final message processing
+        
+    except KeyboardInterrupt:
+        print("Shutting down gracefully...")
+    finally:
+        executor.shutdown()
+        thread.join()
+        node.destroy_node()
+        rclpy.shutdown()
 
-    time.sleep(0.1)
-    status_fsm.trigger_transition(
-        AutomatonEvents(
-            type=AutomatonEvents.MISSION_COMPLETE
-        )
-    )
 
-    # status_fsm.trigger_transition(
-    #     AutomatonEvents(
-    #         type=AutomatonEvents.TRANSITION_COMPLETE,
-    #         stamp=mock_node.get_clock().now().to_msg(),
-    #     )
-    # )
-
-    rclpy.shutdown()
+if __name__ == "__main__":
+    main()
