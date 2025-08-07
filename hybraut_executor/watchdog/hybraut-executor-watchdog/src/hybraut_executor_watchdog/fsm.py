@@ -38,28 +38,26 @@ QOS = QoSProfile(depth=10, reliability=qos_profile_system_default.reliability)
 
 class FSM:
     """
-    An implementation of a finite state machine (FSM) which
-    acts as a watchdog for hybraut system.
+    Finite State Machine for Hybraut watchdog.
+    Separates trigger names from callbacks to avoid name collisions.
     """
 
+    # Define all states
     states = [status for status in StatusEnum]
 
+    # Map incoming EventEnum to trigger method names
     transition_function_map = {
-        EventEnum.VALID_MISSION_REQUEST: "transition_to_active",
-        EventEnum.TRANSITION_GUARD_ENABLED: "transition_guard_enabled",
-        EventEnum.TRANSITION_COMPLETE: "transition_complete",
-        EventEnum.RECOVERABLE_ERROR: "recoverable_error",
-        EventEnum.ATTEMPT_FIX: "attempt_fix",
-        EventEnum.RECOVERED: "recovered",
-        EventEnum.RECOVERY_FAILED: "recovery_failed",
-        EventEnum.CRITICAL_FAILURE: "critical_failure",
-        EventEnum.MISSION_COMPLETE: "mission_complete",
-        EventEnum.SHUTDOWN: "shutdown",
+        EventEnum.VALID_MISSION_REQUEST: "activate_mission",
+        EventEnum.TRANSITION_GUARD_ENABLED: "enable_guard",
+        EventEnum.TRANSITION_COMPLETE: "complete_transition",
+        EventEnum.RECOVERABLE_ERROR: "handle_recoverable_error",
+        EventEnum.ATTEMPT_FIX: "attempt_fix_process",
+        EventEnum.RECOVERED: "complete_recovery",
+        EventEnum.RECOVERY_FAILED: "fail_recovery",
+        EventEnum.CRITICAL_FAILURE: "handle_critical_failure",
+        EventEnum.MISSION_COMPLETE: "finish_mission",
+        EventEnum.SHUTDOWN: "shutdown_system",
     }
-
-    def status_callback(self, msg: any) -> None:
-        """Handle incoming status messages."""
-        self.node.get_logger().info(f"Status received: {msg}")
 
     def __init__(
         self,
@@ -68,77 +66,84 @@ class FSM:
         qos: QoSProfile = None,
         initial_state: StatusEnum = StatusEnum.ACTIVE,
     ):
-        """ 
-        Initializes the FSM with the given ROS 2 node context,
-        once FSM structure is defined, we set up the I/O buses for the 
-        fsm transitions and status updates.
-        """
-        # Set defaults
         if cb_group is None:
             cb_group = ReentrantCallbackGroup()
         if qos is None:
             qos = qos_profile_system_default
-            
-        # Initialize the state machine
+
+        # Initialize state machine, after hook will publish status
         self.machine = Machine(
             model=self,
             states=self.states,
             initial=initial_state,
-            after_state_change=self.publish_status,
-            ignore_invalid_triggers=True,  # Prevents crashes on invalid transitions
+            after_state_change="publish_status",
+            ignore_invalid_triggers=True,
         )
-        
-        # Add all transitions with proper state references
         self._add_transitions()
-        
-        # Initialize ROS components
         self.__post_init__(node=node, cb_group=cb_group, qos=qos)
 
     def _add_transitions(self):
-        """Add all FSM transitions with proper error handling."""
-        try:
-            # Normal operational flow
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.TRANSITION_GUARD_ENABLED], StatusEnum.ACTIVE, StatusEnum.TRANSITIONING
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.TRANSITION_COMPLETE], StatusEnum.TRANSITIONING, StatusEnum.ACTIVE
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.MISSION_COMPLETE], StatusEnum.ACTIVE, StatusEnum.MISSION_COMPLETE
-            )
+        # Normal operational flow
+        self.machine.add_transition(
+            trigger="enable_guard",
+            source=StatusEnum.ACTIVE,
+            dest=StatusEnum.TRANSITIONING,
+            after="on_guard_enabled"
+        )
+        self.machine.add_transition(
+            trigger="complete_transition",
+            source=StatusEnum.TRANSITIONING,
+            dest=StatusEnum.ACTIVE,
+            after="on_transition_complete"
+        )
+        self.machine.add_transition(
+            trigger="finish_mission",
+            source=StatusEnum.ACTIVE,
+            dest=StatusEnum.MISSION_COMPLETE,
+            after="on_mission_complete"
+        )
 
-            # Error handling transitions
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.RECOVERABLE_ERROR], StatusEnum.ACTIVE, StatusEnum.ERROR
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.RECOVERABLE_ERROR], StatusEnum.TRANSITIONING, StatusEnum.ERROR
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.ATTEMPT_FIX], StatusEnum.ERROR, StatusEnum.RECOVERING
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.RECOVERED], StatusEnum.RECOVERING, StatusEnum.ACTIVE
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.RECOVERY_FAILED], StatusEnum.RECOVERING, StatusEnum.ERROR
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.CRITICAL_FAILURE], StatusEnum.ERROR, StatusEnum.FATAL
-            )
-            self.machine.add_transition(
-                self.transition_function_map[EventEnum.CRITICAL_FAILURE], StatusEnum.RECOVERING, StatusEnum.FATAL
-            )
-            
-            # Shutdown transitions (from any state except FATAL)
-            for state in StatusEnum:
-                if state != StatusEnum.FATAL:
-                    self.machine.add_transition("shutdown", state, StatusEnum.FATAL)
-                    
-        except Exception as e:
-            print(f"Error adding transitions: {e}")
-            raise
+        # Error handling
+        self.machine.add_transition(
+            trigger="handle_recoverable_error",
+            source=[StatusEnum.ACTIVE, StatusEnum.TRANSITIONING],
+            dest=StatusEnum.ERROR,
+            after="on_recoverable_error"
+        )
+        self.machine.add_transition(
+            trigger="attempt_fix_process",
+            source=StatusEnum.ERROR,
+            dest=StatusEnum.RECOVERING,
+            after="on_attempt_fix"
+        )
+        self.machine.add_transition(
+            trigger="complete_recovery",
+            source=StatusEnum.RECOVERING,
+            dest=StatusEnum.ACTIVE,
+            after="on_recovered"
+        )
+        self.machine.add_transition(
+            trigger="fail_recovery",
+            source=StatusEnum.RECOVERING,
+            dest=StatusEnum.ERROR,
+            after="on_recovery_failed"
+        )
+        self.machine.add_transition(
+            trigger="handle_critical_failure",
+            source=[StatusEnum.ERROR, StatusEnum.RECOVERING],
+            dest=StatusEnum.FATAL,
+            after="on_critical_failure"
+        )
+
+        # Shutdown from any non-fatal state
+        for state in StatusEnum:
+            if state != StatusEnum.FATAL:
+                self.machine.add_transition(
+                    trigger="shutdown_system",
+                    source=state,
+                    dest=StatusEnum.FATAL,
+                    after="on_shutdown"
+                )
 
     def __post_init__(
         self,
@@ -146,43 +151,35 @@ class FSM:
         cb_group: CallbackGroup = None,
         qos: QoSProfile = None
     ):
-        """ 
-        Post FSM definition initialization.
-        This method sets up the I/O buses for the FSM transitions and status updates.
-        """
         if cb_group is None:
             cb_group = ReentrantCallbackGroup()
         if qos is None:
             qos = qos_profile_system_default
-            
+
         self.node = node
         self.cb_group = cb_group
         self.qos = qos
 
-        try:
-            self.status_bus: StatusBus = StatusBus(
-                node=self.node, 
-                status_callback=self.status_callback, 
-                cb_group=self.cb_group, 
-                qos=self.qos
-            )
-            self.event_bus: EventBus = EventBus(
-                node=node,
-                event_callback=self.trigger_transition,
-                cb_group=cb_group,
-                qos=qos,
-            )
-        except Exception as e:
-            self.node.get_logger().error(f"Failed to initialize buses: {e}")
-            raise
+        self.status_bus: StatusBus = StatusBus(
+            node=self.node,
+            status_callback=self.status_callback,
+            cb_group=self.cb_group,
+            qos=self.qos
+        )
+        self.event_bus: EventBus = EventBus(
+            node=node,
+            event_callback=self.trigger_transition,
+            cb_group=cb_group,
+            qos=qos,
+        )
+
+    def status_callback(self, msg: any) -> None:
+        self.node.get_logger().info(f"Status received: {msg}")
 
     def publish_status(self):
-        """ 
-        Publishes the current state of the FSM to the status bus.
-        """
         try:
             self.status_bus.publish(
-                data=self.state, 
+                data=self.state,
                 message=f"State changed to {self.state}",
             )
             self.node.get_logger().info(f"Published status: {self.state}")
@@ -190,193 +187,68 @@ class FSM:
             self.node.get_logger().error(f"Failed to publish status: {e}")
 
     def trigger_transition(self, event: AutomatonEvents):
-        """
-        Triggers a watchdog fsm transition utilizing an AutomatonEvents msg published
-        via ros2 topic `/automaton/events`
-        """
-        try:
-            if not isinstance(event, AutomatonEvents):
-                raise TypeError(
-                    f"HybrautWatchdog::trigger_transition: event received invalid type: got: {type(event)}, "
-                    "expected AutomatonEvents"
-                )
-
-            # Create mapping from event type value to EventEnum
-            enum_dict = {enum.value: enum for enum in EventEnum}
-
-            if event.type not in enum_dict:
-                self.node.get_logger().warn(
-                    f"HybrautWatchdog::trigger_transition: event type received: `{event.type}` "
-                    "invalid, not within event options for watchdog fsm"
-                )
-                return
-
-            event_enum = enum_dict.get(event.type)
-            self.node.get_logger().info(f"Processing event: {event_enum} with message: {event.message}")
-            
-            self.perform_event_driven_transition(event_enum)
-            
-        except Exception as e:
-            self.node.get_logger().error(f"HybrautWatchdog::trigger_transition: {str(e)}")
-            self.handle_transition_failure(e)
+        if not isinstance(event, AutomatonEvents):
+            self.node.get_logger().error(f"Invalid event type: {type(event)}")
+            return
+        enum_dict = {enum.value: enum for enum in EventEnum}
+        if event.type not in enum_dict:
+            self.node.get_logger().warn(f"Unknown event: {event.type}")
+            return
+        event_enum = enum_dict[event.type]
+        self.node.get_logger().info(f"Processing event: {event_enum}")
+        self.perform_event_driven_transition(event_enum)
 
     def perform_event_driven_transition(self, event: EventEnum):
-        """
-        Performs a transition based on the enum value for event msg
-        """
-        if not isinstance(event, EventEnum):
-            raise ValueError(
-                f"HybrautWatchdog::perform_event_driven_transition: invalid event type, "
-                f"got: `{type(event)}`, expected: `EventEnum`"
-            )
+        trigger = self.transition_function_map.get(event)
+        if not trigger:
+            raise ValueError(f"No trigger mapped for event {event}")
+        if not hasattr(self, trigger):
+            raise AttributeError(f"Trigger method {trigger} not found")
+        getattr(self, trigger)()
+        self.node.get_logger().info(f"Fired trigger: {trigger}")
 
-        transition_func_name = self.transition_function_map.get(event)
+    # Callback handlers (after transitions)
+    def on_guard_enabled(self, event):
+        self.node.get_logger().info(
+            # f"Guard enabled: {event.transition.source} → {event.transition.dest}"
+            f"Guard enabled, transitioning: {event}"
+        )
 
-        if transition_func_name is None:
-            raise ValueError(
-                f"HybrautWatchdog::perform_event_driven_transition: event {event} not mapped to transition function"
-            )
+    def on_transition_complete(self, event):
+        self.node.get_logger().info(
+            f"Guard enabled, transitioning: {event}"
+        )
 
-        try:
-            if hasattr(self, transition_func_name):
-                transition_func = getattr(self, transition_func_name)
-                transition_func()
-                self.node.get_logger().info(f"Successfully executed transition: {transition_func_name}")
-            else:
-                raise AttributeError(f"Method {transition_func_name} not found")
-                
-        except Exception as e:
-            self.node.get_logger().error(f"Transition failed: {e}")
-            self.handle_transition_failure(e)
+    def on_mission_complete(self, event):
+        self.node.get_logger().info("Mission completed successfully")
 
-    def handle_transition_failure(self, error: Exception):
-        """Handle failures during state transitions."""
-        self.node.get_logger().error(f"Transition failure: {error}")
-        
-        # If we're not already in an error state, try to transition to error
-        if self.state not in [StatusEnum.ERROR, StatusEnum.FATAL, StatusEnum.RECOVERING]:
-            try:
-                self.recoverable_error()
-            except Exception as recovery_error:
-                self.node.get_logger().fatal(f"Failed to enter error state: {recovery_error}")
-                # Last resort - try critical failure
-                try:
-                    self.critical_failure()
-                except Exception:
-                    self.node.get_logger().fatal("System in unrecoverable state")
+    def on_recoverable_error(self, event):
+        self.node.get_logger().warning("Entered ERROR state")
 
-    # Transition methods with improved error handling and logging
-    def transition_to_active(self):
-        """Transition to active state on valid mission request."""
-        self.node.get_logger().info("FSM: Transitioning to ACTIVE state")
-        # Add any additional logic needed for activation
+    def on_attempt_fix(self, event):
+        self.node.get_logger().info("Attempting to recover from error")
 
-    def transition_guard_enabled(self):
-        """Handle transition guard enabled event."""
-        current_state = self.state
-        self.node.get_logger().info(f"FSM: Transition guard enabled from state {current_state}")
-        
-        if current_state == StatusEnum.ACTIVE:
-            # This will trigger the machine transition to TRANSITIONING
-            pass
-        else:
-            self.node.get_logger().warn(f"Cannot enable transition guard from state {current_state}")
+    def on_recovered(self, event):
+        self.node.get_logger().info("Recovery successful, back to ACTIVE")
 
-    def transition_complete(self):
-        """Handle transition complete event."""
-        current_state = self.state
-        self.node.get_logger().info(f"FSM: Transition complete from state {current_state}")
-        
-        if current_state == StatusEnum.TRANSITIONING:
-            # This will trigger the machine transition back to ACTIVE
-            pass
-        else:
-            self.node.get_logger().warning(f"Cannot complete transition from state {current_state}")
+    def on_recovery_failed(self, event):
+        self.node.get_logger().error("Recovery attempt failed, back in ERROR")
 
-    def recoverable_error(self):
-        """Handle recoverable error event."""
-        current_state = self.state
-        self.node.get_logger().warning(f"FSM: Recoverable error occurred in state {current_state}")
-        
-        if current_state in [StatusEnum.ACTIVE, StatusEnum.TRANSITIONING]:
-            # This will trigger the machine transition to ERROR
-            pass
-        else:
-            self.node.get_logger().warning(f"Cannot handle recoverable error from state {current_state}")
+    def on_critical_failure(self, event):
+        self.node.get_logger().fatal("Critical failure: entering FATAL state")
 
-    def attempt_fix(self):
-        """Handle attempt fix event."""
-        current_state = self.state
-        self.node.get_logger().info(f"FSM: Attempting to fix error from state {current_state}")
-        
-        if current_state == StatusEnum.ERROR:
-            # This will trigger the machine transition to RECOVERING
-            pass
-        else:
-            self.node.get_logger().warning(f"Cannot attempt fix from state {current_state}")
+    def on_shutdown(self, event):
+        self.node.get_logger().info("Shutdown initiated: entering FATAL state")
 
-    def recovered(self):
-        """Handle recovered event."""
-        current_state = self.state
-        self.node.get_logger().info(f"FSM: Recovered from error, was in state {current_state}")
-        
-        if current_state == StatusEnum.RECOVERING:
-            # This will trigger the machine transition back to ACTIVE
-            pass
-        else:
-            self.node.get_logger().warning(f"Cannot recover from state {current_state}")
-
-    def recovery_failed(self):
-        """Handle recovery failed event."""
-        current_state = self.state
-        self.node.get_logger().error(f"FSM: Recovery failed from state {current_state}")
-        
-        if current_state == StatusEnum.RECOVERING:
-            # This will trigger the machine transition back to ERROR
-            pass
-        else:
-            self.node.get_logger().warn(f"Cannot fail recovery from state {current_state}")
-
-    def critical_failure(self):
-        """Handle critical failure event."""
-        current_state = self.state
-        self.node.get_logger().fatal(f"FSM: Critical failure occurred in state {current_state}")
-        
-        if current_state in [StatusEnum.ERROR, StatusEnum.RECOVERING]:
-            # This will trigger the machine transition to FATAL
-            pass
-        else:
-            self.node.get_logger().warning(f"Cannot handle critical failure from state {current_state}")
-
-    def mission_complete(self):
-        """Handle mission complete event."""
-        current_state = self.state
-        self.node.get_logger().info(f"FSM: Mission completed successfully from state {current_state}")
-        
-        if current_state == StatusEnum.ACTIVE:
-            # This will trigger the machine transition to MISSION_COMPLETE
-            pass
-        else:
-            self.node.get_logger().warn(f"Cannot complete mission from state {current_state}")
-
-    def shutdown(self):
-        """Handle shutdown event."""
-        current_state = self.state
-        self.node.get_logger().info(f"FSM: System shutdown initiated from state {current_state}")
-        # This will trigger the machine transition to FATAL (terminal state)
-
+    # Utilities
     def get_current_state(self) -> StatusEnum:
-        """Get the current state of the FSM."""
         return self.state
 
     def get_valid_transitions(self) -> list:
-        """Get list of valid transitions from current state."""
         return self.machine.get_triggers(self.state)
 
     def is_terminal_state(self) -> bool:
-        """Check if current state is terminal (FATAL)."""
         return self.state == StatusEnum.FATAL
-
 
 def main():
     """
