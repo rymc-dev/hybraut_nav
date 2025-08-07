@@ -76,7 +76,7 @@ class FSM:
             model=self,
             states=self.states,
             initial=initial_state,
-            after_state_change="publish_status",
+            after_state_change=lambda event: self.publish_status(event),
             ignore_invalid_triggers=True,
         )
         self._add_transitions()
@@ -176,13 +176,13 @@ class FSM:
     def status_callback(self, msg: any) -> None:
         self.node.get_logger().info(f"Status received: {msg}")
 
-    def publish_status(self):
+    def publish_status(self, event: any):
         try:
             self.status_bus.publish(
-                data=self.state,
-                message=f"State changed to {self.state}",
+                data=self.get_current_state(),
+                message=f"State changed to {self.get_current_state()}",
             )
-            self.node.get_logger().info(f"Published status: {self.state}")
+            self.node.get_logger().info(f"Published status: {self.get_current_state()}")
         except Exception as e:
             self.node.get_logger().error(f"Failed to publish status: {e}")
 
@@ -204,7 +204,7 @@ class FSM:
             raise ValueError(f"No trigger mapped for event {event}")
         if not hasattr(self, trigger):
             raise AttributeError(f"Trigger method {trigger} not found")
-        getattr(self, trigger)()
+        getattr(self, trigger)(event)
         self.node.get_logger().info(f"Fired trigger: {trigger}")
 
     # Callback handlers (after transitions)
@@ -285,6 +285,14 @@ def main():
         
         # Test sequence
         test_events = [
+            (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
+            (EventEnum.TRANSITION_COMPLETE, "transition completed"),
+            (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
+            (EventEnum.TRANSITION_COMPLETE, "transition completed"),
+            (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
+            (EventEnum.TRANSITION_COMPLETE, "transition completed"),
+            (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
+            (EventEnum.TRANSITION_COMPLETE, "transition completed"),
             (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
             (EventEnum.TRANSITION_COMPLETE, "transition completed"),
             # (EventEnum.RECOVERABLE_ERROR, "recoverable error occurred"),
