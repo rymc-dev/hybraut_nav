@@ -14,8 +14,6 @@ It is intended to be run as part of a ROS 2 application, where it can respond
 to events and publish status updates to a topic.
 """
 
-# Standard library imports
-import time
 
 # Third-party imports
 from transitions import Machine
@@ -33,11 +31,11 @@ from builtin_interfaces.msg import Time
 from hybraut_interfaces.msg import AutomatonEvents, AutomatonStatus
 
 # Local imports
-from hybraut_executor.watchdog.constants import StatusEnum, EventEnum
-from hybraut_executor.watchdog.comm import StatusBus, EventBus
+from hybraut_executor_watchdog.hybraut_consts import StatusEnum, EventEnum
+from hybraut_executor_watchdog.hybraut_bus import StatusBus, EventBus
 
 
-class HybrautWatchdogFSM:
+class FSM:
     """
     an implementation of a finate state machine (fsm) which
     acts as a watchdog for hybraut system.
@@ -58,9 +56,9 @@ class HybrautWatchdogFSM:
         EventEnum.SHUTDOWN: "shutdown",
     }
 
-    def status_callback():
+    def status_callback(self, msg: any) -> None:
         # TODO: placeholder for when status are recieved.
-        ...
+        print (f"status received: {msg}")
 
     def __init__(
         self,
@@ -78,7 +76,7 @@ class HybrautWatchdogFSM:
         self.logger = node.get_logger()
 
         self.status_bus: StatusBus = StatusBus(
-            node=node, status_callback=None, cb_group=cb_group, qos=qos
+            node=node, status_callback=self.status_callback, cb_group=cb_group, qos=qos
         )
         self.event_bus: EventBus = EventBus(
             node=node,
@@ -142,9 +140,17 @@ class HybrautWatchdogFSM:
             transition_func = self.__getattribute__(transition_func_name)
             transition_func()
         except Exception as e:
-            self.logger.error(
-                f"Transition failed on '{trigger_name}' from '{self.state}': {e}"
-            )
+            self.handle_transition_failure(e)
+
+    def handle_transition_failure(self, error: Exception): 
+        self.logger.error(
+            f"HybrautWatchdog::handle_transition_failure: Transition failed with error: {error}"
+        )
+        self.event_bus.publish(
+            data=AutomatonEvents.RECOVERABLE_ERROR,
+            message=str(error)
+        )
+
 
     def trigger_transition(self, event: AutomatonEvents):
         """triggers a watchdog fsm transition utilizing a AutomatonEvents msg published
@@ -178,8 +184,7 @@ class HybrautWatchdogFSM:
             time.sleep(0.02)
             # UPDATE THE CURRENT STATE
             try:
-                state_value = self.state.value
-                self.status_bus.publish(status=self.state, message="")
+                self.status_bus.publish(data=self.state, message="")
             except Exception as e:
                 print(e)  # TODO: improve debugging.
             # self.status_bus.publish()
@@ -187,58 +192,8 @@ class HybrautWatchdogFSM:
             raise Exception(f"HybrautWatchdog::trigger_transition: {str(e)}")
 
         self.node.get_logger().info(
-            f"transition completed, current_state: {self.state}"
+            f"transition sent, current_state: {self.state}"
         )
-
-    """TRANSITION FUNCTIONS"""
-
-    def transition_to_active(self):
-        """auto transition"""
-
-    def transition_guard_enabled(self):
-        """occurs when automaton guard transition in enabled."""
-
-    def transition_complete(self):
-        """transition function on transition from STATE.TRANSITIONING to STATE.ACTIVE"""
-        ...
-
-    def recoverable_error(self):
-        """transition function STATE.* to STATE.ERROR"""
-        ...
-
-    def attempt_fix(self):
-        """transition to STATE.ERROR to STATE.RECOVERING"""
-        ...
-
-    def recovered(self):
-        """transition from state.RECOVERY to state.ACTIVE"""
-        ...
-
-    def recovery_failed(self):
-        """transition from state.RECOVERY to state.FATAL, which triggers
-        auto transition to TERMINAL [*] state which should shutdown the hybraut lifecycle
-        """
-        ...
-
-    def critical_failure(self):
-        """
-        transition from State.[RECOVERY, ERROR] to terminal state [*]
-        this occurs when a critical exception occurs, something that the
-        actions of the RECOVERY state can't deal with.
-        """
-        ...
-
-    def mission_complete(self):
-        """
-        transition from state.[q_goals] to terminal state [*] which will
-        trigger the lifecycle transition for the hybrauts lifecycle node from
-        LIFECYCLE_STATE.ACTIVE to LIFECYCLE_STATE.INACTIVE
-        """
-        ...
-
-    def shutdown(self):
-        """transition from state.FATAL to terminal [*]"""
-        ...
 
 
 if __name__ == "__main__":
@@ -259,10 +214,17 @@ if __name__ == "__main__":
         callback=lambda msg: status_callback(msg),
     )
 
-    status_fsm = HybrautWatchdogFSM(node=mock_node)
+    status_fsm = FSM(node=mock_node)
+    # status_fsm.trigger_transition(
+    #     AutomatonEvents(
+    #         type=AutomatonEvents.TRANSITION_GUARD_ENABLED,
+    #         stamp=mock_node.get_clock().now().to_msg(),
+    #     )
+    # )
+
     status_fsm.trigger_transition(
         AutomatonEvents(
-            type=AutomatonEvents.TRANSITION_GUARD_ENABLED,
+            type=AutomatonEvents.TRANSITION_COMPLETE,
             stamp=mock_node.get_clock().now().to_msg(),
         )
     )

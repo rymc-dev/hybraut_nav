@@ -1,0 +1,7 @@
+**/__pycache__/ 
+**/.vscode/ 
+**/.vscode-test/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ropeproject/
+**/.coverage

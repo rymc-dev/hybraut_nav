@@ -17,7 +17,7 @@ def main():
     import sys
 
     sys.path.append(os.path.dirname(__file__))
-    from src.hybraut_watchdog import HybrautWatchdogFSM
+    from src.hybraut_executor_watchdog.fsm import HybrautWatchdogFSM
     from hybraut_interfaces.msg import AutomatonEvents
 
     watchdog_instance: HybrautWatchdogFSM = HybrautWatchdogFSM(node=node)
