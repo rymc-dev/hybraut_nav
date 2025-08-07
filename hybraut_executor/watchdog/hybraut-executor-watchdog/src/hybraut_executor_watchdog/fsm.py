@@ -76,7 +76,7 @@ class FSM:
         self.logger = node.get_logger()
 
         self.status_bus: StatusBus = StatusBus(
-            node=node, status_callback=self.status_callback, cb_group=cb_group, qos=qos
+            node=node, status_callback=None, cb_group=cb_group, qos=qos
         )
         self.event_bus: EventBus = EventBus(
             node=node,
@@ -116,8 +116,13 @@ class FSM:
         self.machine.add_transition("shutdown", "FATAL", None)  # Terminal
 
     def publish_status(self):
-        self.logger.info(f"Publishing status: {self.state}")
-        # TODO: Implement status publishing logic
+        """ 
+        publishes the current state of the FSM to the status bus.
+        """
+        self.status_bus.publish(
+            data=self.state, 
+            message=f"State changed to {self.state}",
+        )
 
     def perform_event_driven_transition(self, event: EventEnum):
         """
@@ -180,20 +185,10 @@ class FSM:
         try:
             self.perform_event_driven_transition(enum_dict.get(event.type))
             import time
-
             time.sleep(0.02)
-            # UPDATE THE CURRENT STATE
-            try:
-                self.status_bus.publish(data=self.state, message="")
-            except Exception as e:
-                print(e)  # TODO: improve debugging.
-            # self.status_bus.publish()
         except Exception as e:
             raise Exception(f"HybrautWatchdog::trigger_transition: {str(e)}")
 
-        self.node.get_logger().info(
-            f"transition sent, current_state: {self.state}"
-        )
 
 
 if __name__ == "__main__":
@@ -215,18 +210,35 @@ if __name__ == "__main__":
     )
 
     status_fsm = FSM(node=mock_node)
-    # status_fsm.trigger_transition(
-    #     AutomatonEvents(
-    #         type=AutomatonEvents.TRANSITION_GUARD_ENABLED,
-    #         stamp=mock_node.get_clock().now().to_msg(),
-    #     )
-    # )
-
     status_fsm.trigger_transition(
         AutomatonEvents(
-            type=AutomatonEvents.TRANSITION_COMPLETE,
+            type=AutomatonEvents.TRANSITION_GUARD_ENABLED,
             stamp=mock_node.get_clock().now().to_msg(),
         )
     )
+
+    import time
+
+    time.sleep(0.1)
+
+    status_fsm.trigger_transition(
+        AutomatonEvents(
+            type=AutomatonEvents.TRANSITION_COMPLETE
+        )
+    )
+
+    time.sleep(0.1)
+    status_fsm.trigger_transition(
+        AutomatonEvents(
+            type=AutomatonEvents.MISSION_COMPLETE
+        )
+    )
+
+    # status_fsm.trigger_transition(
+    #     AutomatonEvents(
+    #         type=AutomatonEvents.TRANSITION_COMPLETE,
+    #         stamp=mock_node.get_clock().now().to_msg(),
+    #     )
+    # )
 
     rclpy.shutdown()
