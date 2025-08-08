@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: MIT
 
-from .fsm import FSM
+from .fsm import FSM, CustomFSM
 
-__all__ = ["FSM"]
+__all__ = [
+    "FSM"
+    "CustomFSM"
+]
