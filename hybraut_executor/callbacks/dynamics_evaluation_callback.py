@@ -3,6 +3,10 @@
 
 """
 
+# TODO: dynamics evaluation is going to output to it's own output topic like with resets. 
+#       not only simplifying the code for the executor and improving udp communication 
+#       but also enhancing the modularity and reusability of the codebase.
+
 from rclpy.node import Node
 from typing import List, Any, Dict, Callable
 from threading import Lock
