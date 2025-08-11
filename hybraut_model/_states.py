@@ -61,18 +61,20 @@ class State:
         # stash everything you need
         self._name       = name
         self._topic      = topic
+        self._msg_type   = msg_type
         self._node       = node
         self._update_hz  = update_hz
         self._timeout_sec= timeout_sec
         self._max_errors = max_errors
 
         # build the bus
-        self._state_bus = StateBus.initialize_state_bus(
-            node=node,
-            topic=topic,
-            msg_type=msg_type,
-            subscription_callback=self.update_state,
-        )
+        self._state_bus = None
+        # self._state_bus = StateBus.initialize_state_bus(
+        #     node=node,
+        #     topic=topic,
+        #     msg_type=msg_type,
+        #     subscription_callback=self.update_state,
+        # )
         self._is_active = False
         self._current_state = None
         self._error_count = 0
@@ -110,7 +112,7 @@ class State:
 
         self._logger.info(f"Activating state '{self._name}' on topic '{self._topic}'")
         
-        self._state_bus.activate()
+        # self._state_bus.activate()
         self._is_active = True
         
         self._logger.debug(f"State '{self._name}' successfully activated")
@@ -158,7 +160,7 @@ class State:
         
         self._logger.info(f"Deactivating state '{self._name}'")
         
-        self._state_bus.deactivate()
+        # self._state_bus.deactivate()
         self._is_active = False
 
         self._logger.debug(f"State '{self._name}' successfully deactivated")
@@ -179,11 +181,11 @@ class State:
 
     def __str__(self) -> str:
         """Return a human-readable string representation."""
-        return f"<State '{self._name}' on topic '{self._state_bus._topic}' (Active: {self._is_active})>"
+        return f"<State '{self._name}' on topic '{"state bus topic"}' (Active: {self._is_active})>"
 
     def __repr__(self) -> str:
         """Return a detailed string representation for debugging."""
-        msg_type_name = getattr(self._state_bus._msg_type, '__name__', str(self._state_bus._msg_type))
+        msg_type_name = "" #getattr(self._state_bus._msg_type, '__name__', "state topic") # str(self._state_bus._msg_type))
         return (f"State(_name={self._name!r}, _topic={self._state_bus._topic!r}, "
                 f"_msg_type={msg_type_name}, _is_active={self._is_active}, "
                 f"_update_hz={self._update_hz}, _timeout_sec={self._timeout_sec}, "
@@ -198,8 +200,8 @@ class State:
         """
         return {
             "name": self._name,
-            "topic": self._state_bus._topic,
-            "message_type": getattr(self._state_bus._msg_type, '__name__', str(self._state_bus._msg_type)),
+            # "topic": self._state_bus._topic,
+            # "message_type": getattr(self._state_bus._msg_type, '__name__', str(self._state_bus._msg_type)),
             "active": self._is_active,
             "update_hz": self._update_hz,
             "timeout_sec": self._timeout_sec,
@@ -212,7 +214,7 @@ class State:
 
 
     @property
-    def state_bus(self) -> StateBus:
+    def state_bus(self) -> None:
         return self._state_bus
 
     @property

@@ -119,7 +119,7 @@ class Transition:
         """
         pass
 
-from hybraut_model.guards import GuardWrapper
+from hybraut_model._guards import GuardWrapper
 from hybraut_interfaces.msg import GuardEvaluationMSG 
 from hybraut_interfaces.msg import TransitionEvaluationMSG
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
