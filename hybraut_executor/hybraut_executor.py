@@ -17,10 +17,12 @@ from rclpy.clock import Clock, ClockType
 from builtin_interfaces.msg import Duration
 from rclpy.callback_groups import CallbackGroup
 
+from hybraut_executor_watchdog import FSM
+
 
 SYSTEM_CLOCK: Clock = None
 
-class AutomatonExecutor:
+class AutomatonExecutor(FSM):
 
     state_name_map = {
         "INACTIVE": 0,
@@ -44,8 +46,11 @@ class AutomatonExecutor:
     invariant_evaluator_timer: Timer
     dynamics_evaluation_timer: Timer
 
-
     def __init__(self, node: Node, amdl: dict):
+        
+        super().__init__(node=node, cb_group=ReentrantCallbackGroup(), qos=QoSProfile(depth=10))
+        self.error_count = 0
+        self.recovery_attempts = 0
 
         self._automaton_model = HybridAutomaton.register_automaton(
             node=node,
@@ -135,7 +140,6 @@ class AutomatonExecutor:
                 pub
             )
 
-
     def on_before_activate(self):
         
         self._activation_time = self._clock.now()
@@ -211,6 +215,43 @@ class AutomatonExecutor:
     def _invariant_enforcement_callback(self):
         pass
 
+
+    """ === on Transition Functions === """
+
+    def on_recoverable_error(self, event):
+        """Override to add error tracking."""
+        # Call parent implementation first
+        super().on_recoverable_error(event)
+        
+        # Add custom behavior
+        self.error_count += 1
+        self.node.get_logger().info(f"Total errors encountered: {self.error_count}")
+        
+        # Perform additional error analysis
+        if self.error_count > 5:
+            self.node.get_logger().warning("High error count detected!")
+
+    def on_attempt_fix(self, event):
+        """Override to add recovery attempt tracking."""
+        # Call parent implementation
+        super().on_attempt_fix(event)
+        
+        # Add custom behavior
+        self.recovery_attempts += 1
+        self.node.get_logger().info(f"Recovery attempt #{self.recovery_attempts}")
+
+    def pre_guard_enabled(self, event):
+        """Hook called before guard enabled logic."""
+        self.node.get_logger().info("Preparing for guard activation...")
+
+    def post_mission_complete(self, event):
+        """Hook called after mission complete logic."""
+        self.node.get_logger().info(f"Mission statistics: {self.error_count} errors, {self.recovery_attempts} recoveries")
+
+    def _execute_shutdown_logic(self, event):
+        """Custom shutdown logic."""
+        self.node.get_logger().info("Performing custom cleanup before shutdown...")
+        # Add custom cleanup code here
 
 import rclpy
 from rclpy.node import Node
