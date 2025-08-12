@@ -23,7 +23,7 @@ from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
 
-class HybrautDynamicEvaluator:
+class DynamicEvaluator:
     """ 
     Evaluator for dynamics
     """

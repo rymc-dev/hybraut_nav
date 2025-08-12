@@ -9,6 +9,8 @@ from rclpy.node import Node
 from rclpy.time import Duration
 from typing import List
 
+# TODO: Lets initialize the watchdog in here
+
 class RuntimeTracker:
     """
     tracks the execution during runtime for the hybraut model

@@ -7,7 +7,7 @@ from threading import Lock
 
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
 
-class TransitionsEvaluator: 
+class TransitionEvaluator: 
     """
     Evaluator for transitions in a Hybraut hybrid automaton
     """
