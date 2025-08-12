@@ -1,14 +1,17 @@
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+This module defines the State class for managing ROS2 state topics,
+including lifecycle management, message handling, and error tracking.
+It also provides a StateRegistry for managing multiple states.
+"""
+
+
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Type
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Type
 
-from builtin_interfaces.msg import Time
-
-from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.node import Node
-from rclpy.publisher import Publisher
-from rclpy.qos import QoSProfile, qos_profile_default
-from rclpy.subscription import Subscription
 
 from hybraut_model.automaton_types.msg_type import MsgType
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
@@ -17,43 +20,19 @@ from hybraut_model.component_interfaces.registry_interface import ComponentRegis
 logger = logging.getLogger(__name__)
 
 
-
-        
-
 class State:
+    """ 
+    Represents a state in the ROS2 system, managing a specific topic and message type.
+    This class handles the lifecycle of the state, including activation, deactivation,
+    and error management.
     """
-    Manages the lifecycle and data flow of a ROS2 state topic.
-    
-    This class encapsulates a bidirectional ROS2 topic (publisher/subscriber pair)
-    with automatic message handling, error tracking, and lifecycle management.
-    
-    Attributes:
-        _name (str): Unique identifier for this state
-        _topic (str): ROS2 topic name
-        _msg_type (Any): ROS2 message type class
-        _current_state (Any): Most recent received message
-        _last_update (Time): Timestamp of last message reception
-        _state_publisher (Publisher): ROS2 publisher instance
-        _state_subscription (Subscription): ROS2 subscription instance
-        _update_hz (Optional[int]): Expected update frequency in Hz
-        _timeout_sec (Optional[float]): Message timeout threshold in seconds
-        _is_active (bool): Whether publisher/subscriber are active
-        _error_count (int): Number of errors encountered
-        _max_errors (int): Maximum allowed errors before flagging
-        _logger (logging.Logger): Dedicated logger for this state instance
-    
-    Raises:
-        RuntimeError: When attempting invalid lifecycle transitions
-    """
-
+        
     def __init__(
         self,
         name: str,
         topic: str,
         node: Node,
         msg_type: Type,
-        qos_profile: Optional[QoSProfile] = None,
-        cb_group: Optional[CallbackGroup] = None,
         update_hz: Optional[int] = None,
         timeout_sec: Optional[float] = None,
         max_errors: int = 10
@@ -69,12 +48,6 @@ class State:
 
         # build the bus
         self._state_bus = None
-        # self._state_bus = StateBus.initialize_state_bus(
-        #     node=node,
-        #     topic=topic,
-        #     msg_type=msg_type,
-        #     subscription_callback=self.update_state,
-        # )
         self._is_active = False
         self._current_state = None
         self._error_count = 0
@@ -97,26 +70,6 @@ class State:
         # min_expected_interval = 1.0 / expected_hz
         # return time_since_update <= timeout_sec and time_since_update <= 2 * min_expected_interval
 
-    def activate(self) -> None:
-        """
-        Activate the state by creating publisher and subscriber.
-        
-        This method transitions the state from inactive to active, creating
-        the necessary ROS2 communication infrastructure.
-            
-        Raises:
-            RuntimeError: If state is already active
-        """
-        if self._is_active:
-            raise RuntimeError(f"State '{self._name}' is already active")
-
-        self._logger.info(f"Activating state '{self._name}' on topic '{self._topic}'")
-        
-        # self._state_bus.activate()
-        self._is_active = True
-        
-        self._logger.debug(f"State '{self._name}' successfully activated")
-
     def update_state(self, current_state: Any): 
         """
         Internal callback for processing received state messages.
@@ -131,39 +84,13 @@ class State:
         try:
             # Update state data
             self._current_state = current_state
-            self._last_update = node.get_clock().now().to_msg()
-            
+
             # Reset error count on successful reception
             self.reset_error_count()
             self._logger.debug(f"Successfully processed message for state '{self._name}'")
         except Exception as e:
             self.increment_error_count()
             self._logger.error(f"Error processing message for state '{self._name}': {e}")
-
-    def deactivate(self) -> None:
-        """
-        Deactivate the state by cleaning up publisher and subscription.
-        
-        This method transitions the state from active to inactive, properly
-        cleaning up ROS2 resources to prevent memory leaks.
-        
-        Args:
-            node (Node): ROS2 node containing the publisher/subscriber
-            
-        Raises:
-            RuntimeError: If state is not active or node is invalid
-        """
-        if not self._is_active:
-            raise RuntimeError(f"State '{self._name}' is not currently active")
-        if not isinstance(node, Node):
-            raise RuntimeError('node must be of type rclpy.node.Node')
-        
-        self._logger.info(f"Deactivating state '{self._name}'")
-        
-        # self._state_bus.deactivate()
-        self._is_active = False
-
-        self._logger.debug(f"State '{self._name}' successfully deactivated")
 
     def reset_error_count(self) -> None:
         """Reset the error counter to zero."""
@@ -275,8 +202,6 @@ class State:
                 topic = state_dict['topic'],
                 node = node,
                 msg_type = msg_type,
-                qos_profile = None,
-                cb_group = None,
                 update_hz = update_hz,
                 timeout_sec = timeout_sec,
                 max_errors = None
@@ -338,7 +263,9 @@ class StateRegistry(ComponentRegistry['State']):
         return registry
 
 
-if __name__ == '__main__':
+"""main function for testing the State and StateRegistry classes. not for production use."""
+
+def main():
     # Configure logging
     logging.basicConfig(
         level=logging.DEBUG,
@@ -408,3 +335,6 @@ if __name__ == '__main__':
     finally:
         rclpy.shutdown()
         thread.join()
+
+if __name__ == '__main__':
+    main()

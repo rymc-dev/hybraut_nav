@@ -1,10 +1,16 @@
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Evaluation context for the Hybraut framework.
+"""
+
 from dataclasses import dataclass
-# from states import StateRegistry
 from typing import Any
 from builtin_interfaces.msg import Time, Duration
 from typing import Dict, Any, List
 
 from typing import Any
+
 
 @dataclass
 class EvaluationContext:
@@ -13,6 +19,7 @@ class EvaluationContext:
     initialized on automaton evaluation time, and passed to evaluation
     functions.
     """
+
     states: Any
     current_mode: int
     stamp: Time
