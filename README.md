@@ -5,6 +5,7 @@ It supports a **multi-hierarchical architecture**, allowing you to define and cu
 
 This design makes it both **flexible** and **high-performance**, enabling advanced control logic for autonomous systems while preserving maintainability and modularity.
 
+NOTE: `for the full extensive documentation of this project, go to this page: [](https://www.notion.so/Automaton-Framework-2326804d21c580faa721edd1a8d4a914#2326804d21c580b99ac4eb5cdcc1966b)`
 
 # Table of Contents
 
