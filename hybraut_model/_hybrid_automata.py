@@ -1,10 +1,13 @@
-import threading
+# !/usr/bin/python3
+"""
+
+"""
+
+
 from dataclasses import dataclass, field
 from typing import List
 
-import rclpy
-from rclpy.executors import MultiThreadedExecutor
-from rclpy.node import Node
+
 
 from utils import now_to_ros_time_msg
 
@@ -40,9 +43,10 @@ class HybridAutomaton:
     _transitions: TransitionRegistry = field(init=True)
     _modes: ModeRegistry = field(init=True)
 
-    _event_bus: any = field(init=False)
-
-    def generate_evaluation_context(self, current_mode_id: int) -> EvaluationContext:
+    def _generate_evaluation_context(self, current_mode_id: int) -> EvaluationContext:
+        """
+        utility function for hybrid_automata for generating 
+        """
         return EvaluationContext(
             current_mode=current_mode_id,
             states=self._states,
@@ -57,7 +61,7 @@ class HybridAutomaton:
         """performs transition evaluations for the current mode"""
         current_mode:Mode = self._modes.get_mode(current_mode_id)
         possible_transitions = current_mode.get_transition_refs()
-        ctx = self.generate_evaluation_context(current_mode_id)
+        ctx = self._generate_evaluation_context(current_mode_id)
         transition_evaluations: TransitionEvaluationsMSG = self._transitions.evaluate_transitions(transitions=possible_transitions, ctx=ctx)
 
         return transition_evaluations
@@ -67,15 +71,15 @@ class HybridAutomaton:
         # TODO: Need to finish this.
         current_mode: Mode = self._modes.get_mode(current_mode_id)
         # validate the reset names are valid for the current mode
-        ctx = self.generate_evaluation_context(current_mode_id)
+        ctx = self._generate_evaluation_context(current_mode_id)
         resets = self._resets.get_components_by_names(reset_names)
-        return 
+        return
 
     def evaluate_invariants(self, current_mode_id: int) -> InvariantEvaluationsMSG:
         """performs invariant evaluations for the current mode"""
         current_mode: Mode = self._modes.get_mode(current_mode_id)
         invariant_names = current_mode.get_invariant_refs()
-        ctx = self.generate_evaluation_context(current_mode_id)
+        ctx = self._generate_evaluation_context(current_mode_id)
         invariant_evaluations: InvariantEvaluationsMSG = self._invariants.evaluate_invariants_by_name(invariant_names, ctx)
 
         return invariant_evaluations
@@ -83,7 +87,7 @@ class HybridAutomaton:
     def evaluate_dynamics(self, current_mode_id: int) -> AutomatonDynamicsEvaluation:
         current_mode:Mode = self._modes.get_mode(current_mode_id)
         dynamics_names = current_mode.get_dynamics_ref()
-        ctx = self.generate_evaluation_context(current_mode_id)
+        ctx = self._generate_evaluation_context(current_mode_id)
         dynamics_evaluation: AutomatonDynamicsEvaluation = self._dynamics.evaluate_dynamics_by_name(dynamics_names, ctx)
         
         return dynamics_evaluation
@@ -120,9 +124,19 @@ class HybridAutomaton:
             _transitions=transitions
         )
 
-import yaml
+
+"""
+the code below is purely for testing and not to be used in production
+"""
 
 if __name__ == '__main__':
+
+    import rclpy
+    from rclpy.executors import MultiThreadedExecutor
+    from rclpy.node import Node
+    import threading
+    import yaml
+
     rclpy.init()
     executors = MultiThreadedExecutor(num_threads=2)
 

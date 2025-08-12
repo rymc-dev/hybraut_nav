@@ -1,3 +1,45 @@
+# Hybraut Execution Engine (HEE)
+
+The **Hybraut Execution Engine (HEE)** is a package that encapsulates the **Hybraut Model (HM)**, transforming it from a passive, static representation of a hybrid automaton into an active, operational entity.  
+
+This is achieved by surrounding the HM with several functional blocks:  
+
+---
+
+### 1. `hm.evaluators`  
+The **evaluators** are a set of asynchronous callback functions running on ROS 2 timers. They execute:  
+- **Dynamic evaluation functions**  
+- **Transition evaluation functions**  
+- **Invariant evaluation functions**  
+
+These evaluations are published to relevant topics, enabling other components to consume, monitor, and visualize the automaton’s state and behaviour.  
+
+---
+
+### 2. `hm.event_handlers`  
+The **event handlers** are callback functions that respond to triggers such as invariant violations or transition activations detected by the HM evaluators.  
+
+Event handlers perform related actions, which may include:  
+- Publishing status updates  
+- Triggering corrective or mission-handling routines  
+
+Within this layer is a dedicated FSM called **`hybraut_watchdog`**.  
+- **States**: Represent the automaton’s status and are published to `/automaton/status`.  
+- **Events**: Listened for on `/automaton/event` to trigger transitions.  
+
+This enables more robust mission control and simplifies debugging of the automaton’s behaviour.  
+
+---
+
+### 3. `hm.internal_state`  
+This module maintains and publishes runtime information about the HM, including:  
+- Active duration  
+- Current `Q_goal` (if any)  
+- Current mode  
+- Time since last transition  
+
+This information is valuable not only for debugging but also for use in AMDL definitions of the automaton—serving as inputs to ASCII guards, dynamics, invariants, and more.  
+
 # Hybrid Automaton Mission-Flow & Status-Manager Overview
 
 Hybrid-automaton mission flows can become quite intricate once you factor in initialization, mission setup, error handling, recovery and finalization. To make the entire lifecycle easily observable—and to cleanly separate automaton modes from node-lifecycle states—we introduce a dedicated Status-Manager FSM.

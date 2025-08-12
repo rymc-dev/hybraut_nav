@@ -7,18 +7,18 @@ from enum import Enum, auto
 from hybraut_model import HybridAutomaton
 
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
-from hybraut_executor.comms.state_bus import StateBus
+from hybraut_execution_engine.comms.state_bus import StateBus
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
 
 QOS = qos_profile_system_default
 CB_GROUP = ReentrantCallbackGroup()
 
-class HybrautExecutorState(Enum): 
+class ExectorState(Enum): 
     INACTIVE=auto()
     ACTIVE=auto()
 
-class HybrautExecutor(FSM):
+class ExecutionEngine(FSM):
     """
     Example subclass demonstrating how to override transition callbacks
     to add custom functionality while maintaining base behavior.
@@ -35,7 +35,7 @@ class HybrautExecutor(FSM):
 
     def __init__(self, node: Node, hybraut_model: HybridAutomaton):
 
-        self.state = HybrautExecutorState.INACTIVE
+        self.state = ExectorState.INACTIVE
         self.node = node
         self.hybraut_model = hybraut_model
 
@@ -43,23 +43,23 @@ class HybrautExecutor(FSM):
 
 
     def activate(self, *args, **kwargs):
-        if self.state == HybrautExecutorState.INACTIVE:
+        if self.state == ExectorState.INACTIVE:
             self.error_count = 0
             self.recovery_attempts = 0
             super().activate()
             self.__on_activate_hook__()
-            self.state = HybrautExecutorState.ACTIVE
+            self.state = ExectorState.ACTIVE
 
         else:
             print ("already active")
 
     def deactivate(self):
-        if self.state == HybrautExecutorState.ACTIVE: 
+        if self.state == ExectorState.ACTIVE: 
             if self.is_activated:
 
                 super().deactivate()
 
-                self.state = HybrautExecutorState.INACTIVE
+                self.state = ExectorState.INACTIVE
             else: 
                 print ("not activated")
         else: 
@@ -117,7 +117,7 @@ def main():
 
         automaton:HybridAutomaton = HybridAutomaton.register_automaton(node=node, amdl_dict=data) 
 
-        executor = HybrautExecutor(node=node, hybraut_model=automaton)
+        executor = ExecutionEngine(node=node, hybraut_model=automaton)
         executor.activate()
 
         test_events = [

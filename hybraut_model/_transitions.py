@@ -143,9 +143,12 @@ class TransitionRegistry(ComponentRegistry):
             TransitionEvaluationsMSG: Evaluation results for each transition.
         """
         transition_evaluations_msg = TransitionEvaluationsMSG(
-            mode=ctx.current_mode,
+            current_mode=ctx.current_mode,
             stamp=now_to_ros_time_msg()
         )
+        if not isinstance(transitions, dict) or len(transitions) < 1:
+            transition_evaluations_msg.message = "no transitions for this mode."
+            return transition_evaluations_msg
 
         # Extract names and priorities, preserving order
         sorted_items = sorted(transitions.items())
