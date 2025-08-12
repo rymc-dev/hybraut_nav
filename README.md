@@ -1,7 +1,10 @@
 # hybraut_ros2
 
+`hybraut_ros2` is a ROS 2 framework for implementing **formal-method hybrid automata**.  
+It supports a **multi-hierarchical architecture**, allowing you to define and customize automaton elements—such as states, modes, transitions, guards, resets, and dynamics—without heavy low-level coding.
 
-This package contains implementations of COLAV's hybrid automaton Guard conditions dynamics and resets, It provides services for requesting the states of each of these different components which make the automaton.
+This design makes it both **flexible** and **high-performance**, enabling advanced control logic for autonomous systems while preserving maintainability and modularity.
+
 
 # Table of Contents
 
