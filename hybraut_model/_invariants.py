@@ -18,6 +18,10 @@ from hybraut_model._evaluation_context import EvaluationContext
 # Set up module-level logger
 logger = logging.getLogger(__name__)
 
+class EvaluationError(Exception):
+    """Raised when evaluation of an invariant fails."""
+    pass
+
 
 @dataclass
 class InvariantBus:
@@ -120,32 +124,36 @@ class InvariantRegistry(ComponentRegistry['InvariantWrapper']):
             return invariant._evaluate(ctx)
         except Exception as e:
             logger.info(f"{str(e)}")
+            raise EvaluationError()
 
     def evaluate_invariants_by_name(self, invariant_names: List[str], ctx: EvaluationContext) -> List[InvariantEvaluationsMSG]:
         invariant_evaluations_msg: InvariantEvaluationsMSG = InvariantEvaluationsMSG(
             current_mode = ctx.current_mode,
             stamp = ctx.stamp
         )
+        try:
+            invariant_evaluation_msgs: List[InvariantEvaluationMSG] = []
+            for invariant_name in invariant_names:
+                invariant_evaluation_msgs.append(self.evaluate_invariant_by_name(invariant_name, ctx))
+            
+            error = False
+            error_messages = []
+            for invariant_evaluation in invariant_evaluation_msgs:
+                if invariant_evaluation.error == True:
+                    error = True
+                    error_messages.append(invariant_evaluation.message)
 
-        invariant_evaluation_msgs: List[InvariantEvaluationMSG] = []
-        for invariant_name in invariant_names:
-            invariant_evaluation_msgs.append(self.evaluate_invariant_by_name(invariant_name, ctx))
-        
-        error = False
-        error_messages = []
-        for invariant_evaluation in invariant_evaluation_msgs:
-            if invariant_evaluation.error == True:
-                error = True
-                error_messages.append(invariant_evaluation.message)
+            overall_holds = True
+            for invariant_evaluation in invariant_evaluation_msgs:
+                if not invariant_evaluation.holds:
+                    overall_holds = False
 
-        overall_holds = True
-        for invariant_evaluation in invariant_evaluation_msgs:
-            if not invariant_evaluation.holds:
-                overall_holds = False
-
-        invariant_evaluations_msg.overall_holds = overall_holds
-        invariant_evaluations_msg.error = error
-        invariant_evaluations_msg.message = " ".join(error_messages)
+            invariant_evaluations_msg.overall_holds = overall_holds
+            invariant_evaluations_msg.error = error
+            invariant_evaluations_msg.message = " ".join(error_messages)
+        except Exception as e:
+            invariant_evaluations_msg.error = True
+            invariant_evaluations_msg.message = f"Exception occured during invariant evaluation: '{str(e)}'"
 
         return invariant_evaluations_msg
 
