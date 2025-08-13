@@ -82,6 +82,12 @@ class ModeRegistry:
 
     def get_mode(self, mode_id: int):
         return self._modes.get(mode_id)
+    
+    def is_mode(self, mode_id: int):
+        if mode_id in self._modes.keys():
+            return True
+        
+        return False
 
     def get_reachable_modes(self, from_mode: int) -> Mode: ...
 
