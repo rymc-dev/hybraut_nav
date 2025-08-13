@@ -192,8 +192,17 @@ class HybridComponentInterface(ABC):
         self._validate_evaluation_output(result)
 
         return result
-    
+
     # Introspection methods
+    @classmethod
+    def get_component_name(cls) -> str: 
+        return cls.__class__.__name__
+    
+    @classmethod
+    def get_component_description(cls) -> str: 
+        class_doc = cls.__class__.__doc__
+        return class_doc.strip().split('\n')[0] if class_doc else "No description"
+
     @classmethod
     def get_init_input_spec_names(cls) -> List[str]:
         """Return list of initialization input names."""
@@ -221,12 +230,12 @@ class HybridComponentInterface(ABC):
         Returns:
             Dictionary containing component metadata, specifications, and status
         """
-        class_doc = self.__class__.__doc__
+        
         return {
-            'class_name': self.__class__.__name__,
+            'class_name': self.get_component_name(),
             'module': self.__class__.__module__,
             'component_type': self._get_component_type(),
-            'description': class_doc.strip().split('\n')[0] if class_doc else "No description",
+            'description': self.get_component_description(),
             'is_initialized': self.is_initialized,
             'init_input_spec_names': self.get_init_input_spec_names(),
             'init_input_spec_types': [t.__name__ for t in self.get_init_input_spec_types()],

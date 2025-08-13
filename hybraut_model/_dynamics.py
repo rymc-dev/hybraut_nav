@@ -18,6 +18,9 @@ from hybraut_model.component_interfaces.wrapper_interface import WrapperInterfac
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.automaton_types.msg_type import MsgType
+import json
+from typing import Tuple
+from rosidl_runtime_py import message_to_ordereddict
 
 from dataclasses import field
 
@@ -31,32 +34,57 @@ class DynamicsWrapper(WrapperInterface):
     """
     _output_topic: str = field(init=True, default=None)
     _output_msg_type: Type = field(init=True, default=None)
-
     _component_class: Type[DynamicsInterface]
 
 
     def __post_init_hook__(self):
         self.initialize()
 
-    def _evaluate(self, context) -> AutomatonDynamicsEvaluation:
+    def _evaluate(self, ctx: EvaluationContext) -> Tuple[Any, AutomatonDynamicsEvaluation]:
+        """
+        Evaluate the current dynamics for the automaton.
+
+        This method:
+        1. Collects the required state inputs from the given `ctx`.
+        2. Executes the dynamics component to produce a control command (`cmd`).
+        3. Creates an `AutomatonDynamicsEvaluation` message containing
+            descriptive and debugging information about the evaluation, 
+            including a JSON-encoded representation of the command.
+
+        Returns:
+            Tuple[Any, AutomatonDynamicsEvaluation]:
+                - The control command object (type depends on the dynamics output type).
+                - An `AutomatonDynamicsEvaluation` message for logging/diagnostics.
+
+        Raises:
+            RuntimeError: If the dynamics component is not initialized.
+        """
         if not self._is_initialized:
             raise RuntimeError("Component instance is None. Call activate first.")
-        
-        msg: AutomatonDynamicsEvaluation = AutomatonDynamicsEvaluation()
-        states = context.get_state_values(self._component_instance.get_state_input_spec_names())
-        component_info = self._component_instance.get_component_info()
-        msg.dynamic_name = component_info['class_name']
-        msg.dynamic_description = component_info['description']
-        msg.dynamic_parameter_names = component_info['output_spec_param_names']
-        msg.dynamics_parameter_units = component_info['output_spec_param_units']
 
+        # Prepare the debug/introspection message
+        msg = AutomatonDynamicsEvaluation()
+        msg.dynamic_name = self._component_instance.get_component_name()
+        msg.dynamic_description = self._component_instance.get_component_description()
+        msg.dynamic_output_topic = self._output_topic
+
+        cmd = None
         try:
-            msg.dynamic_parameter_values = self._component_instance(**states)
+            # Gather required state inputs for this dynamics
+            state_names = self._component_instance.get_state_input_spec_names()
+            states = ctx.get_state_values(state_names)
+
+            # Execute the dynamics to produce the command
+            cmd = self._component_instance(**states)
+
+            # Serialize the command to JSON for debugging
+            msg.dynamic_output_str = json.dumps(message_to_ordereddict(cmd))
         except Exception as e:
             msg.error = True
-            msg.message = f"exception occured during dynamics evaluation: {e}"
+            msg.message = f"Exception occurred during dynamics evaluation: {e!r}"
 
-        return msg
+        return cmd, msg
+
     
     @classmethod
     def load_dynamics_from_amdl(cls, dynamics_name: str, dynamics_dict: Dict[str, Any]) -> 'DynamicsWrapper':
@@ -95,7 +123,7 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
         if dynamics_name in self._components.keys():
             return self._components[dynamics_name]
         
-    def evaluate_dynamics_by_name(self, dynamics_name: str, ctx: EvaluationContext) -> AutomatonDynamicsEvaluation:
+    def evaluate_dynamics_by_name(self, dynamics_name: str, ctx: EvaluationContext) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         dynamics = self.get_dynamics_by_name(dynamics_name)
         try:
             return dynamics._evaluate(ctx)
@@ -218,9 +246,13 @@ def main():
     dynamics: DynamicsRegistry = DynamicsRegistry.load_dynamics_registry_from_amdl(
         dynamics_dict=dynamics_dict
     )
-    dynamics_output = dynamics.evaluate_dynamics_by_name("pid_controller", evaluation_context)
-    print (dynamics_output)
+    cmd, dynamic_evaluation = dynamics.evaluate_dynamics_by_name("pid_controller", evaluation_context)
+    
+    print (cmd)
+    print (dynamic_evaluation)
 
+
+    executor.shutdown()
     rclpy.shutdown()
 
 if __name__ == '__main__':
