@@ -1,14 +1,25 @@
-from dataclasses import dataclass
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+dynamics class for containing the passive guard components of the automaton.
+"""
 
+
+import logging
+from dataclasses import dataclass
 from typing import Type, Dict, Any
 
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
-
 from hybraut_aci_interfaces import DynamicsInterface
+from hybraut_aci_interfaces._dynamics_interface import DynamicsInterface
+
 from hybraut_model._evaluation_context import EvaluationContext
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
+from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.automaton_types.component_path import ComponentPath
-import logging
+from hybraut_model.automaton_types.msg_type import MsgType
+
+from dataclasses import field
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +29,11 @@ class DynamicsWrapper(WrapperInterface):
     """ 
     wrapper for a instance of dynamics implementation
     """
+    _output_topic: str = field(init=True, default=None)
+    _output_msg_type: Type = field(init=True, default=None)
 
     _component_class: Type[DynamicsInterface]
+
 
     def __post_init_hook__(self):
         self.initialize()
@@ -45,20 +59,24 @@ class DynamicsWrapper(WrapperInterface):
         return msg
     
     @classmethod
-    def load_dynamics_from_amdl(cls, dynamics_name: str, dynamics_dict: Dict[str, Any]):
+    def load_dynamics_from_amdl(cls, dynamics_name: str, dynamics_dict: Dict[str, Any]) -> 'DynamicsWrapper':
         component_path = ComponentPath.load_component_from_famd(dynamics_dict)
         component_class = component_path.get_component_class()
         configuration = dynamics_dict.get('configuration')
+        output = dynamics_dict.get('output')
+        output_topic = output.get('topic')
+        msg_type_info = MsgType(**output['type'])
+        msg_type = msg_type_info.import_msg_type()
+
 
         return cls(
             _name=dynamics_name,
             _component_class=component_class,
-            _configuration=configuration
+            _configuration=configuration,
+            _output_topic=output_topic,
+            _output_msg_type=msg_type
         )
     
-
-from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_aci_interfaces._dynamics_interface import DynamicsInterface
 
 class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
     """Registry specialized for managing dynamics"""
@@ -113,12 +131,19 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
         logger.info(f"Created DynamicsRegistry with {len(dynamics)} dynamics")
         return registry
 
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-import threading
 
-if __name__ == '__main__':
+
+"""main is a test function, which is not for use within production"""
+
+def main():
+    import rclpy
+    from rclpy.node import Node
+    from rclpy.executors import MultiThreadedExecutor
+    import threading
+    from hybraut_model._evaluation_context import EvaluationContext
+    from builtin_interfaces.msg import Time
+    from hybraut_model._states import StateRegistry
+
     rclpy.init()
     node = Node('mock_node')
     executor = MultiThreadedExecutor(num_threads=2)
@@ -129,7 +154,7 @@ if __name__ == '__main__':
 
     dynamics_dict = {
         "pid_controller": {
-            "module": "automaton_models.common_behaviours.dynamics.pid_controller",
+            "module": "hybraut_common_behaviours.dynamics",
             "class_name": "PIDControllerDynamics",
             "configuration": {
                 "control_frequency": 100,
@@ -145,6 +170,13 @@ if __name__ == '__main__':
                 "vel_kd": 0.05, # small derivative for smooth velocity changes
                 "error_tolerance": 0.01, # precision in heading error
                 "max_yaw_rate": 0.1 # limit yaw rate to gentle turns
+            },
+            "output": {
+                "topic": "/cmd_vel",
+                "type": {
+                    "pkg": "geometry_msgs.msg",
+                    "msg": "Twist"
+                }
             }
         }
     }
@@ -168,26 +200,31 @@ if __name__ == '__main__':
         }
     }
 
-    from hybraut_model._states import StateRegistry
-    state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
-    state_registry.activate_components(node)
 
-    from hybraut_model._evaluation_context import EvaluationContext
-    from builtin_interfaces.msg import Time
+    state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
+    
+
 
     evaluation_context = EvaluationContext(
         states=state_registry,
         current_mode=1,
         stamp=Time(),
-        metadata={}
+        metadata={},
+        guard_registry = None,
+        reset_registry = None,
+        invariant_registry = None
     )
 
     dynamics: DynamicsRegistry = DynamicsRegistry.load_dynamics_registry_from_amdl(
         dynamics_dict=dynamics_dict
     )
     dynamics_output = dynamics.evaluate_dynamics_by_name("pid_controller", evaluation_context)
-    print (dynamics)
+    print (dynamics_output)
 
     rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+
 
 
