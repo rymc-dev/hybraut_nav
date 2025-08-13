@@ -126,7 +126,9 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
     def evaluate_dynamics_by_name(self, dynamics_name: str, ctx: EvaluationContext) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         dynamics = self.get_dynamics_by_name(dynamics_name)
         try:
-            return dynamics._evaluate(ctx)
+            cmd, dynamics_evaluation = dynamics._evaluate(ctx)
+            dynamics_evaluation.dynamic_name = dynamics_name
+            return cmd, dynamics_evaluation
         except Exception as e:
             logger.info(f"{str(e)}")
 

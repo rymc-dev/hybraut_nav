@@ -18,9 +18,12 @@ import threading
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation, AutomatonMode, AutomatonStatus
 
 from colav_interfaces.msg import AgentState, WaypointsState
+from typing import Tuple, Any
 
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
+
+from hybraut_execution_engine.evaluators.dynamics.dynamic_bus import DynamicsHub
 
 
 class DynamicEvaluator:
@@ -34,6 +37,7 @@ class DynamicEvaluator:
         """
         self.node = node
         self.automaton = automaton
+        self.dynamics_hub = DynamicsHub(node=node, dynamics_registry=automaton._dynamics)
 
         self.__post_init__()
 
@@ -56,25 +60,22 @@ class DynamicEvaluator:
 
     """ === evaluation functions ==="""
 
-    def _validate_current_mode(current_mode: int, hybraut_model: HybridAutomaton) -> None:
+    def _validate_current_mode(self, current_mode: int, hybraut_model: HybridAutomaton) -> Tuple:
         """Validate that the current mode exists in the automaton"""
-        if current_mode not in list(hybraut_model._modes._modes.keys()):
+        if not hybraut_model._modes.is_mode(current_mode):
             raise ValueError(f"Invalid mode type: {current_mode}")
 
-    def _evaluate_dynamics(current_mode: int, hybraut_model: HybridAutomaton, stamp: Time) -> AutomatonDynamicsEvaluation:
+    def _evaluate_dynamics(self, current_mode: int, hybraut_model: HybridAutomaton, stamp: Time) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         """evaluates the dynamics for the current automaton mode"""
-        msg = AutomatonDynamicsEvaluation(
-            mode=AutomatonMode(type=current_mode, stamp=stamp),
-            stamp=stamp
-        )
         
         try:
-            msg = hybraut_model.evaluate_dynamics(current_mode_id=current_mode)
+            cmd, msg = hybraut_model.evaluate_dynamics(current_mode_id=current_mode)
+        except RuntimeError as e: 
+            raise RuntimeError(f"exception occured during _evaluate_dynamics: {str(e)}")
         except Exception as e:
-            msg.error = True
-            msg.message = f"exception occured: {str(e)}"
+            raise Exception(f"unexpected exception occured during _evaluate_dynamics: '{str(e)}'")
 
-        return msg
+        return cmd, msg
 
     def dynamics_evaluation_callback(
             self,
@@ -95,9 +96,10 @@ class DynamicEvaluator:
             with self.lock:
                 self._validate_current_mode(current_mode, self.automaton)
 
-                evaluation_result:AutomatonDynamicsEvaluation = self._evaluate_dynamics(current_mode=current_mode, hybraut_model=self.automaton, stamp=self.node.get_clock().now().to_msg())
-
-                self.dynamics_evaluation_publisher.publish(evaluation_result)
+                cmd, dynamic_evaluation = self._evaluate_dynamics(current_mode=current_mode, hybraut_model=self.automaton, stamp=self.node.get_clock().now().to_msg())
+                self.dynamics_evaluation_publisher.publish(dynamic_evaluation)
+                if cmd is not None:
+                    self.dynamics_hub.publish(name=dynamic_evaluation.dynamic_name, msg=cmd)
         except Exception as e:
             status_publisher.publish(AutomatonStatus(
                 type=AutomatonStatus.ERROR, 
@@ -129,6 +131,14 @@ def main():
 
     executor = MultiThreadedExecutor(num_threads=2)
     mock_node = Node('mock_node')
+    from hybraut_interfaces.msg import AutomatonStatus
+    status_publisher = mock_node.create_publisher(
+        msg_type=AutomatonStatus,
+        topic='/automaton/status',
+        qos_profile=qos_profile_system_default,
+        callback_group=ReentrantCallbackGroup()
+    )
+
     executor.add_node(mock_node)
 
     thread = threading.Thread(target=executor.spin)
@@ -144,16 +154,17 @@ def main():
         amdl_dict=amdl_dict
     )
 
-    hybraut_dynamic_evaluator = HybrautDynamicEvaluator(
+    hybraut_dynamic_evaluator = DynamicEvaluator(
         node=mock_node,
         automaton=hybraut_model
     )
     
     hybraut_dynamic_evaluator(
         current_mode=0,
-        status_publisher=None
+        status_publisher=status_publisher
     )
 
+    executor.shutdown()
     rclpy.shutdown()
 
 if __name__ == '__main__':

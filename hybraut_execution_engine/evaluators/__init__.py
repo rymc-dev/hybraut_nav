@@ -1,4 +1,4 @@
-from .dynamic_eval import DynamicEvaluator
+from .dynamics import DynamicEvaluator
 from .invariant_eval import InvariantEvaluator
 from .transition_eval import TransitionEvaluator
 
