@@ -1,3 +1,8 @@
+# !/usr/bin/env python3
+
+"""
+"""
+
 import yaml
 import rclpy
 from rclpy.node import Node
@@ -7,7 +12,7 @@ from enum import Enum, auto
 from hybraut_model import HybridAutomaton
 
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
-from hybraut_execution_engine.comms.state_bus import StateBus
+from hybraut_execution_engine.event_handlers.world_state_update_handler import StateBus
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
 
@@ -52,6 +57,43 @@ class ExecutionEngine(FSM):
 
         else:
             print ("already active")
+
+    def _activate_evaluators(self):
+        from hybraut_execution_engine.evaluators import DynamicEvaluator, InvariantEvaluator, TransitionEvaluator
+
+        transition_evaluator = TransitionEvaluator(
+            node=self.node,
+            automaton=self.hybraut_model
+        )
+
+        invariant_evaluator = InvariantEvaluator(
+            node=self.node,
+            automaton=self.hybraut_model
+        )
+
+        transition_evaluator = TransitionEvaluator(
+            node=self.node,
+            automaton=self.hybraut_model
+        )
+
+        self.node.create_timer(
+            timer_period_sec=1.0 / 10,
+            callback=transition_evaluator(self.current_mode),
+            callback_group=ReentrantCallbackGroup()
+        )
+
+        self.node.create_timer(
+            timer_period_sec=1.0/10,
+            callback=invariant_evaluator(self.current_mode),
+            callback_group=ReentrantCallbackGroup()
+        )
+
+        self.node.create_timer(
+            timer_period_sec=1.0 / 10,
+            callback=invariant_evaluator(self.current_mode),
+            callback_group=ReentrantCallbackGroup()
+        )
+
 
     def deactivate(self):
         if self.state == ExectorState.ACTIVE: 

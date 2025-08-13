@@ -25,18 +25,22 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
 from hybraut_execution_engine.evaluators.dynamics.dynamic_bus import DynamicsHub
 
+from hybraut_execution_engine.internal_state import EngineStateTracker
+
 
 class DynamicEvaluator:
     """ 
     Evaluator for dynamics
     """
 
-    def __init__(self, node: Node, automaton: HybridAutomaton):
+    def __init__(self, node: Node, state_tracker: EngineStateTracker, automaton: HybridAutomaton, status_publisher: Publisher):
         """ 
         Initialize the dynamics evaluator.
         """
         self.node = node
         self.automaton = automaton
+        self.state_tracker = state_tracker
+        self.status_publisher = status_publisher
         self.dynamics_hub = DynamicsHub(node=node, dynamics_registry=automaton._dynamics)
 
         self.__post_init__()
@@ -77,11 +81,7 @@ class DynamicEvaluator:
 
         return cmd, msg
 
-    def dynamics_evaluation_callback(
-            self,
-            current_mode: int,
-            status_publisher: Publisher
-    ):
+    def dynamics_evaluation_callback(self):
         """
         Callback for evaluating dynamics in the hybrid automaton on a timer.
 
@@ -93,15 +93,15 @@ class DynamicEvaluator:
         and at the same time if anything goes wrong we publish status updates to '/hybrid_automaton/status
         """
         try:
-            with self.lock:
-                self._validate_current_mode(current_mode, self.automaton)
+            current_mode = self.state_tracker.current_mode
+            self._validate_current_mode(current_mode, self.automaton)
 
-                cmd, dynamic_evaluation = self._evaluate_dynamics(current_mode=current_mode, hybraut_model=self.automaton, stamp=self.node.get_clock().now().to_msg())
-                self.dynamics_evaluation_publisher.publish(dynamic_evaluation)
-                if cmd is not None:
-                    self.dynamics_hub.publish(name=dynamic_evaluation.dynamic_name, msg=cmd)
+            cmd, dynamic_evaluation = self._evaluate_dynamics(current_mode=current_mode, hybraut_model=self.automaton, stamp=self.node.get_clock().now().to_msg())
+            self.dynamics_evaluation_publisher.publish(dynamic_evaluation)
+            if cmd is not None:
+                self.dynamics_hub.publish(name=dynamic_evaluation.dynamic_name, msg=cmd)
         except Exception as e:
-            status_publisher.publish(AutomatonStatus(
+            self.status_publisher.publish(AutomatonStatus(
                 type=AutomatonStatus.ERROR, 
                 meesage=f"exception occured during dynamics evaluation: {str(e)}",
                 stamp=self.node.get_clock().now().to_msg()
@@ -109,8 +109,9 @@ class DynamicEvaluator:
 
     """ === class functions === """
 
-    def __call__(self, current_mode: int, status_publisher: Publisher):
-        self.dynamics_evaluation_callback(current_mode, status_publisher)
+    def __call__(self, *args, **kwargs):
+        with self.lock:
+            self.dynamics_evaluation_callback()
 
     def __str__(self):
         """String representation of the dynamics evaluator."""
@@ -154,61 +155,43 @@ def main():
         amdl_dict=amdl_dict
     )
 
+    state_tracker: EngineStateTracker = EngineStateTracker(
+        node=mock_node,
+        initial_mode=0,
+        q_goals=[1]
+    )
+
     hybraut_dynamic_evaluator = DynamicEvaluator(
         node=mock_node,
-        automaton=hybraut_model
-    )
-    
-    hybraut_dynamic_evaluator(
-        current_mode=0,
+        automaton=hybraut_model,
+        state_tracker=state_tracker,
         status_publisher=status_publisher
     )
+
+    def evaluate_dynamics():
+        import time
+        while True:
+            hybraut_dynamic_evaluator()
+            time.sleep(5.0)
+    thread2 = threading.Thread(target=evaluate_dynamics)
+    thread2.start()
+
+
+    def increment_current_mode():
+        import time
+        while True:
+            time.sleep(5.0)
+            state_tracker.current_mode+=1
+            print ('incremented current mode')
+
+    thread3 = threading.Thread(target=increment_current_mode)
+    thread3.start()
+
+
+    thread.join()
 
     executor.shutdown()
     rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
-
-
-# import rclpy
-# from rclpy.qos import QoSProfile
-# from rclpy.executors import MultiThreadedExecutor
-# from hybraut_model import HybridAutomaton
-
-# if __name__ == '__main__':
-#     rclpy.init()
-#     executor = MultiThreadedExecutor(num_threads=2)
-#     mock_node = Node('mock_node')
-#     executor.add_node(mock_node)
-
-#     lock = threading.Lock()
-#     automaton_model:HybridAutomaton = HybridAutomatonFactory.hybrid_automaton_registry(
-#         automaton_famd_path='/home/ryan/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/colav_hybrid_automaton/automaton/colav-famd.yml', 
-#         generate_mmd_diagrams=False
-#     )
-#     automaton_model.create_state_publishers(node=mock_node)
-#     automaton_model.create_state_subscriptions(node=mock_node)
-#     stamp = Time()
-#     dynamics_evaluation_publisher = mock_node.create_publisher(
-#         topic = '/hybrid_automaton/dynamics',
-#         msg_type = HybridAutomatonDynamicsEvaluation,
-#         qos_profile = QoSProfile(depth=10)
-#     ) 
-#     status_publisher = mock_node.create_publisher(
-#         topic = '/hybrid_automaton/status',
-#         msg_type = HybridAutomatonStatus,
-#         qos_profile = QoSProfile(depth=10)
-#     )
-
-#     threading.Thread(target=executor.spin).start()
-    
-#     dynamics_evaluation_callback(
-#         lock=lock,
-#         automaton_model=automaton_model,
-#         stamp=stamp,
-#         dynamics_evaluation_publisher=dynamics_evaluation_publisher,
-#         status_publisher=status_publisher
-#     )
-
-#     rclpy.shutdown()

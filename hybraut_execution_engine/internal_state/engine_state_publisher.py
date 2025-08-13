@@ -11,7 +11,7 @@ from hybraut_interfaces.msg import AutomatonRuntimeState
 from builtin_interfaces.msg import Duration
 from rclpy.publisher import Publisher
 from rclpy.timer import Timer
-from hybraut_execution_engine.internal_state.runtime_tracker import RuntimeTracker
+from hybraut_execution_engine.internal_state.engine_state_tracker import EngineStateTracker
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
@@ -23,7 +23,7 @@ class StatePublisher:
 
     def __init__(self, node: Node, runtime_tracker, publish_rate_hz:float=1.0):
         self.node: Node = node
-        self.runtime_tracker: RuntimeTracker = runtime_tracker
+        self.runtime_tracker: EngineStateTracker = runtime_tracker
         self.publisher: Publisher = node.create_publisher(
             msg_type=AutomatonRuntimeState, 
             topic="/automaton/runtime_state", 
@@ -73,7 +73,7 @@ def main():
     thread = threading.Thread(target=executor.spin)
     thread.start()
 
-    runtime_tracker = RuntimeTracker(
+    runtime_tracker = EngineStateTracker(
         node = mock_node,
         initial_mode=0,
         q_goals=[1]

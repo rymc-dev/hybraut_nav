@@ -1,6 +1,6 @@
 from .dynamics import DynamicEvaluator
-from .invariant_eval import InvariantEvaluator
-from .transition_eval import TransitionEvaluator
+from .invariants import InvariantEvaluator
+from .transitions import TransitionEvaluator
 
 __all__ = [
     'DynamicEvaluator',

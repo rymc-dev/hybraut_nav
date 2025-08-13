@@ -1,3 +1,8 @@
+# !/usr/bin/env python3
+"""
+
+"""
+
 from rclpy.node import Node
 from typing import Any, Type, Callable
 from dataclasses import dataclass, field
@@ -6,7 +11,7 @@ from rclpy.qos import QoSProfile, qos_profile_system_default
 
 
 @dataclass
-class StateBus:
+class WorldStateUpdateHandler:
     node: Node
     topic: str
     msg_type: Type[Any]
@@ -41,3 +46,13 @@ class StateBus:
             qos=qos if qos else qos_profile_system_default,
             cb_group=cb_group if cb_group else ReentrantCallbackGroup()
         )
+
+class WorldStateUpdateHandlerHub: 
+    pass
+
+
+def main():
+    pass
+
+if __name__ == '__main__':
+    main()

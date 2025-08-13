@@ -11,12 +11,15 @@ from typing import List
 
 # TODO: Lets initialize the watchdog in here
 
-class RuntimeTracker:
+class EngineStateTracker:
     """
     tracks the execution during runtime for the hybraut model
     """
 
     def __init__(self, node: Node, initial_mode: int, q_goals: List[int]):
+        """ 
+        contains the state of the hybraut engine.
+        """
         self.node = node 
         self.start_time = node.get_clock().now()
         self.last_transition_time = self.start_time

@@ -64,6 +64,7 @@ class DynamicsWrapper(WrapperInterface):
 
         # Prepare the debug/introspection message
         msg = AutomatonDynamicsEvaluation()
+        msg.current_mode = ctx.current_mode
         msg.dynamic_name = self._component_instance.get_component_name()
         msg.dynamic_description = self._component_instance.get_component_description()
         msg.dynamic_output_topic = self._output_topic
