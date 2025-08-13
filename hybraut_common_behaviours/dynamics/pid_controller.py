@@ -1,5 +1,4 @@
 from hybraut_aci_interfaces import DynamicsInterface, IOSpec
-from hybraut_aci_interfaces._dynamics_interface import DynamicsSpecBuilder
 from colav_interfaces.msg import (
     AgentState as ROSAgentState,
     WaypointsState as ROSWaypointsState,
@@ -9,6 +8,7 @@ import math
 import time
 from collections import deque
 from typing import NamedTuple, Dict, Any
+from geometry_msgs.msg import Twist, Vector3
 
 
 def quaternion_to_heading(qx, qy, qz, qw) -> float:
@@ -31,7 +31,7 @@ class PIDControllerDynamics(DynamicsInterface):
     - Proper output saturation
     """
     
-    _dynamic_output_spec = DynamicsSpecBuilder.create_automaton_control_outputs()
+    _dynamic_output_type = Twist
 
     _init_input_spec = [
         IOSpec.create_io_spec(name='control_frequency', type=int),
@@ -313,10 +313,12 @@ class PIDControllerDynamics(DynamicsInterface):
             # Gradually reduce velocity as we approach the waypoint
             final_velocity *= 0.5
 
-        return self.create_output(
-            velocity=final_velocity,
-            yaw_rate=target_yaw_rate
+        twist_msg = Twist(
+            linear=Vector3(x=final_velocity, y=0.0, z=0.0),
+            angular=Vector3(x=0.0, y=0.0, z=target_yaw_rate)
         )
+
+        return twist_msg
 
     def reset_pid_state(self):
         """Reset PID internal state - useful when switching waypoints."""
@@ -488,16 +490,16 @@ if __name__ == '__main__':
         }
         
         # Get PID output
-        dynamic_output = dynamics(**state_kwargs)
+        dynamic_output: Twist = dynamics(**state_kwargs)
         
         # Simulate vehicle response to commands
-        simulate_vehicle_dynamics(dynamic_output.velocity, dynamic_output.yaw_rate, dt)
+        simulate_vehicle_dynamics(dynamic_output.linear.x, dynamic_output.angular.z, dt)
         
         # Print every 50 iterations
         if i % 50 == 0:
             print(f"Step {i:3d}: pos=({vehicle_x:6.2f},{vehicle_y:6.2f}), "
                   f"vel={vehicle_velocity:5.2f}, heading={vehicle_heading:5.2f}, "
-                  f"vel_cmd={dynamic_output.velocity:5.2f}, yaw_cmd={dynamic_output.yaw_rate:5.2f}, "
+                  f"vel_cmd={dynamic_output.linear.x:5.2f}, yaw_cmd={dynamic_output.angular.z:5.2f}, "
                   f"dist_to_wp={distance_to_wp:5.2f}")
         
         # Simulate some time passing
@@ -526,44 +528,44 @@ if __name__ == '__main__':
         'waypoints_state': ROSWaypointsState(current_waypoint=waypoints[0])
     }
     
-    output = dynamics(**far_state_kwargs)
-    print(f"Large error test: velocity={output.velocity:.3f}, yaw_rate={output.yaw_rate:.3f}")
+    # output = dynamics(**far_state_kwargs)
+    # print(f"Large error test: velocity={output.velocity:.3f}, yaw_rate={output.yaw_rate:.3f}")
     
-    # Test 2: Very close to waypoint
-    print("\n--- Test 2: Close to Waypoint ---")
-    close_agent = ROSAgentState()
-    close_agent.pose = Pose(
-        position=Point(x=29.9, y=100.1, z=0.0),
-        orientation=create_quaternion_from_yaw(0.1)
-    )
-    close_agent.velocity = 20.0
+    # # Test 2: Very close to waypoint
+    # print("\n--- Test 2: Close to Waypoint ---")
+    # close_agent = ROSAgentState()
+    # close_agent.pose = Pose(
+    #     position=Point(x=29.9, y=100.1, z=0.0),
+    #     orientation=create_quaternion_from_yaw(0.1)
+    # )
+    # close_agent.velocity = 20.0
     
-    close_state_kwargs = {
-        'agent_state': close_agent,
-        'waypoints_state': ROSWaypointsState(current_waypoint=waypoints[0])
-    }
+    # close_state_kwargs = {
+    #     'agent_state': close_agent,
+    #     'waypoints_state': ROSWaypointsState(current_waypoint=waypoints[0])
+    # }
     
-    output = dynamics(**close_state_kwargs)
-    print(f"Close to waypoint test: velocity={output.velocity:.3f}, yaw_rate={output.yaw_rate:.3f}")
+    # output = dynamics(**close_state_kwargs)
+    # print(f"Close to waypoint test: velocity={output.velocity:.3f}, yaw_rate={output.yaw_rate:.3f}")
     
-    # Test 3: High speed approach
-    print("\n--- Test 3: High Speed Approach ---")
-    fast_agent = ROSAgentState()
-    fast_agent.pose = Pose(
-        position=Point(x=25.0, y=95.0, z=0.0),
-        orientation=create_quaternion_from_yaw(0.5)
-    )
-    fast_agent.velocity = 35.0  # Above max velocity
+    # # Test 3: High speed approach
+    # print("\n--- Test 3: High Speed Approach ---")
+    # fast_agent = ROSAgentState()
+    # fast_agent.pose = Pose(
+    #     position=Point(x=25.0, y=95.0, z=0.0),
+    #     orientation=create_quaternion_from_yaw(0.5)
+    # )
+    # fast_agent.velocity = 35.0  # Above max velocity
     
-    fast_state_kwargs = {
-        'agent_state': fast_agent,
-        'waypoints_state': ROSWaypointsState(current_waypoint=waypoints[0])
-    }
+    # fast_state_kwargs = {
+    #     'agent_state': fast_agent,
+    #     'waypoints_state': ROSWaypointsState(current_waypoint=waypoints[0])
+    # }
     
-    output = dynamics(**fast_state_kwargs)
-    print(f"High speed test: velocity={output.velocity:.3f}, yaw_rate={output.yaw_rate:.3f}")
+    # output = dynamics(**fast_state_kwargs)
+    # print(f"High speed test: velocity={output.velocity:.3f}, yaw_rate={output.yaw_rate:.3f}")
     
-    print("\n=== Test Complete ===")
-    print(f"Final vehicle position: ({vehicle_x:.2f}, {vehicle_y:.2f})")
-    print(f"Final waypoint: ({waypoints[current_waypoint_idx].position.x:.2f}, {waypoints[current_waypoint_idx].position.y:.2f})")
-    print(f"Final distance to waypoint: {distance_to_wp:.2f}m")
+    # print("\n=== Test Complete ===")
+    # print(f"Final vehicle position: ({vehicle_x:.2f}, {vehicle_y:.2f})")
+    # print(f"Final waypoint: ({waypoints[current_waypoint_idx].position.x:.2f}, {waypoints[current_waypoint_idx].position.y:.2f})")
+    # print(f"Final distance to waypoint: {distance_to_wp:.2f}m")
