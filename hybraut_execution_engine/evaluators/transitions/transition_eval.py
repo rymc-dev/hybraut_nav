@@ -113,7 +113,13 @@ def main() -> None:
         amdl_dict = yaml.safe_load(f)
         automaton = HybridAutomaton.register_automaton(node=node, amdl_dict=amdl_dict)
 
-    evaluator = TransitionEvaluator(node=node, automaton=automaton)
+    state_tracker: EngineStateTracker = EngineStateTracker(
+        node=node,
+        initial_mode=0,
+        q_goals=[1]
+    )
+
+    evaluator = TransitionEvaluator(node=node, automaton=automaton, state_tracker=state_tracker)
 
     # Shared current_mode as a list so it is mutable in nested scopes
     current_mode = [0]
@@ -121,7 +127,7 @@ def main() -> None:
     # Timer calls evaluator with the current current_mode value
     node.create_timer(
         0.1,
-        lambda: evaluator._evaluate_transitions(current_mode=current_mode[0]),
+        lambda: evaluator(),
         callback_group=ReentrantCallbackGroup(),
     )
 

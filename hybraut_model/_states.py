@@ -31,7 +31,6 @@ class State:
         self,
         name: str,
         topic: str,
-        node: Node,
         msg_type: Type,
         update_hz: Optional[int] = None,
         timeout_sec: Optional[float] = None,
@@ -41,7 +40,6 @@ class State:
         self._name       = name
         self._topic      = topic
         self._msg_type   = msg_type
-        self._node       = node
         self._update_hz  = update_hz
         self._timeout_sec= timeout_sec
         self._max_errors = max_errors
