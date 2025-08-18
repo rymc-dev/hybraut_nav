@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Type
 from hybraut_interfaces.msg import AutomatonReset, AutomatonResets
 
 from hybraut_model.automaton_types.component_path import ComponentPath
-from hybraut_aci_interfaces import ResetInterface
+from hybraut_aci import ResetInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
 

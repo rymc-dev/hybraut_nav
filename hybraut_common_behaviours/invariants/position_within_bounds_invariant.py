@@ -1,4 +1,4 @@
-from hybraut_aci_interfaces import InvariantInterface, IOSpec
+from hybraut_aci import InvariantInterface, IOSpec
 from geometry_msgs.msg import PoseStamped
 
 
@@ -9,17 +9,12 @@ class PositionWithinBoundsInvariant(InvariantInterface):
         IOSpec.create_io_spec("y_min", float),
         IOSpec.create_io_spec("y_max", float),
     ]
-    _state_input_spec = [
-        IOSpec.create_io_spec("pose", PoseStamped)
-    ]
+    _state_input_spec = [IOSpec.create_io_spec("pose", PoseStamped)]
 
     def _evaluate(self, **state_kwargs) -> bool:
         pose = state_kwargs["pose"].pose.position
-        return (
-            self.x_min <= pose.x <= self.x_max and
-            self.y_min <= pose.y <= self.y_max
-        )
-    
+        return self.x_min <= pose.x <= self.x_max and self.y_min <= pose.y <= self.y_max
+
 
 def main():
     # Initialize invariant with bounds
@@ -38,5 +33,6 @@ def main():
     # Print result
     print(f"PositionWithinBoundsInvariant holds: {result}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

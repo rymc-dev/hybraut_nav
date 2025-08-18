@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Type
 
 from hybraut_interfaces.msg import InvariantEvaluationMSG, InvariantEvaluationsMSG
 
-from hybraut_aci_interfaces import InvariantInterface
+from hybraut_aci import InvariantInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry

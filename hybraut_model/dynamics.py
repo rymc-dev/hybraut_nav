@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from typing import Type, Dict, Any
 
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
-from hybraut_aci_interfaces import DynamicsInterface
-from hybraut_aci_interfaces._dynamics_interface import DynamicsInterface
+from hybraut_aci import DynamicsInterface
+from hybraut_aci._dynamics_interface import DynamicsInterface
 
 from hybraut_model.evaluation_context import EvaluationContext
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface

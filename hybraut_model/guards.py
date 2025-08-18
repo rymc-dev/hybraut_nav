@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Type
 
 from hybraut_interfaces.msg import GuardEvaluationMSG
-from hybraut_aci_interfaces import GuardInterface
+from hybraut_aci import GuardInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry

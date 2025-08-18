@@ -1,4 +1,4 @@
-from hybraut_aci_interfaces import InvariantInterface, IOSpec
+from hybraut_aci import InvariantInterface, IOSpec
 import time
 from std_msgs.msg import Float64
 
@@ -8,9 +8,7 @@ class TimeoutInvariant(InvariantInterface):
         IOSpec.create_io_spec("timeout_sec", float),
         IOSpec.create_io_spec("entry_time", float),
     ]
-    _state_input_spec = [
-        IOSpec.create_io_spec("current_time", Float64)
-    ]
+    _state_input_spec = [IOSpec.create_io_spec("current_time", Float64)]
 
     def _evaluate(self, **state_kwargs) -> bool:
         current_time: Float64 = state_kwargs["current_time"]._data
@@ -31,5 +29,5 @@ def main():
     print(f"At t+6 seconds, invariant holds? {invariant(current_time=current)}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

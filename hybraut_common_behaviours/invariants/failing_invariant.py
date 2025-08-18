@@ -1,4 +1,4 @@
-from hybraut_aci_interfaces import InvariantInterface
+from hybraut_aci import InvariantInterface
 
 
 class FailingInvariant(InvariantInterface):
@@ -12,5 +12,6 @@ def main():
 
     print(f"FailingInvariant Test Result: {result}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

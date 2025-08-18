@@ -4,7 +4,7 @@ from utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
 from hybraut_model.evaluation_context import EvaluationContext
-from hybraut_aci_interfaces._hybrid_automaton_component_interface import (
+from hybraut_aci._hybrid_automaton_component_interface import (
     HybridComponentInterface,
 )
 

@@ -1,16 +1,11 @@
-
-from hybraut_aci_interfaces import InvariantInterface, IOSpec
+from hybraut_aci import InvariantInterface, IOSpec
 from geometry_msgs.msg import TwistStamped
 import math
 
 
 class VelocityNonZeroInvariant(InvariantInterface):
-    _init_input_spec = [
-        IOSpec.create_io_spec("min_velocity", float)
-    ]
-    _state_input_spec = [
-        IOSpec.create_io_spec("velocity", TwistStamped)
-    ]
+    _init_input_spec = [IOSpec.create_io_spec("min_velocity", float)]
+    _state_input_spec = [IOSpec.create_io_spec("velocity", TwistStamped)]
 
     def _evaluate(self, **state_kwargs) -> bool:
         twist = state_kwargs["velocity"].twist.linear
@@ -41,5 +36,5 @@ def main():
     print(f"VelocityNonZeroInvariant holds (speed >= 0.5): {result}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

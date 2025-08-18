@@ -1,14 +1,12 @@
-from hybraut_aci_interfaces import GuardInterface, IOSpec
+from hybraut_aci import GuardInterface, IOSpec
 from geometry_msgs.msg import PoseStamped
 
 
 class GoalReachedGuard(GuardInterface):
-    _init_input_spec = [
-        IOSpec.create_io_spec("tolerance", float)
-    ]
+    _init_input_spec = [IOSpec.create_io_spec("tolerance", float)]
     _state_input_spec = [
         IOSpec.create_io_spec("current_pose", PoseStamped),
-        IOSpec.create_io_spec("goal_pose", PoseStamped)
+        IOSpec.create_io_spec("goal_pose", PoseStamped),
     ]
 
     def _evaluate(self, **state_kwargs) -> bool:
@@ -25,8 +23,9 @@ class GoalReachedGuard(GuardInterface):
 
 def main():
     guard: GuardInterface = GoalReachedGuard(tolerance=10.0)
-    result:bool = guard(current_pose=PoseStamped(), goal_pose=PoseStamped())
+    result: bool = guard(current_pose=PoseStamped(), goal_pose=PoseStamped())
     print(f"GoalReached Guard Result: {result}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

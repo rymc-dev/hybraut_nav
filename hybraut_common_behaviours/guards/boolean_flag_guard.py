@@ -1,14 +1,10 @@
-
-from hybraut_aci_interfaces import GuardInterface, IOSpec
+from hybraut_aci import GuardInterface, IOSpec
 from std_msgs.msg import Bool
 
+
 class BooleanFlagGuard(GuardInterface):
-    _init_input_spec = [
-        IOSpec.create_io_spec("expected_flag", bool)
-    ]
-    _state_input_spec = [
-        IOSpec.create_io_spec("flag_msg", Bool)
-    ]
+    _init_input_spec = [IOSpec.create_io_spec("expected_flag", bool)]
+    _state_input_spec = [IOSpec.create_io_spec("flag_msg", Bool)]
 
     def _evaluate(self, **state_kwargs) -> bool:
         flag_msg: Bool = state_kwargs["flag_msg"]
@@ -23,5 +19,6 @@ def main():
     result = flag_guard(flag_msg=flag)
     print(f"BooleanFlagGuard result: {result}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

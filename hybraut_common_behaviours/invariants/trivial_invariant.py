@@ -1,4 +1,4 @@
-from hybraut_aci_interfaces import InvariantInterface
+from hybraut_aci import InvariantInterface
 
 
 class TrivialInvariant(InvariantInterface):
@@ -12,5 +12,6 @@ def main():
 
     print(f"Trivial Invariant Test Result: {result}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
