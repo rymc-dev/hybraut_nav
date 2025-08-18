@@ -23,25 +23,25 @@ class Mode:
     _id: int = field(init=True)
     _name: str = field(init=True)
     _dynamics_ref: str = field(init=True)
-    _invariants_refs: List[str] = field(init=True)
+    _invariant_refs: List[str] = field(init=True)
 
     _description: str = field(init=True, default="no description")
-    _transitions_ref: Dict[int, Transition] = field(init=True, default=None)
+    _transition_refs: Dict[int, Transition] = field(init=True, default=None)
     _entry_actions: List[str] = field(init=True, default=None)
     _exit_actions: List[str] = field(init=True, default=None)
     _is_goal_mode: bool = field(init=True, default=False)
 
-    def on_enter(self, context: EvaluationContext): ...
+    def on_enter(self, ctx: EvaluationContext): ...
 
-    def on_exit(self, context: EvaluationContext): ...
+    def on_exit(self, ctx: EvaluationContext): ...
 
     def get_enabled_transition_refs(self) -> List[str]: ...
 
     def get_dynamics_ref(self) -> str:
         return self._dynamics_ref
 
-    def get_transition_refs(self) -> List[str]:
-        return self._transitions_ref
+    def get_transition_refs_and_priorities(self) -> Dict[int, str]:
+        return self._transition_refs
 
     def get_invariant_refs(self) -> List[str]:
         return self._invariants_refs
@@ -64,7 +64,7 @@ class Mode:
             _description=description,
             _dynamics_ref=dynamics,
             _invariants_refs=invariants,
-            _transitions_ref=transitions,
+            _transition_refs=transitions,
             _entry_actions=entry_actions,
             _exit_actions=exit_actions,
             _is_goal_mode=is_goal_mode,

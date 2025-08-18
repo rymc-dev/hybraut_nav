@@ -86,30 +86,44 @@ classDiagram
     class Mode {
         - id: int
         - name: str
-        - description: str
-        - dynamics: DynamicsWrapper
-        - transitions: List[Transition]
+        - description: str = "no description"
+
+        - dynamics_ref: str
+        - transition_refs: Dict[str, Transition]
         - invariant_refs: List[str]
+
         - entry_actions: List[str]
         - exit_actions: List[str]
         - is_goal_mode: bool
-        + on_enter(context: EvaluationContext)
-        + on_exit(context: EvaluationContext)
-        + evaluate_invariants(context: EvaluationContext) bool
-        + get_enabled_transitions(context: EvaluationContext) List[Transition]
+
+        + on_enter(ctx: EvaluationContext)
+        + on_exit(ctx: EvaluationContext)
+        + get_enabled_transition_refs() -> List[str]
+        + get_dynamics_ref() -> str
+        + get_invariant_refs() -> List[str]
+        + get_transition_refs_and_priority() -> List[str]
+        + get_invariant_refs() -> List[str]
+
+        + @classmethod load_mode_from_amdl(mode_id: int, mode_dict: Dict[str, Any]) -> 'Mode
     }
     
   class State {
     - name: str
-    - current_state: Optional[Any] = None
-    - activation_time: Optional[Time] = None
-    - last_update: Time = Time()
-    - update_hz: Optional[int] = None
-    - timeout_sec: Optional[float] = None
+    - topic: str
+    - msg_type: Type[Any]
+    - update_hz: float = 1.0
+    - timeout_sec: float = 10.0
+    - max_errors: int = 5 
     
     - error_count: int = 0
     - max_errors: int = 10
     - is_active: bool = False
+
+    - current_state: Any = None 
+    - error_count: int = 0
+    - last_update: Optional[float] = None
+
+    - logger: rclpy.logging.Logger
 
     + __init__(...)
     + __post_init__(): None
