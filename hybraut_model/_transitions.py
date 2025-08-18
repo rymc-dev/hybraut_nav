@@ -41,9 +41,6 @@ class Transition:
     )  # EAGER urgency for transition means the transition occurs automatically.
     _metadata: Dict[str, Any] = field(init=True, default_factory=lambda: {})
 
-    def __post_init__(self):
-        pass
-
     def get_target_mode(self):
         return self._target_mode
 
@@ -91,26 +88,27 @@ class Transition:
 
         return msg
 
+    def __repr__(self):
+        return (
+            f"Transition(name={self._name!r}, target_mode={self._target_mode}, "
+            f"guards={self._guard_refs}, resets={self._reset_refs}, urgency={self._urgency})"
+        )
+
+    def __str__(self):
+        return f"Transition '{self._name}' -> Mode {self._target_mode} | Guards: {self._guard_refs} | Resets: {self._reset_refs} | Urgency: {self._urgency}"
+
     @classmethod
     def load_transition_from_amdl(
         cls, transition_name: str, transition_value: Dict[str, Any]
     ):
-        print(f"{transition_name}, {transition_value}")
+        """
+        Load a transition from a configuration dictionary.
+        """
         name = transition_name
         target_mode = transition_value["target_mode"]
         guard_ref = transition_value["guard"]
         reset_ref = transition_value.get("reset")
-        urgency = transition_value.get("urgency")
-
-        if urgency is None:
-            return cls(
-                _name=name,
-                _target_mode=target_mode,
-                _guard_refs=guard_ref,
-                _reset_refs=reset_ref,
-            )
-
-        urgency = UrgencyEnums.EAGER
+        urgency = UrgencyEnums(transition_value.get("urgency", 1))
 
         return cls(
             _name=name,
@@ -234,6 +232,13 @@ class TransitionRegistry(ComponentRegistry):
                 raise
         return components
 
+    def __repr__(self):
+        return f"TransitionRegistry({list(self._components.keys())})"
+
+    def __str__(self):
+        transitions_str = "\n".join(str(t) for t in self._components.values())
+        return f"TransitionRegistry with {len(self._components)} transitions:\n{transitions_str}"
+
     @classmethod
     def load_transition_registry_from_amdl(cls, transition_dict: dict):
         logging.info("Loading TransitionRegistry")
@@ -248,7 +253,29 @@ class TransitionRegistry(ComponentRegistry):
 
 
 def main():
-    pass
+    # Example usage of Transition and TransitionrRegistry
+
+    transition_data = {
+        "transition_1": {
+            "target_mode": 2,
+            "guard": ["guard_1", "guard_2"],
+            "reset": ["reset_1"],
+            "urgency": 1,  # EAGER urgency,
+        },
+        "transition_2": {
+            "target_mode": 3,
+            "guard": ["guard_3"],
+            "reset": ["reset_2", "reset_3"],
+            "urgency": 2,  # LAZY urgency
+        },
+    }
+
+    transition_registry = TransitionRegistry.load_transition_registry_from_amdl(
+        transition_data
+    )
+
+    print(f"string transition_registry representation: {transition_registry}\n")
+    print(f"__repr__ transition_registry representation: {repr(transition_registry)}")
 
 
 if __name__ == "__main__":

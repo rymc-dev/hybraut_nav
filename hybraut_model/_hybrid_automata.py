@@ -15,8 +15,6 @@ This module is intended to be used as part of a larger Hybraut framework, which 
 evaluation.
 """
 
-from rclpy.node import Node
-
 from dataclasses import dataclass, field
 from typing import List
 

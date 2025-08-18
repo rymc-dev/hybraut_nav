@@ -143,16 +143,6 @@ class GuardRegistry(ComponentRegistry["GuardWrapper"]):
 
 
 def main():
-    import rclpy
-    from rclpy.node import Node
-    import threading
-    from rclpy.executors import MultiThreadedExecutor
-
-    rclpy.init()
-    node = Node("mock_node")
-    executor = MultiThreadedExecutor(num_threads=2)
-    thread = threading.Thread(target=executor.spin)
-    thread.start()
 
     guard_dict = {
         "boolean_flag_guard": {
@@ -171,10 +161,7 @@ def main():
     }
     from hybraut_model._states import StateRegistry
 
-    state_registry = StateRegistry.load_state_registry_from_amdl(
-        node=node, states_dict=states
-    )
-    state_registry.activate_components(node)
+    state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
 
     from hybraut_model._evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
@@ -193,7 +180,6 @@ def main():
     )
 
     print(guard_evaluations)
-    rclpy.shutdown()
 
 
 if __name__ == "__main__":

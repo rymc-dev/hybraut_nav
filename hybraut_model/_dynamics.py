@@ -29,18 +29,20 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DynamicsWrapper(WrapperInterface):
-    """ 
+    """
     wrapper for a instance of dynamics implementation
     """
+
     _output_topic: str = field(init=True, default=None)
     _output_msg_type: Type = field(init=True, default=None)
     _component_class: Type[DynamicsInterface]
 
-
     def __post_init_hook__(self):
         self.initialize()
 
-    def _evaluate(self, ctx: EvaluationContext) -> Tuple[Any, AutomatonDynamicsEvaluation]:
+    def _evaluate(
+        self, ctx: EvaluationContext
+    ) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         """
         Evaluate the current dynamics for the automaton.
 
@@ -48,7 +50,7 @@ class DynamicsWrapper(WrapperInterface):
         1. Collects the required state inputs from the given `ctx`.
         2. Executes the dynamics component to produce a control command (`cmd`).
         3. Creates an `AutomatonDynamicsEvaluation` message containing
-            descriptive and debugging information about the evaluation, 
+            descriptive and debugging information about the evaluation,
             including a JSON-encoded representation of the command.
 
         Returns:
@@ -86,28 +88,28 @@ class DynamicsWrapper(WrapperInterface):
 
         return cmd, msg
 
-    
     @classmethod
-    def load_dynamics_from_amdl(cls, dynamics_name: str, dynamics_dict: Dict[str, Any]) -> 'DynamicsWrapper':
+    def load_dynamics_from_amdl(
+        cls, dynamics_name: str, dynamics_dict: Dict[str, Any]
+    ) -> "DynamicsWrapper":
         component_path = ComponentPath.load_component_from_famd(dynamics_dict)
         component_class = component_path.get_component_class()
-        configuration = dynamics_dict.get('configuration')
-        output = dynamics_dict.get('output')
-        output_topic = output.get('topic')
-        msg_type_info = MsgType(**output['type'])
+        configuration = dynamics_dict.get("configuration")
+        output = dynamics_dict.get("output")
+        output_topic = output.get("topic")
+        msg_type_info = MsgType(**output["type"])
         msg_type = msg_type_info.import_msg_type()
-
 
         return cls(
             _name=dynamics_name,
             _component_class=component_class,
             _configuration=configuration,
             _output_topic=output_topic,
-            _output_msg_type=msg_type
+            _output_msg_type=msg_type,
         )
-    
 
-class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
+
+class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     """Registry specialized for managing dynamics"""
 
     def __post_init__(self):
@@ -117,14 +119,16 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
     def get_dynamics_names(self):
         if self._components is None:
             return []
-        
+
         return list(self._components.keys())
-    
-    def get_dynamics_by_name(self, dynamics_name: str): 
+
+    def get_dynamics_by_name(self, dynamics_name: str):
         if dynamics_name in self._components.keys():
             return self._components[dynamics_name]
-        
-    def evaluate_dynamics_by_name(self, dynamics_name: str, ctx: EvaluationContext) -> Tuple[Any, AutomatonDynamicsEvaluation]:
+
+    def evaluate_dynamics_by_name(
+        self, dynamics_name: str, ctx: EvaluationContext
+    ) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         dynamics = self.get_dynamics_by_name(dynamics_name)
         try:
             cmd, dynamics_evaluation = dynamics._evaluate(ctx)
@@ -136,7 +140,7 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
     @classmethod
     def _component_class(cls) -> Type[DynamicsWrapper]:
         return DynamicsWrapper
-    
+
     @classmethod
     def register(cls, dynamics_dict: Dict[str, Any]) -> Dict[str, DynamicsWrapper]:
         components = {}
@@ -144,17 +148,20 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
             try:
                 component_cls = cls._component_class()
                 component = component_cls.load_dynamics_from_amdl(
-                    dynamics_name=name,
-                    dynamics_dict=conf
+                    dynamics_name=name, dynamics_dict=conf
                 )
                 components[name] = component
-            except Exception as e: 
-                logging.getLogger(__name__).error(f"Failed to import component '{name}': {e}")
-            
+            except Exception as e:
+                logging.getLogger(__name__).error(
+                    f"Failed to import component '{name}': {e}"
+                )
+
         return components
-    
+
     @classmethod
-    def load_dynamics_registry_from_amdl(cls, dynamics_dict: Dict[str, Any]) -> 'DynamicsWrapper': 
+    def load_dynamics_registry_from_amdl(
+        cls, dynamics_dict: Dict[str, Any]
+    ) -> "DynamicsWrapper":
         """generates the dyanmics registry from amdl"""
         logger.info("Loading DynamicsRegistry from 'amdl' configuration")
         dynamics = cls.register(dynamics_dict)
@@ -163,25 +170,17 @@ class DynamicsRegistry(ComponentRegistry['DynamicsInterface']):
         return registry
 
 
-
 """main is a test function, which is not for use within production"""
 
+
 def main():
-    import rclpy
-    from rclpy.node import Node
-    from rclpy.executors import MultiThreadedExecutor
+
     import threading
     from hybraut_model._evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
     from hybraut_model._states import StateRegistry
 
-    rclpy.init()
-    node = Node('mock_node')
-    executor = MultiThreadedExecutor(num_threads=2)
-    thread = threading.Thread(target=executor.spin)
-    thread.start()
-
-    dynamics_name = 'pid_controller'
+    dynamics_name = "pid_controller"
 
     dynamics_dict = {
         "pid_controller": {
@@ -192,23 +191,20 @@ def main():
                 "max_velocity": 30.0,
                 "derivative_filter_alpha": 0.1,
                 "integral_max": 0.2,
-                "target_velocity": 25.0, # updated cruise speed
-                "yaw_kp": 0.3, # gentle heading proportional gain
-                "yaw_ki": 0.01, # small integral for smooth correction
-                "yaw_kd": 0.05, # small derivative gain to damp oscillations
-                "vel_kp": 0.5, # moderate velocity proportional gain
-                "vel_ki": 0.05, # small integral to avoid windup
-                "vel_kd": 0.05, # small derivative for smooth velocity changes
-                "error_tolerance": 0.01, # precision in heading error
-                "max_yaw_rate": 0.1 # limit yaw rate to gentle turns
+                "target_velocity": 25.0,  # updated cruise speed
+                "yaw_kp": 0.3,  # gentle heading proportional gain
+                "yaw_ki": 0.01,  # small integral for smooth correction
+                "yaw_kd": 0.05,  # small derivative gain to damp oscillations
+                "vel_kp": 0.5,  # moderate velocity proportional gain
+                "vel_ki": 0.05,  # small integral to avoid windup
+                "vel_kd": 0.05,  # small derivative for smooth velocity changes
+                "error_tolerance": 0.01,  # precision in heading error
+                "max_yaw_rate": 0.1,  # limit yaw rate to gentle turns
             },
             "output": {
                 "topic": "/cmd_vel",
-                "type": {
-                    "pkg": "geometry_msgs.msg",
-                    "msg": "Twist"
-                }
-            }
+                "type": {"pkg": "geometry_msgs.msg", "msg": "Twist"},
+            },
         }
     }
 
@@ -216,50 +212,37 @@ def main():
         "agent_state": {
             "topic": "/state/agent",
             "description": "State of the agent including position, velocity and heading.",
-            "type": {
-                "pkg": "colav_interfaces.msg",
-                "msg": "AgentState"
-            }
+            "type": {"pkg": "colav_interfaces.msg", "msg": "AgentState"},
         },
         "waypoints_state": {
             "topic": "/state/waypoints",
             "description": "State of the waypoints including current waypoint and virtual waypoints.",
-            "type": {
-                "pkg": "colav_interfaces.msg",
-                "msg": "WaypointsState"
-            }
-        }
+            "type": {"pkg": "colav_interfaces.msg", "msg": "WaypointsState"},
+        },
     }
 
-
-    state_registry = StateRegistry.load_state_registry_from_amdl(node=node, states_dict=states)
-    
-
+    state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
 
     evaluation_context = EvaluationContext(
         states=state_registry,
         current_mode=1,
         stamp=Time(),
         metadata={},
-        guard_registry = None,
-        reset_registry = None,
-        invariant_registry = None
+        guard_registry=None,
+        reset_registry=None,
+        invariant_registry=None,
     )
 
     dynamics: DynamicsRegistry = DynamicsRegistry.load_dynamics_registry_from_amdl(
         dynamics_dict=dynamics_dict
     )
-    cmd, dynamic_evaluation = dynamics.evaluate_dynamics_by_name("pid_controller", evaluation_context)
-    
-    print (cmd)
-    print (dynamic_evaluation)
+    cmd, dynamic_evaluation = dynamics.evaluate_dynamics_by_name(
+        "pid_controller", evaluation_context
+    )
+
+    print(cmd)
+    print(dynamic_evaluation)
 
 
-    executor.shutdown()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-
-
