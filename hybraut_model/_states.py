@@ -53,17 +53,6 @@ class State:
         """Initialize the logger after dataclass creation."""
         self._logger = logging.getLogger(f"{__name__}.State.{self._name}")
 
-    def is_synced(self, expected_hz: float, timeout_sec: float) -> bool:
-        """Check if the state has been updated recently enough."""
-        if not self._is_active:
-            raise RuntimeError("can't check is_synced if states are not active")
-
-        return True
-        # now = time.time()
-        # time_since_update = now - self.timestamp
-        # min_expected_interval = 1.0 / expected_hz
-        # return time_since_update <= timeout_sec and time_since_update <= 2 * min_expected_interval
-
     def update_state(self, current_state: Any):
         """
         Internal callback for processing received state messages.
@@ -109,16 +98,28 @@ class State:
             )
 
     def __str__(self) -> str:
-        """Return a human-readable string representation."""
-        return f"<State '{self._name}' on topic '{self._topic}'>"
+        """Return a concise, human-readable representation of the state."""
+        return (
+            f"State '{self._name}' on topic '{self._topic}', "
+            f"message type: {getattr(self._msg_type, '__name__', str(self._msg_type))}, "
+            f"errors: {self._error_count}/{self._max_errors}"
+        )
 
     def __repr__(self) -> str:
-        """Return a detailed string representation for debugging."""
+        """Return a detailed representation for debugging."""
+        current_state_repr = (
+            repr(self._current_state) if self._current_state is not None else "None"
+        )
         return (
-            f"State(_name={self._name!r}, _topic={self._topic!r}, "
-            f"_msg_type={self._msg_type!r}"
-            f"_update_hz={self._update_hz}, _timeout_sec={self._timeout_sec}, "
-            f"_error_count={self._error_count})"
+            f"{self.__class__.__name__}("
+            f"name={self._name!r}, "
+            f"topic={self._topic!r}, "
+            f"msg_type={getattr(self._msg_type, '__name__', repr(self._msg_type))}, "
+            f"update_hz={self._update_hz}, "
+            f"timeout_sec={self._timeout_sec}, "
+            f"error_count={self._error_count}, "
+            f"max_errors={self._max_errors}, "
+            f"current_state={current_state_repr})"
         )
 
     def get_info(self) -> Dict[str, Any]:
@@ -148,76 +149,6 @@ class State:
         """Get the current state message (read-only property)."""
         return self._current_state
 
-    @property
-    def is_active(self) -> bool:
-        """Check if the state is currently active (read-only property)."""
-        return self._is_active
-
-    @classmethod
-    def load_state_from_amdl(
-        cls, state_name: str, state_dict: Dict[str, Any]
-    ) -> "State":
-        """
-        Create a State instance from FAMD (Formal Automaton Model Description) configuration.
-
-        This factory method enables creation of State objects from configuration
-        dictionaries, typically loaded from YAML or JSON files.
-
-        Args:
-            name (str): Unique name for the state
-            state_dict (Dict[str, Any]): Configuration dictionary containing:
-                - topic (str): ROS2 topic name
-                - type (dict): Message type specification with 'pkg' and 'msg'
-                - params (dict): Optional parameters like 'update_hz', 'timeout_sec'
-
-        Returns:
-            State: Configured State instance
-
-        Raises:
-            KeyError: If required configuration keys are missing
-            ImportError: If message type cannot be imported
-
-        Example:
-            >>> config = {
-            ...     "topic": "/robot/pose",
-            ...     "type": {"pkg": "geometry_msgs.msg", "msg": "Pose"},
-            ...     "params": {"update_hz": 10.0, "timeout_sec": 0.5}
-            ... }
-            >>> state = State.load_state_from_famd("pose_state", config)
-        """
-        try:
-            # Extract and validate message type
-            msg_type_info = MsgType(**state_dict["type"])
-            msg_type = msg_type_info.import_msg_type()
-
-            # Extract optional parameters
-            params = state_dict.get("params", {})
-            update_hz = params.get("update_hz")
-            timeout_sec = params.get("timeout_sec")
-            max_errors = params.get("max_errors", 10)
-
-            logger.info(f"Loading state '{state_name}' from FAMD configuration")
-
-            return State(
-                name=state_name,
-                topic=state_dict["topic"],
-                msg_type=msg_type,
-                update_hz=update_hz,
-                timeout_sec=timeout_sec,
-                max_errors=None,
-            )
-
-        except KeyError as e:
-            error_msg = (
-                f"Missing required key in state configuration for '{state_name}': {e}"
-            )
-            logger.error(error_msg)
-            raise KeyError(error_msg)
-        except Exception as e:
-            error_msg = f"Failed to load state '{state_name}' from FAMD: {e}"
-            logger.error(error_msg)
-            raise
-
 
 @dataclass
 class StateRegistry(ComponentRegistry["State"]):
@@ -238,40 +169,6 @@ class StateRegistry(ComponentRegistry["State"]):
     @classmethod
     def _component_class(cls) -> Type[State]:
         return State
-
-    @classmethod
-    def register(
-        cls: Type["ComponentRegistry"], config_dict: Dict[str, Any]
-    ) -> Dict[str, State]:
-        """
-        Create and return component instances from configuration dict.
-        Subclasses must implement `_component_class()` returning their component class.
-        """
-        components = {}
-
-        for name, conf in config_dict.items():
-            try:
-                component_cls = cls._component_class()
-                component = component_cls.load_state_from_amdl(
-                    state_name=name, state_dict=conf
-                )
-                components[name] = component
-            except Exception as e:
-                logging.getLogger(__name__).error(
-                    f"Failed to load component '{name}': {e}"
-                )
-                raise
-        return components
-
-    @classmethod
-    def load_state_registry_from_amdl(
-        cls, states_dict: Dict[str, Any]
-    ) -> "StateRegistry":
-        logger.info("Loading StateRegistry from 'amdl' configuration")
-        states = cls.register(config_dict=states_dict)
-        registry = cls(_components=states)
-        logger.info(f"Created StateRegistry with {len(states)} states")
-        return registry
 
 
 """main function for testing the State and StateRegistry classes. not for production use."""
@@ -329,8 +226,8 @@ def main():
 
         logger.info(f"Registry status: {_state_registry.get_registry_status()}")
 
-        logger.info(f"Registry status after deactivation: {_state_registry}")
-
+        print(f"Registry __str__ representation: {_state_registry}\n")
+        print(f"Registry __repr__ representation: {repr(_state_registry)}")
     except Exception as e:
         logger.error(f"Error in main execution: {e}")
     finally:

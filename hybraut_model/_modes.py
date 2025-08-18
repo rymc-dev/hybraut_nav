@@ -120,7 +120,24 @@ class ModeRegistry:
 
 
 def main():
-    pass
+    mode_dict = {
+        0: {
+            "name": "Idle",
+            "description": "The robot is idle.",
+            "dynamics": "idle_dynamics",
+            "invariants": ["idle_invariant"],
+            "transitions": {1: "start_transition", 2: "stop_transition"},
+        },
+        1: {
+            "name": "Active",
+            "description": "The robot is active.",
+            "dynamics": "active_dynamics",
+            "invariants": ["active_invariant"],
+            "transitions": {0: "stop_transition", 2: "pause_transition"},
+        },
+    }
+
+    mode_registry = ModeRegistry.load_modes_registry_from_amdl(mode_dict)
 
 
 if __name__ == "__main__":
