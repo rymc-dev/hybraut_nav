@@ -11,8 +11,8 @@ from typing import Any, Dict, List, Type
 
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.constants.urgency import UrgencyEnums
-from hybraut_model._evaluation_context import EvaluationContext
-from hybraut_model._guards import GuardWrapper
+from hybraut_model.evaluation_context import EvaluationContext
+from hybraut_model.guards import GuardWrapper
 
 from hybraut_interfaces.msg import (
     GuardEvaluationMSG,
@@ -96,27 +96,6 @@ class Transition:
 
     def __str__(self):
         return f"Transition '{self._name}' -> Mode {self._target_mode} | Guards: {self._guard_refs} | Resets: {self._reset_refs} | Urgency: {self._urgency}"
-
-    @classmethod
-    def load_transition_from_amdl(
-        cls, transition_name: str, transition_value: Dict[str, Any]
-    ):
-        """
-        Load a transition from a configuration dictionary.
-        """
-        name = transition_name
-        target_mode = transition_value["target_mode"]
-        guard_ref = transition_value["guard"]
-        reset_ref = transition_value.get("reset")
-        urgency = UrgencyEnums(transition_value.get("urgency", 1))
-
-        return cls(
-            _name=name,
-            _target_mode=target_mode,
-            _guard_refs=guard_ref,
-            _reset_refs=reset_ref,
-            _urgency=urgency,
-        )
 
     def execute_transition(self, ctx: EvaluationContext):
         """
@@ -212,41 +191,12 @@ class TransitionRegistry(ComponentRegistry):
     def _component_class(cls) -> Type[Transition]:
         return Transition
 
-    @classmethod
-    def register(
-        cls: Type["ComponentRegistry"], config_dict: Dict[str, Any]
-    ) -> Dict[str, Transition]:
-        components = {}
-
-        for name, conf in config_dict.items():
-            try:
-                component_cls = cls._component_class()
-                component = component_cls.load_transition_from_amdl(
-                    transition_name=name, transition_value=conf
-                )
-                components[name] = component
-            except Exception as e:
-                logging.getLogger(__name__).error(
-                    f"Failed to load component '{name}': {e}"
-                )
-                raise
-        return components
-
     def __repr__(self):
         return f"TransitionRegistry({list(self._components.keys())})"
 
     def __str__(self):
         transitions_str = "\n".join(str(t) for t in self._components.values())
         return f"TransitionRegistry with {len(self._components)} transitions:\n{transitions_str}"
-
-    @classmethod
-    def load_transition_registry_from_amdl(cls, transition_dict: dict):
-        logging.info("Loading TransitionRegistry")
-        transitions = cls.register(transition_dict)
-        registry = cls(_components=transitions)
-        logger.info(f"Created TransitionRegistry with {len(transitions)} transitions")
-
-        return registry
 
 
 """ === Main function for testing or running the module, not for production use === """

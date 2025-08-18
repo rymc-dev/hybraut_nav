@@ -19,7 +19,7 @@ from hybraut_aci_interfaces import InvariantInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_model._evaluation_context import EvaluationContext
+from hybraut_model.evaluation_context import EvaluationContext
 
 from hybraut_model.exceptions import EvaluationException
 
@@ -57,20 +57,6 @@ class InvariantWrapper(WrapperInterface):
             msg.message = f"exception occured during invariant evaluation: '{str(e)}'"
 
         return msg
-
-    @classmethod
-    def load_invariant_from_amdl(
-        cls, invariant_name: str, invariant_dict: Dict[str, Any]
-    ) -> "InvariantWrapper":
-        component_path = ComponentPath.load_component_from_famd(invariant_dict)
-        component_class = component_path.get_component_class()
-        configuration = invariant_dict.get("configuration", {})
-
-        return cls(
-            _name=invariant_name,
-            _component_class=component_class,
-            _configuration=configuration,
-        )
 
 
 class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
@@ -142,32 +128,6 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
     def _component_class(cls) -> Type[InvariantWrapper]:
         return InvariantWrapper
 
-    @classmethod
-    def register(cls, invariants_dict: Dict[str, Any]) -> Dict[str, InvariantWrapper]:
-        components = {}
-        for name, conf in invariants_dict.items():
-            try:
-                component_cls = cls._component_class()
-                component = component_cls.load_invariant_from_amdl(name, conf)
-                components[name] = component
-            except Exception as e:
-                logging.getLogger(__name__).error(
-                    f"Failed to import component '{name}': {e}"
-                )
-
-        return components
-
-    @classmethod
-    def load_invariant_registry_from_amdl(
-        cls, invariants_dict: Dict[str, Any]
-    ) -> "InvariantRegistry":
-        """generates the guard_registry from amdl"""
-        logger.info("Loading GuardRegistry from 'amdl' configuration")
-        invariants = cls.register(invariants_dict)
-        registry = cls(_components=invariants)
-        logger.info(f"Created GuardRegistry with {len(invariants)} guards")
-        return registry
-
 
 if __name__ == "__main__":
 
@@ -187,7 +147,7 @@ if __name__ == "__main__":
             "type": {"pkg": "std_msgs.msg", "msg": "Float64"},
         }
     }
-    from hybraut_model._states import StateRegistry
+    from hybraut_model.states import StateRegistry
     from std_msgs.msg import Float64
 
     state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)

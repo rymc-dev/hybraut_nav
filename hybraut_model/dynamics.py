@@ -13,7 +13,7 @@ from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from hybraut_aci_interfaces import DynamicsInterface
 from hybraut_aci_interfaces._dynamics_interface import DynamicsInterface
 
-from hybraut_model._evaluation_context import EvaluationContext
+from hybraut_model.evaluation_context import EvaluationContext
 from hybraut_model.component_interfaces.wrapper_interface import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.automaton_types.component_path import ComponentPath
@@ -88,26 +88,6 @@ class DynamicsWrapper(WrapperInterface):
 
         return cmd, msg
 
-    @classmethod
-    def load_dynamics_from_amdl(
-        cls, dynamics_name: str, dynamics_dict: Dict[str, Any]
-    ) -> "DynamicsWrapper":
-        component_path = ComponentPath.load_component_from_famd(dynamics_dict)
-        component_class = component_path.get_component_class()
-        configuration = dynamics_dict.get("configuration")
-        output = dynamics_dict.get("output")
-        output_topic = output.get("topic")
-        msg_type_info = MsgType(**output["type"])
-        msg_type = msg_type_info.import_msg_type()
-
-        return cls(
-            _name=dynamics_name,
-            _component_class=component_class,
-            _configuration=configuration,
-            _output_topic=output_topic,
-            _output_msg_type=msg_type,
-        )
-
 
 class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     """Registry specialized for managing dynamics"""
@@ -141,34 +121,6 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     def _component_class(cls) -> Type[DynamicsWrapper]:
         return DynamicsWrapper
 
-    @classmethod
-    def register(cls, dynamics_dict: Dict[str, Any]) -> Dict[str, DynamicsWrapper]:
-        components = {}
-        for name, conf in dynamics_dict.items():
-            try:
-                component_cls = cls._component_class()
-                component = component_cls.load_dynamics_from_amdl(
-                    dynamics_name=name, dynamics_dict=conf
-                )
-                components[name] = component
-            except Exception as e:
-                logging.getLogger(__name__).error(
-                    f"Failed to import component '{name}': {e}"
-                )
-
-        return components
-
-    @classmethod
-    def load_dynamics_registry_from_amdl(
-        cls, dynamics_dict: Dict[str, Any]
-    ) -> "DynamicsWrapper":
-        """generates the dyanmics registry from amdl"""
-        logger.info("Loading DynamicsRegistry from 'amdl' configuration")
-        dynamics = cls.register(dynamics_dict)
-        registry = cls(_components=dynamics)
-        logger.info(f"Created DynamicsRegistry with {len(dynamics)} dynamics")
-        return registry
-
 
 """main is a test function, which is not for use within production"""
 
@@ -176,9 +128,9 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
 def main():
 
     import threading
-    from hybraut_model._evaluation_context import EvaluationContext
+    from hybraut_model.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
-    from hybraut_model._states import StateRegistry
+    from hybraut_model.states import StateRegistry
 
     dynamics_name = "pid_controller"
 

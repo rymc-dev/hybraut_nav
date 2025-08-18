@@ -3,19 +3,25 @@ from dataclasses import dataclass, field
 from utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
-from hybraut_model._evaluation_context import EvaluationContext
-from hybraut_aci_interfaces._hybrid_automaton_component_interface import HybridComponentInterface
+from hybraut_model.evaluation_context import EvaluationContext
+from hybraut_aci_interfaces._hybrid_automaton_component_interface import (
+    HybridComponentInterface,
+)
 
 
 @dataclass
 class WrapperInterface(ABC):
     _name: str = field(init=True)
     _component_class: Type[HybridComponentInterface]
-    _component_instance: Optional[HybridComponentInterface] = field(default=None, init=False)
+    _component_instance: Optional[HybridComponentInterface] = field(
+        default=None, init=False
+    )
     _configuration: Optional[Dict[str, Any]] = field(init=True)
 
-    _cache_enabled: bool = field(default=True, init=True) 
-    _cache_ttl: float = field(default=1.0, init=True)  # Time-to-live in seconds for caching evaluation results
+    _cache_enabled: bool = field(default=True, init=True)
+    _cache_ttl: float = field(
+        default=1.0, init=True
+    )  # Time-to-live in seconds for caching evaluation results
     _last_evaluation: Optional[Any] = field(default=None, init=False)
     _last_evaluation_time: Optional[Time] = field(default=None, init=False)
     _is_initialized: bool = field(default=False, init=False)
@@ -39,29 +45,30 @@ class WrapperInterface(ABC):
                     f"Invalid type for configuration key '{config_name}': "
                     f"expected {expected_type.__name__}, got {type(self._configuration[config_name]).__name__}."
                 )
-            
+
         self.__post_init_hook__()
-            
 
     def get_configuration_names(self) -> List[str]:
         return self._component_class.init_input_spec_names()
-    
+
     def get_configuration_types(self) -> List[Type]:
         return self._component_class.init_input_spec_types()
-    
+
     def get_state_input_names(self) -> List[str]:
         return self._component_class.state_input_spec_names()
-    
+
     def get_state_input_types(self) -> List[Type]:
         return self._component_class.state_input_spec_types()
-    
+
     def get_current_configuration(self) -> Dict[str, Any]:
         return self._configuration
-    
-    def update_configuration_value(self, configuration_name: str, configuration_value: Any): 
+
+    def update_configuration_value(
+        self, configuration_name: str, configuration_value: Any
+    ):
         if configuration_name not in self._configuration:
-            return AttributeError('configuration_name is not in configuration')
-        
+            return AttributeError("configuration_name is not in configuration")
+
         self._configuration[configuration_name] = configuration_value
 
     def __post_init_hook__(self):
@@ -76,7 +83,7 @@ class WrapperInterface(ABC):
         Subclasses may override this to perform schema checks or consistency validation.
         """
         if not self._is_initialized:
-            raise RuntimeError('Tried to evaluate but the component is not activated')
+            raise RuntimeError("Tried to evaluate but the component is not activated")
 
     def _is_cache_valid(self, context: EvaluationContext) -> bool:
         """
@@ -84,10 +91,10 @@ class WrapperInterface(ABC):
         """
         if not self._cache_enabled or self._last_evaluation_time is None:
             return False
-        
+
         if context.current_time is None:
             return False
-            
+
         # Simple TTL check - in real implementation you'd convert Time to seconds
         time_diff = context.current_time.sec - self._last_evaluation_time.sec
         return time_diff < self._cache_ttl
@@ -101,19 +108,19 @@ class WrapperInterface(ABC):
 
     def __call__(self, context: EvaluationContext) -> Any:
         self.__pre_evaluate_hook__(context)
-        
+
         # Check cache first
         if self._is_cache_valid(context):
             return self._last_evaluation
-        
+
         # Perform evaluation
         result = self._evaluate(context)
-        
+
         # Update cache
         if self._cache_enabled:
             self._last_evaluation = result
             self._last_evaluation_time = context.current_time
-        
+
         return result
 
     def initialize(self):

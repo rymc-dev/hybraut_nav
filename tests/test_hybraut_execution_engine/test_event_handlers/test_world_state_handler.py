@@ -13,7 +13,7 @@ from hybraut_execution_engine.event_handlers.world_state_update_handler import (
 import pytest
 import rclpy
 from rclpy.node import Node
-from hybraut_model._states import State, StateRegistry
+from hybraut_model.states import State, StateRegistry
 
 
 @pytest.fixture

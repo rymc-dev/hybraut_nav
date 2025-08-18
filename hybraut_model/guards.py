@@ -13,7 +13,7 @@ from hybraut_aci_interfaces import GuardInterface
 from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_model._evaluation_context import EvaluationContext
+from hybraut_model.evaluation_context import EvaluationContext
 from hybraut_model.exceptions import EvaluationException
 
 logger = logging.getLogger(__name__)
@@ -57,19 +57,6 @@ class GuardWrapper(WrapperInterface):
                 f"Error evaluating guard '{self._name}': {str(e)}"
             )
 
-    @classmethod
-    def load_guard_from_amdl(
-        cls, guard_name: str, guard_dict: Dict[str, Any]
-    ) -> "GuardWrapper":
-        component_path = ComponentPath.load_component_from_famd(guard_dict)
-        component_class = component_path.get_component_class()
-        configuration = guard_dict.get("configuration", None)
-        return cls(
-            _name=guard_name,
-            _component_class=component_class,
-            _configuration=configuration,
-        )
-
 
 class GuardRegistry(ComponentRegistry["GuardWrapper"]):
     """Registry specialized for managing guard components"""
@@ -110,34 +97,6 @@ class GuardRegistry(ComponentRegistry["GuardWrapper"]):
     def _component_class(cls) -> Type[GuardWrapper]:
         return GuardWrapper
 
-    @classmethod
-    def register(cls, guard_dict: Dict[str, Any]) -> Dict[str, GuardWrapper]:
-        components = {}
-        for name, conf in guard_dict.items():
-            try:
-                component_cls = cls._component_class()
-                component = component_cls.load_guard_from_amdl(
-                    guard_name=name, guard_dict=conf
-                )
-                components[name] = component
-            except Exception as e:
-                logging.getLogger(__name__).error(
-                    f"Failed to import component '{name}': {e}"
-                )
-
-        return components
-
-    @classmethod
-    def load_guard_registry_from_amdl(
-        cls, guard_dict: Dict[str, Any]
-    ) -> "GuardRegistry":
-        """generates the guard_registry from amdl"""
-        logger.info("Loading GuardRegistry from 'amdl' configuration")
-        guards = cls.register(guard_dict)
-        registry = cls(_components=guards)
-        logger.info(f"Created GuardRegistry with {len(guards)} guards")
-        return registry
-
 
 """ main function for testing the GuardRegistry, not for production use"""
 
@@ -159,11 +118,11 @@ def main():
             "type": {"pkg": "std_msgs.msg", "msg": "Bool"},
         }
     }
-    from hybraut_model._states import StateRegistry
+    from hybraut_model.states import StateRegistry
 
     state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
 
-    from hybraut_model._evaluation_context import EvaluationContext
+    from hybraut_model.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

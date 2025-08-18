@@ -9,8 +9,8 @@ entering and exiting modes, and retrieving enabled transitions.
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from hybraut_model._evaluation_context import EvaluationContext
-from hybraut_model._transitions import Transition
+from hybraut_model.evaluation_context import EvaluationContext
+from hybraut_model.transitions import Transition
 
 
 @dataclass
@@ -46,30 +46,6 @@ class Mode:
     def get_invariant_refs(self) -> List[str]:
         return self._invariants_refs
 
-    @classmethod
-    def load_mode_from_amdl(cls, mode_idx, mode_dict):
-        id = mode_idx
-        name = mode_dict["name"]
-        description = mode_dict.get("description")
-        dynamics = mode_dict.get("dynamics")
-        invariants = mode_dict.get("invariants")
-        transitions = mode_dict.get("transitions")
-        entry_actions = None
-        exit_actions = None
-        is_goal_mode = False
-
-        return cls(
-            _id=id,
-            _name=name,
-            _description=description,
-            _dynamics_ref=dynamics,
-            _invariants_refs=invariants,
-            _transition_refs=transitions,
-            _entry_actions=entry_actions,
-            _exit_actions=exit_actions,
-            _is_goal_mode=is_goal_mode,
-        )
-
 
 @dataclass
 class ModeRegistry:
@@ -104,16 +80,6 @@ class ModeRegistry:
         Validates the connectivity of modes in the registry.
         """
         ...
-
-    @classmethod
-    def load_modes_registry_from_amdl(cls, mode_dict: dict):
-        modes: Dict[int, Mode] = {}
-        for mode_idx, mode_conf in mode_dict.items():
-            modes[mode_idx] = Mode.load_mode_from_amdl(
-                mode_idx=mode_idx, mode_dict=mode_conf
-            )
-
-        return cls(_modes=modes)
 
 
 """main function for testing purposes, not for production use"""
