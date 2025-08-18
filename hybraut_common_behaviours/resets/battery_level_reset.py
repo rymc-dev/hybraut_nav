@@ -1,6 +1,13 @@
 from hybraut_aci import ResetInterface, IOSpec
 from std_msgs.msg import Float64, Int32, Bool
 from typing import Dict, Any
+from enum import Enum, auto
+
+
+class BatteryMode(Enum):
+    NORMAL = auto()
+    LOW = auto()
+    CRITICAL = auto()
 
 
 class BatteryLevelReset(ResetInterface):
