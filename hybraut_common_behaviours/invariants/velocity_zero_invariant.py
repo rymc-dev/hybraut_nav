@@ -8,8 +8,13 @@ class VelocityNonZeroInvariant(InvariantInterface):
     _state_input_spec = [IOSpec.create_io_spec("velocity", TwistStamped)]
 
     def _evaluate(self, **state_kwargs) -> bool:
-        twist = state_kwargs["velocity"].twist.linear
-        speed = math.hypot(twist.x, twist.y)
+        """Evaluate whether the velocity magnitude is above the minimum threshold."""
+        velocity_msg: TwistStamped = state_kwargs["velocity"]
+        linear = velocity_msg.twist.linear
+
+        # Compute full 3D speed magnitude
+        speed = math.sqrt(linear.x**2 + linear.y**2 + linear.z**2)
+
         return speed >= self.min_velocity
 
 
