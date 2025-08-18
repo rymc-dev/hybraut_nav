@@ -1,6 +1,6 @@
 # !/usr/bin/python
 
-""" 
+"""
 runtime tracker for the hybraut execution engine
 """
 
@@ -11,16 +11,17 @@ from typing import List
 
 # TODO: Lets initialize the watchdog in here
 
+
 class EngineStateTracker:
     """
     tracks the execution during runtime for the hybraut model
     """
 
     def __init__(self, node: Node, initial_mode: int, q_goals: List[int]):
-        """ 
+        """
         contains the state of the hybraut engine.
         """
-        self.node = node 
+        self.node = node
         self.start_time = node.get_clock().now()
         self.last_transition_time = self.start_time
         self.current_mode = initial_mode
@@ -33,19 +34,20 @@ class EngineStateTracker:
     def record_transition(self):
         now = self.node.get_clock().now()
         self.last_transition_time = now
-        self.transition_count+=1
+        self.transition_count += 1
 
     def get_runtime_state(self):
         now = self.node.get_clock().now()
         return {
             "active_duration": (now - self.start_time).nanoseconds / 1e9,
-            "time_since_last_transition": (now - self.last_transition_time).nanoseconds / 1e9,
+            "time_since_last_transition": (now - self.last_transition_time).nanoseconds
+            / 1e9,
             "current_mode": self.current_mode,
             "q_goals": self.q_goals,
-            "transition_count": self.transition_count
+            "transition_count": self.transition_count,
         }
-    
-    def reset(self): 
+
+    def reset(self):
         self.start_time = self.node.get_clock()
         self.last_transition_time = self.start_time
         self.current_mode = None
@@ -94,5 +96,3 @@ class EngineStateTracker:
 
 # if __name__ == '__main__':
 #     main()
-
-

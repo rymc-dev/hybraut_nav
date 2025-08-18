@@ -54,13 +54,13 @@ class HybridAutomaton:
     _initial_mode: int = field(init=True)
     _goal_modes: List[int] = field(init=True)
 
+    _modes: ModeRegistry = field(init=True)
     _states: StateRegistry = field(init=True)
     _guards: GuardRegistry = field(init=True)
     _resets: ResetRegistry = field(init=True)
     _dynamics: DynamicsRegistry = field(init=True)
     _invariants: InvariantRegistry = field(init=True)
     _transitions: TransitionRegistry = field(init=True)
-    _modes: ModeRegistry = field(init=True)
 
     def _generate_evaluation_context(self, current_mode_id: int) -> EvaluationContext:
         """
@@ -80,7 +80,9 @@ class HybridAutomaton:
         """performs transition evaluations for the current mode"""
 
         if not self._modes.is_mode(current_mode_id):
-            raise RuntimeError(f"invalid mode received: {current_mode_id}, not valid mode for evaluation.")
+            raise RuntimeError(
+                f"invalid mode received: {current_mode_id}, not valid mode for evaluation."
+            )
 
         try:
             current_mode: Mode = self._modes.get_mode(current_mode_id)
@@ -107,7 +109,9 @@ class HybridAutomaton:
         """performs invariant evaluations for the current mode"""
 
         if not self._modes.is_mode(current_mode_id):
-            raise RuntimeError(f"invalid mode received: {current_mode_id}, not valid mode for evaluation.")
+            raise RuntimeError(
+                f"invalid mode received: {current_mode_id}, not valid mode for evaluation."
+            )
 
         try:
             current_mode: Mode = self._modes.get_mode(current_mode_id)
@@ -127,21 +131,26 @@ class HybridAutomaton:
                 f"Unexpected error evaluating invariants for mode {current_mode_id}: {str(e)}"
             ) from e
 
-
-    def evaluate_dynamics(self, current_mode_id: int) -> Tuple[Any, AutomatonDynamicsEvaluation]:
+    def evaluate_dynamics(
+        self, current_mode_id: int
+    ) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         """performs dynamics evaluations for the current mode"""
 
         if not self._modes.is_mode(current_mode_id):
-            raise RuntimeError(f"invalid mode received: {current_mode_id}, not valid mode for evaluation.")
+            raise RuntimeError(
+                f"invalid mode received: {current_mode_id}, not valid mode for evaluation."
+            )
 
         try:
             current_mode: Mode = self._modes.get_mode(current_mode_id)
             dynamics_names = current_mode.get_dynamics_ref()
             ctx = self._generate_evaluation_context(current_mode_id)
-            cmd, dynamics_evaluation = self._dynamics.evaluate_dynamics_by_name(dynamics_names, ctx)
+            cmd, dynamics_evaluation = self._dynamics.evaluate_dynamics_by_name(
+                dynamics_names, ctx
+            )
 
             return cmd, dynamics_evaluation
-        
+
         except EvaluationException as e:
             raise EvaluationException(
                 f"Error evaluating dynamics for mode {current_mode_id}: {str(e)}"
@@ -155,7 +164,9 @@ class HybridAutomaton:
         """execute resets to states"""
         # TODO: Need to finish this.
         if not self._modes.is_mode(current_mode_id):
-            raise RuntimeError(f"invalid mode received: {current_mode_id}, not valid mode for evaluation.")
+            raise RuntimeError(
+                f"invalid mode received: {current_mode_id}, not valid mode for evaluation."
+            )
 
         current_mode: Mode = self._modes.get_mode(current_mode_id)
         # validate the reset names are valid for the current mode
@@ -232,31 +243,30 @@ if __name__ == "__main__":
         node=node, amdl_dict=data
     )
 
-    try: 
+    try:
         transitions_evalutation = automaton.evaluate_transitions(current_mode_id=0)
-        print (transitions_evalutation)
+        print(transitions_evalutation)
     except RuntimeError as e:
-        print (str(e))
-    except Exception as e: 
-        print (f"unexpected exception occured: {str(e)}")
+        print(str(e))
+    except Exception as e:
+        print(f"unexpected exception occured: {str(e)}")
 
     try:
         invariants_evaluation = automaton.evaluate_invariants(current_mode_id=0)
-        print (invariants_evaluation)
+        print(invariants_evaluation)
     except RuntimeError as e:
-        print (str(e))
+        print(str(e))
     except Exception as e:
-        print (f"unexpected excpetion occured: {str(e)}")
-
+        print(f"unexpected excpetion occured: {str(e)}")
 
     try:
         cmd, dynamics_output = automaton.evaluate_dynamics(current_mode_id=0)
-        print (f"cmd: {cmd}")
-        print (dynamics_output)
+        print(f"cmd: {cmd}")
+        print(dynamics_output)
     except RuntimeError as e:
-        print (str(e))
+        print(str(e))
         # print exception status unrecoverable
-    except Exception as e: 
-        print (f"unexpected exception occured: {str(e)}")
+    except Exception as e:
+        print(f"unexpected exception occured: {str(e)}")
 
     rclpy.shutdown()

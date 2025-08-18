@@ -1,0 +1,338 @@
+classDiagram
+    direction TB
+    
+    %% Utility Classes
+    class FAMDValidator
+    class AutomatonRenderer
+    
+    
+    %% Main Automaton Class
+    class HybridAutomaton {
+        - name: str
+        - description: str
+        - version: str
+
+        - initial_mode: int
+        - goal_modes: List[int]
+
+        - modes: ModeRegistry
+        - states: StateRegistry
+        - guards: GuardRegistry
+        - resets: ResetRegistry
+        - dynamics: DynamicsRegistry
+        - invariants: InvariantRegistry
+        - transitions: TransitionRegistry
+
+        - generate_evaluation_context(current_mode: int) -> EvaluationContext 
+        
+        + evaluate_transitions(current_mode: int) -> TransitionEvalautionsMSG
+        + evaluate_invariants(current_mode: int) -> InvariantsEvalautionMSG 
+        + evaluate_dynamics(current_mode: int) -> DynamicsEvaluationMSG
+        + execute_resets(current_mode: int, reset_names: List[str]) -> ResetResultsMSG
+
+        + @classmethod registry_automaton(cls, amdl_dict: dict) -> HybridAutomaton    }
+    
+    %% Registry Pattern for Better Management
+    @dataclass
+    class ModeRegistry {
+        - modes: Dict[int, Mode]
+        - mode_graph: Dict[int, List[int]]
+
+        + get_mode(mode_id: int) -> Mode
+        + is_mode(mode_id: int) -> bool
+        + get_reachable_modes(from_mode: int) -> List[int]
+        + validate_from_to_mode(from_mode: int, to_mode: int) -> bool 
+        + validate_mode_connectivity() -> bool 
+
+        + @classmethod load_modes_registry_from_amdl(cls, mode_dict: dict) -> 'ModeRegistry'
+    }
+    
+    @dataclass
+    class StateRegistry {
+        - states: Dict[str, State]
+
+        + __post_init__() -> None
+
+        + get_current_states(state_names: List[str]) -> Dict[str, Any]
+        - @classmethod_component_class() -> Type['State']
+
+        - @classmethod register_state(config_dict: Dict[str, Any]) -> 'State'
+        + @classmethod load_states_registry_from_amdl(states_dict: Dict[str, Any]) -> 'StateRegistry'
+    }
+    
+    @dataclass
+    class GuardRegistry {
+        - guards: Dict[str, GuardWrapper]
+        + register_guard(name: str, guard: GuardWrapper)
+        + get_guard(name: str) GuardWrapper
+        + evaluate_guard(name: str, context: EvaluationContext) GuardEvaluation
+    }
+    
+    class ResetRegistry {
+        - resets: Dict[str, ResetWrapper]
+        + register_reset(name: str, reset: ResetWrapper)
+        + get_reset(name: str) ResetWrapper
+        + apply_reset(name: str, context: EvaluationContext) ResetResult
+    }
+    
+    class InvariantRegistry {
+        - invariants: Dict[str, InvariantWrapper]
+        + register_invariant(name: str, invariant: InvariantWrapper)
+        + get_invariant(name: str) InvariantWrapper
+        + check_invariant(name: str, context: EvaluationContext) bool
+    }
+    
+    %% Enhanced Mode with Lifecycle
+    class Mode {
+        - id: int
+        - name: str
+        - description: str
+        - dynamics: DynamicsWrapper
+        - transitions: List[Transition]
+        - invariant_refs: List[str]
+        - entry_actions: List[str]
+        - exit_actions: List[str]
+        - is_goal_mode: bool
+        + on_enter(context: EvaluationContext)
+        + on_exit(context: EvaluationContext)
+        + evaluate_invariants(context: EvaluationContext) bool
+        + get_enabled_transitions(context: EvaluationContext) List[Transition]
+    }
+    
+  class State {
+    - name: str
+    - current_state: Optional[Any] = None
+    - activation_time: Optional[Time] = None
+    - last_update: Time = Time()
+    - update_hz: Optional[int] = None
+    - timeout_sec: Optional[float] = None
+    
+    - error_count: int = 0
+    - max_errors: int = 10
+    - is_active: bool = False
+
+    + __init__(...)
+    + __post_init__(): None
+    + activate(): None
+    + deactivate(): None
+
+    + get_current_state() -> Any
+    + is_active() -> bool
+    + is_synced() -> bool
+
+    + reset_error_count(): None
+    + increment_error_count(): None
+    - update_state(state_msg: Any): None
+
+    + __str__() -> str
+    + __repr__() -> str
+    + get_info() -> Dict[str, Any]
+    + load_state_from_famd(state_data: Dict[str, Any]) -> State
+	}
+	
+    
+    %% Enhanced Transition with Metadata
+    class Transition {
+        <<dataclass>>
+        - name: str
+        - source_mode: int
+        - target_mode: int
+        - guard_ref: str
+        - reset_ref: Optional[str]
+        - priority: int
+        - urgency: UrgencyLevel
+        - metadata: Dict[str, Any]
+        + is_enabled(context: EvaluationContext) bool
+        + execute(context: EvaluationContext) TransitionResult
+        + load_transition_from_famd(name, config, guard_ref, reset_ref) Transition
+    }
+    
+    %% Evaluation Context for Better Data Flow
+    class EvaluationContext {
+        - states: StateRegistry
+        - current_mode: int
+        - timestamp: float
+        - event_history: List[AutomatonEvent]
+        - metadata: Dict[str, Any]
+        + get_state_value(name: str) Any
+        + get_state_age(name: str) float
+        + add_metadata(key: str, value: Any)
+    }
+    
+    %% Result Types for Better Error Handling
+    class ValidationResult {
+        <<dataclass>>
+        - is_valid: bool
+        - errors: List[str]
+        - warnings: List[str]
+    }
+    
+    class TransitionResult {
+        <<dataclass>>
+        - success: bool
+        - new_mode: int
+        - reset_applied: bool
+        - error_message: Optional[str]
+    }
+    
+    class GuardEvaluation {
+        <<dataclass>>
+        - enabled: bool
+        - confidence: float
+        - metadata: Dict[str, Any]
+    }
+
+
+classDiagram
+    %% ===== Wrapper Interface =====
+    class WrapperInterface {
+        <<abstract>>
+        <<dataclass>>
+        - str _name
+        - Type[HybridComponentInterface] _component_class
+        - Optional[HybridComponentInterface] _component_instance
+        - Optional[Dict[str, Any]] _configuration
+        - bool _cache_enabled
+        - float _cache_ttl
+        - Optional[Any] _last_evaluation
+        - Optional[Time] _last_evaluation_time
+        - bool _is_initialized
+        + __post_init__()
+        + get_configuration_names() List~str~
+        + get_configuration_types() List~Type~
+        + get_state_input_names() List~str~
+        + get_state_input_types() List~Type~
+        + get_current_configuration() Dict~str, Any~
+        + update_configuration_value(configuration_name, configuration_value)
+        + __post_init_hook__()
+        + __pre_evaluate_hook__(context)
+        + _is_cache_valid(context) bool
+        + _evaluate(context) Any
+        + __call__(context) Any
+        + initialize()
+        + shutdown()
+        + clear_cache()
+    }
+
+    %% ===== Relationships =====
+    WrapperInterface --> HybridComponentInterface : uses
+    WrapperInterface --> EvaluationContext : uses
+    WrapperInterface --> Time : uses
+
+    
+    %% Enhanced Wrapper Classes with Caching
+    class GuardWrapper {
+        <<dataclass>>
+        - name: str
+        - guard: GuardInterface
+        - cache_enabled: bool
+        - cache_ttl: float
+        - last_evaluation: Optional[GuardEvaluation]
+        - last_evaluation_time: float
+        + evaluate(context: EvaluationContext) GuardEvaluation
+        + clear_cache()
+        + load_guard_from_famd(data: Dict[str, Any]) GuardWrapper
+    }
+    
+    class ResetWrapper {
+        <<dataclass>>
+        - name: str
+        - reset: ResetInterface
+        + evaluate(context: EvaluationContext) ResetResult
+        + load_reset_from_famd(data: Dict[str, Any]) ResetWrapper
+    }
+    
+    class InvariantWrapper {
+        <<dataclass>>
+        - name: str
+        - invariant: InvariantInterface
+        - violation_count: int
+        - max_violations: int
+        + evaluate_invariant(context: EvaluationContext) bool
+        + reset_violation_count()
+        + load_invariant_from_famd(data: Dict[str, Any]) InvariantWrapper
+    }
+    
+    class DynamicsWrapper {
+        - name: str
+        - dynamics: DynamicsInterface
+        + evaluate_dynamics(context: EvaluationContext) Any
+        + load_dynamics_from_famd(data: Dict[str, Any]) DynamicsWrapper
+    }
+    
+    %% Core Interfaces (Enhanced)
+    class core_interfaces.GuardInterface {
+        <<interface>>
+        + evaluate(context: EvaluationContext) GuardEvaluation
+        + get_dependencies() List[str]
+    }
+    
+    class core_interfaces.ResetInterface {
+        <<interface>>
+        + apply_reset(context: EvaluationContext) ResetResult
+        + get_affected_states() List[str]
+    }
+    
+    class core_interfaces.InvariantInterface {
+        <<interface>>
+        + check_invariant(context: EvaluationContext) bool
+        + get_dependencies() List[str]
+    }
+    
+    class core_interfaces.DynamicsInterface {
+        <<interface>>
+        + evaluate_dynamics(context: EvaluationContext) Any
+        + get_output_states() List[str]
+    }
+    
+    %% Enums
+    class UrgencyLevel {
+        <<enumeration>>
+        LOW
+        MEDIUM
+        HIGH
+        CRITICAL
+    }
+    
+    class EventType {
+        <<enumeration>>
+        MODE_ENTERED
+        MODE_EXITED
+        TRANSITION_TRIGGERED
+        INVARIANT_VIOLATED
+        STATE_TIMEOUT
+        GUARD_EVALUATED
+    }
+    
+    %% Relationships
+    HybridAutomaton *-- ModeRegistry : contains
+    HybridAutomaton *-- StateRegistry : contains
+    HybridAutomaton *-- GuardRegistry : contains
+    HybridAutomaton *-- ResetRegistry : contains
+    HybridAutomaton *-- InvariantRegistry : contains
+    ModeRegistry *-- Mode : contains
+    StateRegistry *-- State : contains
+    GuardRegistry *-- GuardWrapper : contains
+    ResetRegistry *-- ResetWrapper : contains
+    InvariantRegistry *-- InvariantWrapper : contains
+    
+    Mode *-- Transition : contains
+    Mode *-- DynamicsWrapper : contains
+    
+    AutomatonExecutor ..> HybridAutomaton : executes
+    
+    GuardWrapper *-- core_interfaces.GuardInterface : wraps
+    ResetWrapper *-- core_interfaces.ResetInterface : wraps
+    InvariantWrapper *-- core_interfaces.InvariantInterface : wraps
+    DynamicsWrapper *-- core_interfaces.DynamicsInterface : wraps
+    
+    EvaluationContext ..> StateRegistry : uses
+    
+    AutomatonEvent ..> EventType : uses
+    
+    Transition ..> UrgencyLevel : uses
+    Transition ..> GuardWrapper : references via guard_ref
+    Transition ..> ResetWrapper : references via reset_ref
+    
+    HybridAutomaton ..> FAMDValidator : uses
+    HybridAutomaton ..> AutomatonRenderer : uses

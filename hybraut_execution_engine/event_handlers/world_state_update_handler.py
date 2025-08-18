@@ -1,7 +1,5 @@
 # !/usr/bin/env python3
-"""
-
-"""
+""" """
 
 from rclpy.node import Node
 from typing import Any, Type, Callable
@@ -27,7 +25,7 @@ class WorldStateHandler:
             topic=self.state._topic,
             callback=lambda msg: self.state.update_state(msg),
             qos_profile=self.qos,
-            callback_group=self.cb_group
+            callback_group=self.cb_group,
         )
 
     @classmethod
@@ -35,17 +33,18 @@ class WorldStateHandler:
         cls,
         node: Node,
         state: State,
-        qos: QoSProfile = None,
-        cb_group: CallbackGroup = None
+        qos: QoSProfile = qos_profile_system_default,
+        cb_group: CallbackGroup = ReentrantCallbackGroup(),
     ) -> "WorldStateHandler":
         return cls(
             node=node,
             state=state,
             qos=qos if qos else qos_profile_system_default,
-            cb_group=cb_group if cb_group else ReentrantCallbackGroup()
+            cb_group=cb_group if cb_group else ReentrantCallbackGroup(),
         )
 
-class WorldStateHandlerHub: 
+
+class WorldStateHandlerHub:
     pass
 
 
@@ -58,19 +57,15 @@ def main():
 
     rclpy.init()
 
-    node = Node('node')
-    
+    node = Node("node")
+
     executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(node)
 
     thread = threading.Thread(target=executor.spin)
     thread.start()
 
-    state = State(
-        name = 'pose_stamped',
-        topic ='/imu',
-        msg_type=PoseStamped
-    )
+    state = State(name="pose_stamped", topic="/imu", msg_type=PoseStamped)
 
     world_state_handler = WorldStateHandler.create(
         node=node,
@@ -78,10 +73,11 @@ def main():
     )
 
     import time
+
     time.sleep(100.0)
-    
-    rclpy.shutdown()    
-    
-    
-if __name__ == '__main__':
+
+    rclpy.shutdown()
+
+
+if __name__ == "__main__":
     main()

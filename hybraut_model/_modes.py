@@ -80,20 +80,30 @@ class ModeRegistry:
     def register_mode(cls, mode: Mode):
         pass
 
-    def get_mode(self, mode_id: int):
+    def get_mode(self, mode_id: int) -> Mode:
         return self._modes.get(mode_id)
-    
-    def is_mode(self, mode_id: int):
+
+    def is_mode(self, mode_id: int) -> bool:
         if mode_id in self._modes.keys():
             return True
-        
+
         return False
 
-    def get_reachable_modes(self, from_mode: int) -> Mode: ...
+    def get_reachable_modes(self, from_mode: int) -> List[Mode]:
+        """
+        returns a list of modes that are reachable from_mode id
+        """
+        ...
 
-    def get_reachable_modes(self, from_mode: int) -> List[Mode]: ...
+    def validate_from_to_mode(self, from_mode: int, to_mode: int) -> bool:
+        """validates if a transition from from_mode to to_mode is valid based on the mode graph"""
+        ...
 
-    def validate_mode_connectivity(self) -> bool: ...
+    def validate_mode_connectivity(self) -> bool:
+        """
+        Validates the connectivity of modes in the registry.
+        """
+        ...
 
     @classmethod
     def load_modes_registry_from_amdl(cls, mode_dict: dict):
