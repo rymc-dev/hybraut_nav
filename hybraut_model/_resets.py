@@ -10,10 +10,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type
 
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, qos_profile_system_default
-from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
-from rclpy.publisher import Publisher
 
 from hybraut_interfaces.msg import AutomatonReset, AutomatonResets
 
@@ -124,10 +120,6 @@ class ResetRegistry(ComponentRegistry["ResetWrapper"]):
 
     def __post_init__(self):
         self._component_type_name = "Reset"
-        # self._reset_bus = ResetBus(
-        #     _node=self._node,
-
-        # )
         super().__post_init__()
 
     def get_reset_names(self):
@@ -201,20 +193,10 @@ def main():
             },
         }
     }
-    import rclpy
-    from rclpy.node import Node
-    from rclpy.executors import MultiThreadedExecutor
     import threading
 
-    rclpy.init()
-    node = Node("mock_node")
-    executor = MultiThreadedExecutor(num_threads=2)
-    thread = threading.Thread(target=executor.spin)
-    thread.start()
-    executor.add_node(node)
-
     registry: ResetRegistry = ResetRegistry.load_reset_registry_from_amdl(
-        node=node, reset_dict=reset_dict
+        reset_dict=reset_dict
     )
     # registry.activate_components(node)
 
@@ -254,10 +236,7 @@ def main():
     }
     from hybraut_model._states import StateRegistry
 
-    state_registry = StateRegistry.load_state_registry_from_amdl(
-        node=node, states_dict=states
-    )
-    state_registry.activate_components(node)
+    state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
     # state_registry._components['battery_level'].current_state = Float64(_data=80.5)
     # state_registry._components['current_power_mode'].current_state = Int32(_data=2)
     from builtin_interfaces.msg import Time
@@ -269,8 +248,6 @@ def main():
     reset_names = registry.get_reset_names()
     resets = registry.evaluate_resets_by_names(reset_names, evaluation_context)
     print(registry.get_reset_names())
-
-    rclpy.shutdown()
 
 
 if __name__ == "__main__":

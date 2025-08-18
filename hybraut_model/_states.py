@@ -11,8 +11,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type
 
-from rclpy.node import Node
-
 from hybraut_model.automaton_types.msg_type import MsgType
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 

@@ -12,10 +12,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type
 
-from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
-from rclpy.node import Node
-from rclpy.publisher import Publisher
-from rclpy.qos import QoSProfile, qos_profile_system_default
 
 from hybraut_interfaces.msg import InvariantEvaluationMSG, InvariantEvaluationsMSG
 
@@ -28,7 +24,6 @@ from hybraut_model._evaluation_context import EvaluationContext
 from hybraut_model.exceptions import EvaluationException
 
 
-# Set up module-level logger
 logger = logging.getLogger(__name__)
 
 
@@ -103,7 +98,9 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
             return invariant._evaluate(ctx)
         except Exception as e:
             logger.info(f"{str(e)}")
-            raise EvaluationError()
+            raise EvaluationException(
+                f"evaluation exception during 'evaluate_invariant_by_name': {str(e)}"
+            )
 
     def evaluate_invariants_by_name(
         self, invariant_names: List[str], ctx: EvaluationContext
@@ -172,26 +169,12 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
         return registry
 
 
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-import threading
-
 if __name__ == "__main__":
-    rclpy.init()
-
-    node = Node("mock_node")
-
-    executor = MultiThreadedExecutor(num_threads=2)
-    thread = threading.Thread(target=executor.spin)
-    thread.start()
-
-    executor.add_node(node)
 
     invariant_name = "timeout_invariant"
     invariants_dict = {
         "timeout_invariant": {
-            "module": "automaton_models.common_behaviours.invariants.timeout_invariant",
+            "module": "hybraut_common_behaviours.invariants",
             "class_name": "TimeoutInvariant",
             "configuration": {"timeout_sec": 10.0, "entry_time": 1.0},
         }
@@ -205,30 +188,34 @@ if __name__ == "__main__":
         }
     }
     from hybraut_model._states import StateRegistry
+    from std_msgs.msg import Float64
 
-    state_registry = StateRegistry.load_state_registry_from_amdl(
-        node=node, states_dict=states
-    )
-    state_registry.activate_components(node)
-
+    state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
+    state_registry.get_components_by_names(["current_time"])[
+        "current_time"
+    ].update_state(Float64(data=0.0))
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(
-        states=state_registry, current_mode=1, stamp=Time(), metadata={}
+        states=state_registry,
+        reset_registry=None,
+        invariant_registry=None,
+        guard_registry=None,
+        current_mode=1,
+        stamp=Time(),
+        metadata={},
     )
 
     invariant_registry: InvariantRegistry = (
         InvariantRegistry.load_invariant_registry_from_amdl(
-            node=node, invariants_dict=invariants_dict
+            invariants_dict=invariants_dict
         )
     )
     invariant_evaluations: List[InvariantEvaluationMSG] = (
         invariant_registry.evaluate_invariants_by_name(
             invariant_names=invariants_dict.keys(),
-            evaluation_context=evaluation_context,
+            ctx=evaluation_context,
         )
     )
 
     print(invariant_evaluations)
-
-    rclpy.shutdown()
