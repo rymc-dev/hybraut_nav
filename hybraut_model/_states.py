@@ -321,7 +321,6 @@ def main():
         )
 
         logger.info(f"Registry status before activation: {_state_registry}")
-        _state_registry.activate_components(node)
 
         import time
 
@@ -332,7 +331,6 @@ def main():
 
         logger.info(f"Registry status: {_state_registry.get_registry_status()}")
 
-        _state_registry.deactivate_components(node)
         logger.info(f"Registry status after deactivation: {_state_registry}")
 
     except Exception as e:
