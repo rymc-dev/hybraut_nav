@@ -31,6 +31,33 @@ class Mode:
     _exit_actions: List[str] = field(init=True, default=None)
     _is_goal_mode: bool = field(init=True, default=False)
 
+    def get_id(self):
+        return self._id
+
+    def get_name(self):
+        return self._name
+
+    def get_description(self):
+        return self._description
+
+    def get_dynamics_ref(self):
+        return self._dynamics_ref
+
+    def get_invariant_refs(self):
+        return self._invariant_refs
+
+    def get_transition_refs(self):
+        return self._transition_refs
+
+    def get_entry_actions(self):
+        return self._entry_actions
+
+    def get_exit_actions(self):
+        return self._exit_actions
+
+    def get_is_goal_mode(self):
+        return self._is_goal_mode
+
     def on_enter(self, ctx: EvaluationContext): ...
 
     def on_exit(self, ctx: EvaluationContext): ...
@@ -44,13 +71,22 @@ class Mode:
         return self._transition_refs
 
     def get_invariant_refs(self) -> List[str]:
-        return self._invariants_refs
+        return self._invariant_refs
 
 
 @dataclass
 class ModeRegistry:
     _modes: Dict[int, Mode] = field(init=True)
     _mode_graph: Dict[int, List[int]] = field(init=False)
+
+    def get_mode_ids(self):
+        return list(self._modes.keys())
+
+    def get_mode_names(self):
+        return [mode.get_name() for mode in self._modes.values()]
+
+    def get_num_nodes(self):
+        return len(self._modes)
 
     @classmethod
     def register_mode(cls, mode: Mode):
