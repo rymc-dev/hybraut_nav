@@ -1,3 +1,4 @@
+# !/usr/bin/env python3
 """
 Unit tests for the TransitionFactory class in amdl_to_hybraut_model_factory.
 These tests verify the correct loading, registration, and registry creation of transitions from AMDL configurations.

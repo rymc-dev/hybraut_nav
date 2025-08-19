@@ -8,9 +8,13 @@ the provided AMDL configuration.
 
 from hybraut_model.dynamics import DynamicsWrapper, DynamicsRegistry
 from typing import Dict, Any
+from hybraut_model.automaton_types import ComponentPath, MsgType
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class _DynamicsFactory:
+class DynamicsFactory:
 
     component_cls = DynamicsWrapper
 
@@ -35,12 +39,13 @@ class _DynamicsFactory:
         )
 
     @classmethod
-    def register(cls, dynamics_dict: Dict[str, Any]) -> Dict[str, DynamicsWrapper]:
+    def register_dynamics_from_amdl(
+        cls, dynamics_dict: Dict[str, Any]
+    ) -> Dict[str, DynamicsWrapper]:
         components = {}
         for name, conf in dynamics_dict.items():
             try:
-                component_cls = cls._component_class()
-                component = component_cls.load_dynamics_from_amdl(
+                component = cls.load_dynamics_from_amdl(
                     dynamics_name=name, dynamics_dict=conf
                 )
                 components[name] = component
@@ -57,7 +62,6 @@ class _DynamicsFactory:
     ) -> DynamicsRegistry:
         """generates the dyanmics registry from amdl"""
         logger.info("Loading DynamicsRegistry from 'amdl' configuration")
-        dynamics = cls.register(dynamics_dict)
-        registry = cls(_components=dynamics)
-        logger.info(f"Created DynamicsRegistry with {len(dynamics)} dynamics")
+        dynamics = cls.register_dynamics_from_amdl(dynamics_dict)
+        registry = DynamicsRegistry(_components=dynamics)
         return registry

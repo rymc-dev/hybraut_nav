@@ -1,6 +1,7 @@
-# TODO: This class tests needs to be finished.
-
-""" """
+# !/usr/bin/env python3
+"""
+Test Suite for the Guard Factory
+"""
 
 import pytest
 from amdl_to_hybraut_model_factory.guard_factory import GuardFactory
