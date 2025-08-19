@@ -49,9 +49,9 @@ def test_load_guard_from_amdl(sample_guard_name_and_conf):
     assert guard._configuration == guard_cfg["configuration"]
 
 
-def test_register_transitions_from_amdl(sample_guard_amdl):
-    """test the register_transitions_from_amdl method"""
-    guards: Dict[str, GuardWrapper] = GuardFactory.register_transitions_from_amdl(
+def test_register_guards_from_amdl(sample_guard_amdl):
+    """test the register_guards_from_amdl method"""
+    guards: Dict[str, GuardWrapper] = GuardFactory.register_guards_from_amdl(
         sample_guard_amdl
     )
 

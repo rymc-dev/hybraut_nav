@@ -24,10 +24,12 @@ class GuardFactory:
     @classmethod
     def load_guard_from_amdl(
         cls, guard_name: str, guard_dict: Dict[str, Any]
-    ) -> "GuardWrapper":
+    ) -> GuardWrapper:
+        """loads an individual GuardWrapper from AMDL"""
         component_path = ComponentPath.load_component_from_famd(guard_dict)
         component_class = component_path.get_component_class()
         configuration = guard_dict.get("configuration", None)
+
         return GuardWrapper(
             _name=guard_name,
             _component_class=component_class,
@@ -35,9 +37,10 @@ class GuardFactory:
         )
 
     @classmethod
-    def register_transitions_from_amdl(
+    def register_guards_from_amdl(
         cls, guard_dict: Dict[str, Any]
     ) -> Dict[str, GuardWrapper]:
+        """loads a list of guards from AMDL"""
         components = {}
         for name, conf in guard_dict.items():
             try:
@@ -56,7 +59,7 @@ class GuardFactory:
     ) -> "GuardRegistry":
         """generates the guard_registry from amdl"""
         logger.info("Loading GuardRegistry from 'amdl' configuration")
-        guards = cls.register_transitions_from_amdl(guard_dict)
+        guards = cls.register_guards_from_amdl(guard_dict)
         registry = GuardRegistry(_components=guards)
         logger.info(f"Created GuardRegistry with {len(guards)} guards")
         return registry
