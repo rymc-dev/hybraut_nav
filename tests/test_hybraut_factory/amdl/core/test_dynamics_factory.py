@@ -6,9 +6,10 @@ Test Suite for the dynamics factory
 from hybraut_factory.amdl.core.dynamics_factory import DynamicsFactory
 import pytest
 from hybraut_models.core.dynamics import DynamicsWrapper, DynamicsRegistry
+from typing import Dict
 
 
-# @pytest.fixture
+@pytest.fixture
 def sample_dynamics_name_and_cfg():
     """
     a fixture containing an individual dynamic controller
@@ -86,18 +87,31 @@ def test_load_dynamics_from_amdl(sample_dynamics_name_and_cfg):
     assert dynamics._configuration == dynamics_cfg["configuration"]
 
 
-def test_register_dynamics_from_amdl():
+def test_register_dynamics_from_amdl(sample_dynamics_controllers_amdl):
     """tests registering dynamics from amdl into a list of dynamics"""
-    pass
+    amdl = sample_dynamics_controllers_amdl
+    dynamics_list: Dict[str, DynamicsWrapper] = (
+        DynamicsFactory.register_dynamics_from_amdl(amdl)
+    )
+
+    assert [key in dynamics_list.keys() for key in amdl.keys()]
+
+    for _, dynamic_wrapper in dynamics_list.items():
+        assert isinstance(dynamic_wrapper, DynamicsWrapper)
+        assert (
+            dynamic_wrapper._configuration
+            == amdl[dynamic_wrapper._name]["configuration"]
+        )
 
 
-def test_load_dynamics_registry_from_amdl():
+def test_load_dynamics_registry_from_amdl(sample_dynamics_controllers_amdl):
     """tests loading the dynamics registry from amdl"""
-    pass
+    amdl = sample_dynamics_controllers_amdl
+    registry: DynamicsRegistry = DynamicsFactory.load_dynamics_registry_from_amdl(amdl)
+
+    assert isinstance(registry, DynamicsRegistry)
+    assert registry.get_num_dynamics() == len(amdl)
 
 
 if __name__ == "__main__":
-    test_load_dynamics_from_amdl(sample_dynamics_name_and_cfg())
-
-# if __name__ == "__main__":
-#     pytest.main([__file__])
+    pytest.main([__file__])

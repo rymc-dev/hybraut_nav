@@ -96,6 +96,9 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
         self._component_type_name = "Dynamics"
         super().__post_init__()
 
+    def get_num_dynamics(self):
+        return len(self._components)
+
     def get_dynamics_names(self):
         if self._components is None:
             return []
