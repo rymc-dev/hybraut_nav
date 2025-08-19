@@ -5,6 +5,7 @@ These tests verify the correct loading, registration, and registry creation of t
 
 import pytest
 from amdl_to_hybraut_model_factory.transition_factory import TransitionFactory
+from hybraut_model.constants.urgency import UrgencyEnums
 
 
 @pytest.fixture
@@ -15,7 +16,7 @@ def sample_transition_name_and_amdl():
             "target_mode": 2,
             "guard": ["guard_1", "guard_2"],
             "reset": ["reset_1"],
-            "urgency": 1,  # EAGER urgency,
+            "urgency": UrgencyEnums.EAGER.value,  # EAGER urgency,
         },
     )
 
@@ -27,13 +28,13 @@ def sample_transitions_amdl():
             "target_mode": 2,
             "guard": ["guard_1", "guard_2"],
             "reset": ["reset_1"],
-            "urgency": 1,
+            "urgency": UrgencyEnums.EAGER.value,
         },
         "transition_2": {
             "target_mode": 3,
             "guard": ["guard_3"],
             "reset": ["reset_2", "reset_3"],
-            "urgency": 2,
+            "urgency": UrgencyEnums.LAZY.value,
         },
     }
 
