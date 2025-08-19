@@ -62,8 +62,6 @@ class Mode:
 
     def on_exit(self, ctx: EvaluationContext): ...
 
-    def get_enabled_transition_refs(self) -> List[str]: ...
-
     def get_dynamics_ref(self) -> str:
         return self._dynamics_ref
 
