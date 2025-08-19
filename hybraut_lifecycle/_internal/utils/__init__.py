@@ -15,10 +15,10 @@ from .validate_mode import validate_mode
 from .unsafe_set_utils import extract_polygon_vertices
 from .euclidean_distance import euclidean_distance
 from .unsafe_set_utils import is_imminent_collision, is_inside_unsafe_set
-from ....utils.rotation_utils import (
+from ....hybraut_utils.rotation_utils import (
     quaternion_to_heading,
     normalize_angle,
-    delta_heading
+    delta_heading,
 )
 
 
@@ -37,7 +37,6 @@ __all__ = [
     "parse_transition",
     "select_highest_priority_transition",
     "validate_mode",
-
     # custom utils
     "extract_polygon_vertices",
     "euclidean_distance",
@@ -45,5 +44,5 @@ __all__ = [
     "normalize_angle",
     "delta_heading",
     "is_imminent_collision",
-    "is_inside_unsafe_set"
+    "is_inside_unsafe_set",
 ]

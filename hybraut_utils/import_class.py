@@ -1,5 +1,11 @@
+"""
+simple utility for dynamic importing of classes utilizing
+module_path and class_name
+"""
+
 from typing import Type, Any
 import importlib
+
 
 def import_class(module_path: str, class_name: str) -> Type[Any]:
     """

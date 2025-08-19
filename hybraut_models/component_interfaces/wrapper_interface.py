@@ -1,10 +1,10 @@
 from typing import Any, Type, Optional, Dict, List
 from dataclasses import dataclass, field
-from utils import import_class
+from hybraut_utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
 from hybraut_models.context.evaluation_context import EvaluationContext
-from hybraut_aci._hybrid_automaton_component_interface import (
+from hybraut_aci.core.core_interface.hybrid_automaton_component_interface import (
     HybridComponentInterface,
 )
 

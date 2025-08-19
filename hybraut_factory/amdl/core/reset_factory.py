@@ -8,6 +8,8 @@ It is designed to be used within the Hybraut ROS2 framework.
 
 from hybraut_models.core.resets import ResetRegistry, ResetWrapper
 from typing import Dict, Any
+from hybraut_models.loaders import ComponentPath
+import logging
 
 
 class ResetFactory:
@@ -15,6 +17,8 @@ class ResetFactory:
     Factory class for creating reset components from amdl-style configuration.
     This class is responsible for loading reset components dynamically
     """
+
+    _component_class = ResetWrapper
 
     @classmethod
     def load_reset_wrapper_from_amdl(
@@ -37,7 +41,7 @@ class ResetFactory:
         component_path: ComponentPath = ComponentPath.load_component_from_famd(
             reset_dict
         )
-        component_cls = component_path.get_component_class()
+        component_cls: ResetWrapper = component_path.get_component_class()
 
         # Retrieve expected constructor argument names/types
         expected_configuration_names = component_cls.get_init_input_spec_names()
@@ -72,13 +76,14 @@ class ResetFactory:
         return reset_wrapper
 
     @classmethod
-    def register(cls, reset_dict: Dict[str, Any]) -> Dict[str, ResetWrapper]:
+    def register_reset_wrappers_from_amdl(
+        cls, reset_dict: Dict[str, Any]
+    ) -> Dict[str, ResetWrapper]:
         components = {}
         if reset_dict is not None:
             for name, conf in reset_dict.items():
                 try:
-                    component_cls = cls._component_class()
-                    component = component_cls.load_reset_wrapper_from_amdl(
+                    component = cls.load_reset_wrapper_from_amdl(
                         reset_name=name, reset_dict=conf
                     )
                     components[name] = component
@@ -94,8 +99,6 @@ class ResetFactory:
         cls, reset_dict: Dict[str, Any]
     ) -> "ResetRegistry":
         """reset dictionary"""
-        logger.info("Loading ResetRegistry from 'amdl' configuration")
-        resets = cls.register(reset_dict)
+        resets = cls.register_reset_wrappers_from_amdl(reset_dict)
         registry = cls(_components=resets)
-        logger.info(f"Created ResetRegistry with {len(resets)} resets")
         return registry

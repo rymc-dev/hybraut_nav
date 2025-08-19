@@ -1,3 +1,8 @@
+# !/usr/bin/env python3
+"""
+simple euclidean distance calculation file
+"""
+
 import numpy as np
 
 
@@ -8,4 +13,4 @@ def euclidean_distance(point1, point2) -> float:
 
     returns: euclidean_distance: float
     """
-    return np.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
+    return np.sqrt((point2[0] - point1[0]) ** 2 + (point2[1] - point1[1]) ** 2)

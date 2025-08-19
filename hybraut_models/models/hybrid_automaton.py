@@ -18,7 +18,7 @@ evaluation.
 from dataclasses import dataclass, field
 from typing import List
 
-from utils import now_to_ros_time_msg
+from hybraut_utils import now_to_ros_time_msg
 
 from hybraut_models.core.guards import GuardRegistry
 from hybraut_models.core.invariants import InvariantRegistry

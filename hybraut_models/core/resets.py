@@ -19,7 +19,7 @@ from hybraut_models.component_interfaces.registry_interface import ComponentRegi
 from hybraut_models.component_interfaces.wrapper_interface import WrapperInterface
 
 from hybraut_models.context.evaluation_context import EvaluationContext
-from utils import now_to_ros_time_msg
+from hybraut_utils import now_to_ros_time_msg
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)

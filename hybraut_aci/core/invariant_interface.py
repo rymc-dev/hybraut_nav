@@ -25,7 +25,9 @@ Example Usage:
 """
 
 from abc import abstractmethod
-from ._hybrid_automaton_component_interface import HybridComponentInterface
+from .core_interface import (
+    HybridComponentInterface,
+)
 
 
 class InvariantInterface(HybridComponentInterface):

@@ -1,4 +1,4 @@
-# Automaton Component Interfaces (`aci`)
+# Automaton Component Interfaces (`ACI`)
 
 Automaton Component Interfaces are **blueprints** for creating low-level components—such as **Guards**, **Resets**, **Dynamics**, and **Invariants**—that plug seamlessly into the hybrid automaton framework.  
 

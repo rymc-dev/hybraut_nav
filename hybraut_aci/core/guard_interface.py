@@ -17,32 +17,34 @@ Example Usage:
             InputSpec.create_input_spec("agent_state", AgentState),
             InputSpec.create_input_spec("waypoints_state", WaypointsState)
         ]
-        
+
         def __call__(self, **state_kwargs) -> bool:
             super().__call__(**state_kwargs)
             # Implementation logic here
             distance = self._calculate_distance(
-                state_kwargs["agent_state"], 
+                state_kwargs["agent_state"],
                 state_kwargs["waypoints_state"]
             )
             return distance <= self.distance_threshold
 """
 
 from abc import abstractmethod
-from ._hybrid_automaton_component_interface import HybridComponentInterface
+from .core_interface import (
+    HybridComponentInterface,
+)
 
 
 class GuardInterface(HybridComponentInterface):
     """
     Interface for hybrid automaton guard functions.
-    
+
     Guard functions evaluate transition conditions during hybrid automaton execution.
     They determine whether a transition from one mode to another should occur based
     on the current system state.
-    
+
     This interface extends the base HybridAutomatonComponentInterface to provide
     guard-specific functionality.
-    
+
     Attributes:
         logger: ROS2 logger instance for debugging and information output
         is_initialized: Flag indicating if the guard has been properly initialized

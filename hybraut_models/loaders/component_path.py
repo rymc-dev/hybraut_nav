@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
-from utils import import_class
+from hybraut_utils import import_class
+
 
 @dataclass
 class ComponentPath:
@@ -14,6 +15,5 @@ class ComponentPath:
     @classmethod
     def load_component_from_famd(cls, component_dict: dict):
         return cls(
-            _module=component_dict['module'],
-            _class_name=component_dict['class_name']
+            _module=component_dict["module"], _class_name=component_dict["class_name"]
         )

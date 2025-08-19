@@ -1,7 +1,9 @@
 from abc import abstractmethod
 from typing import Any, Dict, Type
 from collections import deque
-from ._hybrid_automaton_component_interface import HybridComponentInterface
+from .core_interface import (
+    HybridComponentInterface,
+)
 
 
 class DynamicsInterface(HybridComponentInterface):
@@ -12,9 +14,9 @@ class DynamicsInterface(HybridComponentInterface):
     """
 
     _dynamic_output_type: Type = None
-    _component_type = 'Dynamics'
+    _component_type = "Dynamics"
 
-    # Update init, dynamic_output_spec is a class varianble that is not optional it must be assigned on 
+    # Update init, dynamic_output_spec is a class varianble that is not optional it must be assigned on
     # implenetation of this interface
 
     def __init__(self, **init_kwargs):
@@ -29,11 +31,13 @@ class DynamicsInterface(HybridComponentInterface):
         self._dt = 0.1
         self._avg_dt = self._dt  # initialize average dt
         if self._dynamic_output_type is None:
-            raise ValueError(f"{self.__class__.__name__} must define `_dynamic_output_type`")
-        
+            raise ValueError(
+                f"{self.__class__.__name__} must define `_dynamic_output_type`"
+            )
+
         self._output_type = self._dynamic_output_type
         super().__init__(**init_kwargs)
-    
+
     def _post_init_hook(self) -> None:
         """
         Hook for subclasses to create state buffers after init.
@@ -44,7 +48,9 @@ class DynamicsInterface(HybridComponentInterface):
 
     def _validate_output(self, output: Any):
         if not isinstance(output, self._output_type):
-            raise TypeError(f"Output must be of type {self._output_type}, got {type(output).__name__}")
+            raise TypeError(
+                f"Output must be of type {self._output_type}, got {type(output).__name__}"
+            )
 
     def _avg_dt_calc(self, current_dt: float, alpha: float = 0.1):
         """Exponential moving average for time delta smoothing."""
@@ -52,8 +58,7 @@ class DynamicsInterface(HybridComponentInterface):
 
     @abstractmethod
     def _evaluate(self, **state_kwargs):
-        """this contains the implementation of the runtime dynamics evaluation
-        """
+        """this contains the implementation of the runtime dynamics evaluation"""
         pass
 
     def __call__(self, **state_kwargs) -> Any:
@@ -65,21 +70,23 @@ class DynamicsInterface(HybridComponentInterface):
             Any: _description_
         """
         return super().__call__(**state_kwargs)
-    
+
     def _validate_evaluation_output(self, output):
         self._validate_output(output)
 
     @classmethod
     def dynamic_output_type(cls) -> str:
-        return cls._dynamic_output_type  if cls._dynamic_output_type else "Undefined"
+        return cls._dynamic_output_type if cls._dynamic_output_type else "Undefined"
 
     def get_component_info(self) -> Dict[str, Any]:
         """Return introspection information about this dynamics component."""
         info: Dict[str, Any] = super().get_component_info()
         class_doc = self.__class__.__doc__
-        info.update({
-            'output_type': self.dynamic_output_type(),
-        })
+        info.update(
+            {
+                "output_type": self.dynamic_output_type(),
+            }
+        )
 
         return info
 

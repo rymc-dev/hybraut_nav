@@ -1,5 +1,11 @@
+"""
+a utility file containing several utility functions for
+rotation calculations
+"""
+
 import numpy as np
 import math
+
 
 def quaternion_to_heading(qx, qy, qz, qw) -> float:
     """Convert quaternion to heading angle in radians."""
@@ -10,6 +16,7 @@ def quaternion_to_heading(qx, qy, qz, qw) -> float:
 
 
 def normalize_angle(angle: float):
+    """normalizes an angle between -pi - pi inclusive"""
     return (angle + np.pi) % (2 * np.pi) - np.pi
 
 

@@ -20,7 +20,7 @@ from hybraut_interfaces.msg import (
     TransitionEvaluationsMSG,
 )
 
-from utils import now_to_ros_time_msg
+from hybraut_utils import now_to_ros_time_msg
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)
