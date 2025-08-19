@@ -1,4 +1,3 @@
-
 """
 Hybrid Automaton Invariant Interface
 
@@ -26,17 +25,17 @@ Example Usage:
 """
 
 from abc import abstractmethod
-from ._hybrid_automaton_component_interface import  HybridComponentInterface
+from ._hybrid_automaton_component_interface import HybridComponentInterface
 
 
 class InvariantInterface(HybridComponentInterface):
     """
     Interface for hybrid automaton invariant functions.
-    
+
     Invariant functions evaluate if we can stay in the current mode based on
     the system state. This interface extends the base HybridAutomatonComponentInterface
     to provide invariant-specific functionality.
-    
+
     Attributes:
         logger: ROS2 logger instance for debugging and information output
         is_initialized: Flag indicating if the invariant has been properly initialized

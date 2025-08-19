@@ -9,14 +9,13 @@ and managing a registry of invariant components.
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type
+from dataclasses import dataclass
+from typing import List, Type
 
 
 from hybraut_interfaces.msg import InvariantEvaluationMSG, InvariantEvaluationsMSG
 
 from hybraut_aci import InvariantInterface
-from hybraut_model.automaton_types.component_path import ComponentPath
 from hybraut_model.component_interfaces import WrapperInterface
 from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_model.evaluation_context import EvaluationContext
@@ -57,6 +56,26 @@ class InvariantWrapper(WrapperInterface):
             msg.message = f"exception occured during invariant evaluation: '{str(e)}'"
 
         return msg
+
+    def __repr__(self) -> str:
+        cls_name = self.__class__.__name__
+        # Prefer the instance’s class if available
+        if getattr(self, "_component_instance", None):
+            comp_cls = self._component_instance.__class__.__name__
+        else:
+            comp_cls = getattr(
+                self._component_class, "__name__", str(self._component_class)
+            )
+        return f"<{cls_name}(component_class={comp_cls})>"
+
+    def __str__(self) -> str:
+        if getattr(self, "_component_instance", None):
+            info = self._component_instance.get_component_info()
+            return f"InvariantWrapper for '{info.get('class_name')}' - {info.get('description', '')}"
+        comp_cls = getattr(
+            self._component_class, "__name__", str(self._component_class)
+        )
+        return f"InvariantWrapper(uninitialized, component_class={comp_cls})"
 
 
 class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
@@ -127,6 +146,17 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
     @classmethod
     def _component_class(cls) -> Type[InvariantWrapper]:
         return InvariantWrapper
+
+    def __repr__(self) -> str:
+        cls_name = self.__class__.__name__
+        n = len(self._components) if self._components else 0
+        return f"<{cls_name}(n_invariants={n})>"
+
+    def __str__(self) -> str:
+        if not self._components:
+            return "InvariantRegistry(empty)"
+        names = ", ".join(self._components.keys())
+        return f"InvariantRegistry with {len(self._components)} invariants: [{names}]"
 
 
 if __name__ == "__main__":

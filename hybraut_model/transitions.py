@@ -41,6 +41,9 @@ class Transition:
     )  # EAGER urgency for transition means the transition occurs automatically.
     _metadata: Dict[str, Any] = field(init=True, default_factory=lambda: {})
 
+    def get_name(self):
+        return self._name
+
     def get_target_mode(self):
         return self._target_mode
 
@@ -52,6 +55,9 @@ class Transition:
 
     def get_urgency(self):
         return self._urgency
+
+    def get_metadata(self):
+        return self._metadata
 
     def evaluate_transition(self, ctx: EvaluationContext):
         """
