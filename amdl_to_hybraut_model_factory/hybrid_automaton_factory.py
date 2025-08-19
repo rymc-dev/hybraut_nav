@@ -4,7 +4,7 @@ factory class for generating a hybrid automaton model fomr
 an AMDL file.
 """
 
-from hybraut_model import HybridAutomaton
+from hybraut_models import HybridAutomaton
 
 from amdl_to_hybraut_model_factory.state_factory import StateFactory
 from amdl_to_hybraut_model_factory.guard_factory import GuardFactory

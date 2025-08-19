@@ -20,15 +20,15 @@ from typing import List
 
 from utils import now_to_ros_time_msg
 
-from hybraut_model.guards import GuardRegistry
-from hybraut_model.invariants import InvariantRegistry
-from hybraut_model.modes import ModeRegistry, Mode
-from hybraut_model.resets import ResetRegistry
-from hybraut_model.dynamics import DynamicsRegistry
-from hybraut_model.states import StateRegistry
-from hybraut_model.transitions import TransitionRegistry
+from hybraut_models.core.guards import GuardRegistry
+from hybraut_models.core.invariants import InvariantRegistry
+from hybraut_models.core.modes import ModeRegistry, Mode
+from hybraut_models.core.resets import ResetRegistry
+from hybraut_models.core.dynamics import DynamicsRegistry
+from hybraut_models.core.states import StateRegistry
+from hybraut_models.core.transitions import TransitionRegistry
 
-from hybraut_model.evaluation_context import EvaluationContext
+from hybraut_models.context.evaluation_context import EvaluationContext
 
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
@@ -36,7 +36,7 @@ from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from typing import Tuple, Any
 
 
-from hybraut_model.exceptions import EvaluationException
+from hybraut_models.exceptions import EvaluationException
 
 
 @dataclass

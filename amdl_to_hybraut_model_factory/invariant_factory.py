@@ -12,9 +12,9 @@ This module is essential for ensuring the integrity and consistency of invariant
 within the Hybraut model.
 """
 
-from hybraut_model.invariants import InvariantWrapper, InvariantRegistry
+from hybraut_models.core.invariants import InvariantWrapper, InvariantRegistry
 from typing import Dict, Any, Type
-from hybraut_model.automaton_types import ComponentPath
+from hybraut_models.loaders import ComponentPath
 import logging
 
 logger = logging.getLogger(__name__)

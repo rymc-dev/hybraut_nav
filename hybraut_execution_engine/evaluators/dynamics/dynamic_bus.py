@@ -10,7 +10,7 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.node import Node
 from typing import Dict
-from hybraut_model.dynamics import DynamicsRegistry
+from hybraut_models.core.dynamics import DynamicsRegistry
 
 
 @dataclass
@@ -129,7 +129,7 @@ def main():
             },
         }
     }
-    from hybraut_model.dynamics import DynamicsRegistry
+    from hybraut_models.core.dynamics import DynamicsRegistry
 
     dynamics: DynamicsRegistry = DynamicsRegistry.load_dynamics_registry_from_amdl(
         dynamics_dict=dynamics_dict

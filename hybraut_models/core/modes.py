@@ -2,15 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 This module defines the Mode and ModeRegistry classes for managing modes in a robotic automaton system.
-It includes functionality for defining modes, their transitions, and invariants, as well as methods for
+It include
+s functionality for defining modes, their transitions, and invariants, as well as methods for
 entering and exiting modes, and retrieving enabled transitions.
 """
 
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from hybraut_model.evaluation_context import EvaluationContext
-from hybraut_model.transitions import Transition
+from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.core.transitions import Transition
 
 
 @dataclass

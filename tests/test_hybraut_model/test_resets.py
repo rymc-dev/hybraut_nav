@@ -1,4 +1,4 @@
-from hybraut_model.resets import ResetWrapper, ResetRegistry
+from hybraut_models.core.resets import ResetWrapper, ResetRegistry
 import pytest
 
 

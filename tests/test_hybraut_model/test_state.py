@@ -1,4 +1,4 @@
-from hybraut_model.states import State, StateRegistry
+from hybraut_models.core.states import State, StateRegistry
 import pytest
 from geometry_msgs.msg import PoseStamped
 

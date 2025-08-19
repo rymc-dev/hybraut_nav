@@ -5,7 +5,7 @@ Test Suite for the State Factory
 
 from amdl_to_hybraut_model_factory.state_factory import StateFactory
 import pytest
-from hybraut_model.states import State, StateRegistry
+from hybraut_models.core.states import State, StateRegistry
 from typing import Dict
 
 

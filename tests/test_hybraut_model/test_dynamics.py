@@ -1,4 +1,4 @@
-from hybraut_model.dynamics import DynamicsWrapper, DynamicsRegistry
+from hybraut_models.core.dynamics import DynamicsWrapper, DynamicsRegistry
 import pytest
 
 

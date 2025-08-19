@@ -1,16 +1,16 @@
-from hybraut_model.hybrid_automaton import HybridAutomaton
+from hybraut_models.models.hybrid_automaton import HybridAutomaton
 import pytest
 
-from hybraut_model.modes import ModeRegistry
-from hybraut_model.states import StateRegistry
-from hybraut_model.guards import GuardRegistry
-from hybraut_model.resets import ResetRegistry
-from hybraut_model.dynamics import DynamicsRegistry
-from hybraut_model.invariants import InvariantRegistry
+from hybraut_models.core.modes import ModeRegistry
+from hybraut_models.core.states import StateRegistry
+from hybraut_models.core.guards import GuardRegistry
+from hybraut_models.core.resets import ResetRegistry
+from hybraut_models.core.dynamics import DynamicsRegistry
+from hybraut_models.core.invariants import InvariantRegistry
 
 from unittest.mock import Mock, MagicMock, patch
 
-from hybraut_model.mode_registry import ModeRegistry
+from hybraut_models.mode_registry import ModeRegistry
 
 
 @pytest.fixture

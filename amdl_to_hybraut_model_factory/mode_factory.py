@@ -7,7 +7,7 @@ It includes functionality for loading modes from a configuration dictionary and 
 
 from typing import Dict, Any
 
-from hybraut_model.modes import Mode, ModeRegistry
+from hybraut_models.core.modes import Mode, ModeRegistry
 
 
 class ModeFactory:

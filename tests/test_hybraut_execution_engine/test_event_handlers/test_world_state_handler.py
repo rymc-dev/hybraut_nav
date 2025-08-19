@@ -13,7 +13,7 @@ from hybraut_execution_engine.event_handlers.world_state_update_handler import (
 import pytest
 import rclpy
 from rclpy.node import Node
-from hybraut_model.states import State, StateRegistry
+from hybraut_models.core.states import State, StateRegistry
 
 
 @pytest.fixture
@@ -88,7 +88,7 @@ class TestWorldStateHandler:
     def test_state_initialization_and_attributes(self):
         try:
             state_name, state_conf = self.get_sample_state_amdl
-            from hybraut_model.automaton_types.msg_type import MsgType
+            from hybraut_models.loaders.msg_type import MsgType
 
             msg_type = MsgType(**state_conf.get("type", None))
             msg_type = msg_type.import_msg_type()

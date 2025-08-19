@@ -10,11 +10,11 @@ from typing import Any, Dict, List, Type
 
 from hybraut_interfaces.msg import GuardEvaluationMSG
 from hybraut_aci import GuardInterface
-from hybraut_model.automaton_types.component_path import ComponentPath
-from hybraut_model.component_interfaces import WrapperInterface
-from hybraut_model.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_model.evaluation_context import EvaluationContext
-from hybraut_model.exceptions import EvaluationException
+from hybraut_models.loaders.component_path import ComponentPath
+from hybraut_models.component_interfaces import WrapperInterface
+from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
+from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.exceptions import EvaluationException
 
 logger = logging.getLogger(__name__)
 
@@ -121,11 +121,11 @@ def main():
             "type": {"pkg": "std_msgs.msg", "msg": "Bool"},
         }
     }
-    from hybraut_model.states import StateRegistry
+    from hybraut_models.core.states import StateRegistry
 
     state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
 
-    from hybraut_model.evaluation_context import EvaluationContext
+    from hybraut_models.context.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

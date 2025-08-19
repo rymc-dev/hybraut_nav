@@ -6,8 +6,8 @@ This module provides a factory for creating State instances from AMDL (Automaton
 configuration, enabling dynamic loading of state definitions.
 """
 
-from hybraut_model.states import State, StateRegistry
-from hybraut_model.automaton_types import MsgType
+from hybraut_models.core.states import State, StateRegistry
+from hybraut_models.loaders import MsgType
 from typing import Dict, Any
 import logging
 

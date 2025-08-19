@@ -4,7 +4,7 @@ a test suite for testing invariants factory
 """
 
 from amdl_to_hybraut_model_factory.invariant_factory import InvariantFactory
-from hybraut_model.invariants import InvariantWrapper, InvariantRegistry
+from hybraut_models.core.invariants import InvariantWrapper, InvariantRegistry
 import pytest
 from typing import List
 

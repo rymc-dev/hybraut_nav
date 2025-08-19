@@ -1,4 +1,4 @@
-from hybraut_model.guards import GuardWrapper, GuardRegistry
+from hybraut_models.core.guards import GuardWrapper, GuardRegistry
 import pytest
 
 

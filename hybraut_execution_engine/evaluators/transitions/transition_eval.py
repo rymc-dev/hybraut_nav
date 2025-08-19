@@ -10,7 +10,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
-from hybraut_model import HybridAutomaton
+from hybraut_models import HybridAutomaton
 from threading import Lock
 
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
@@ -114,12 +114,12 @@ def main() -> None:
         automaton = HybridAutomaton.register_automaton(node=node, amdl_dict=amdl_dict)
 
     state_tracker: EngineStateTracker = EngineStateTracker(
-        node=node,
-        initial_mode=0,
-        q_goals=[1]
+        node=node, initial_mode=0, q_goals=[1]
     )
 
-    evaluator = TransitionEvaluator(node=node, automaton=automaton, state_tracker=state_tracker)
+    evaluator = TransitionEvaluator(
+        node=node, automaton=automaton, state_tracker=state_tracker
+    )
 
     # Shared current_mode as a list so it is mutable in nested scopes
     current_mode = [0]

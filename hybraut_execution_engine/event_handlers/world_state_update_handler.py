@@ -6,7 +6,7 @@ from typing import Any, Type, Callable
 from dataclasses import dataclass, field
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
-from hybraut_model.states import State
+from hybraut_models.core.states import State
 from rclpy.subscription import Subscription
 
 

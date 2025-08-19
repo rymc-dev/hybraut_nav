@@ -17,7 +17,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
-from hybraut_model import HybridAutomaton
+from hybraut_models import HybridAutomaton
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
 
 from hybraut_execution_engine.internal_state import EngineStateTracker
@@ -96,41 +96,38 @@ class InvariantEvaluator:
 
 import time
 
+
 def main() -> None:
     rclpy.init()
-    node = Node('mock_node')
+    node = Node("mock_node")
     executor = MultiThreadedExecutor(num_threads=os.cpu_count())
     executor.add_node(node)
 
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
 
-    amdl_path = '/home/ryan/ros2_ws/src/hybraut_tb3/amdl/turtlebot3.amdl.yml'
+    amdl_path = "/home/ryan/ros2_ws/src/hybraut_tb3/amdl/turtlebot3.amdl.yml"
     with open(amdl_path, "r") as f:
         amdl_dict = yaml.safe_load(f)
         automaton = HybridAutomaton.register_automaton(node=node, amdl_dict=amdl_dict)
 
     state_tracker: EngineStateTracker = EngineStateTracker(
-        node=node,
-        initial_mode=0,
-        q_goals=[1]
+        node=node, initial_mode=0, q_goals=[1]
     )
 
-    evaluator = InvariantEvaluator(node=node, automaton=automaton, state_tracker=state_tracker)
+    evaluator = InvariantEvaluator(
+        node=node, automaton=automaton, state_tracker=state_tracker
+    )
 
     # Shared current_mode as a list so it is mutable in nested scopes
     current_mode = [0]
 
     # Timer calls evaluator with the current current_mode value
-    node.create_timer(
-        0.1,
-        lambda: evaluator(),
-        callback_group=ReentrantCallbackGroup()
-    )
+    node.create_timer(0.1, lambda: evaluator(), callback_group=ReentrantCallbackGroup())
 
     # Thread to increment current_mode after 5 seconds
     def increment_mode_after_delay():
-        while True: 
+        while True:
             time.sleep(5)
             current_mode[0] += 1
             node.get_logger().info(f"Current mode incremented to {current_mode[0]}")
@@ -143,7 +140,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        rclpy.shutdown()    
+        rclpy.shutdown()
+
 
 """ This is a mock main function to demonstrate the usage of InvariantEvaluator.
 In a real application, this would be replaced with the actual ROS2 node setup and execution."""

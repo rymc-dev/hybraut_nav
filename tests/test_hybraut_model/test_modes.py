@@ -1,4 +1,4 @@
-from hybraut_model.modes import Mode, ModeRegistry
+from hybraut_models.core.modes import Mode, ModeRegistry
 import pytest
 
 
