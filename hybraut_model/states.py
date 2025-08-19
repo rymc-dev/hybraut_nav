@@ -158,6 +158,9 @@ class StateRegistry(ComponentRegistry["State"]):
         self._component_type_name = "State"
         super().__post_init__()
 
+    def get_num_states(self):
+        return len(self._components)
+
     def get_current_states(self, state_names: List[str]) -> Dict[str, Any]:
         components = self.get_components_by_names(state_names)
         current_states = {}

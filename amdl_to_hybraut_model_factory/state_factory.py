@@ -7,20 +7,16 @@ configuration, enabling dynamic loading of state definitions.
 """
 
 from hybraut_model.states import State, StateRegistry
+from hybraut_model.automaton_types import MsgType
 from typing import Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class _StateFactory:
+class StateFactory:
     component_cls = State
     logger = logging.getLogger(__name__)
-
-    @classmethod
-    def _component_class(cls) -> type:
-        """
-        Return the component class to instantiate.
-        Subclasses can override this method to provide different component types.
-        """
-        return cls.component_cls
 
     @classmethod
     def load_state_from_amdl(cls, state_name: str, state_dict: Dict[str, Any]) -> State:
@@ -86,7 +82,7 @@ class _StateFactory:
             raise
 
     @classmethod
-    def register(cls, config_dict: Dict[str, Any]) -> Dict[str, State]:
+    def register_states_from_amdl(cls, config_dict: Dict[str, Any]) -> Dict[str, State]:
         """
         Create and return component instances from a configuration dictionary.
         """
@@ -110,7 +106,7 @@ class _StateFactory:
         Load multiple states and return a StateRegistry instance.
         """
         cls.logger.info("Loading StateRegistry from 'amdl' configuration")
-        states = cls.register(config_dict=states_dict)
-        registry = cls(_components=states)
+        states = cls.register_states_from_amdl(config_dict=states_dict)
+        registry = StateRegistry(_components=states)
         cls.logger.info(f"Created StateRegistry with {len(states)} states")
         return registry
