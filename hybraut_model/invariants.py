@@ -90,6 +90,9 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
             return []
         return list(self._components.keys())
 
+    def get_num_invariants(self):
+        return self._components is not None and len(self._components) or 0
+
     def get_invariant_by_name(self, invariant_name: str):
         if invariant_name in self._components.keys():
             return self._components[invariant_name]

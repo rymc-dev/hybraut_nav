@@ -14,6 +14,10 @@ within the Hybraut model.
 
 from hybraut_model.invariants import InvariantWrapper, InvariantRegistry
 from typing import Dict, Any, Type
+from hybraut_model.automaton_types import ComponentPath
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class InvariantFactory:
@@ -23,6 +27,8 @@ class InvariantFactory:
     in the Hybraut model.
     """
 
+    _component_class = InvariantWrapper
+
     @classmethod
     def load_invariant_from_amdl(
         cls, invariant_name: str, invariant_dict: Dict[str, Any]
@@ -31,19 +37,20 @@ class InvariantFactory:
         component_class = component_path.get_component_class()
         configuration = invariant_dict.get("configuration", {})
 
-        return cls(
+        return InvariantWrapper(
             _name=invariant_name,
             _component_class=component_class,
             _configuration=configuration,
         )
 
     @classmethod
-    def register(cls, invariants_dict: Dict[str, Any]) -> Dict[str, InvariantWrapper]:
+    def register_invariants_from_amdl(
+        cls, invariants_dict: Dict[str, Any]
+    ) -> Dict[str, InvariantWrapper]:
         components = {}
         for name, conf in invariants_dict.items():
             try:
-                component_cls = cls._component_class()
-                component = component_cls.load_invariant_from_amdl(name, conf)
+                component = cls.load_invariant_from_amdl(name, conf)
                 components[name] = component
             except Exception as e:
                 logging.getLogger(__name__).error(
@@ -58,7 +65,6 @@ class InvariantFactory:
     ) -> "InvariantRegistry":
         """generates the guard_registry from amdl"""
         logger.info("Loading GuardRegistry from 'amdl' configuration")
-        invariants = cls.register(invariants_dict)
-        registry = cls(_components=invariants)
-        logger.info(f"Created GuardRegistry with {len(invariants)} guards")
+        invariants = cls.register_invariants_from_amdl(invariants_dict)
+        registry = InvariantRegistry(_components=invariants)
         return registry
