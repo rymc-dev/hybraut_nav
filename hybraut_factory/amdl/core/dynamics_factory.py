@@ -30,7 +30,7 @@ class DynamicsFactory:
         msg_type_info = MsgType(**output["type"])
         msg_type = msg_type_info.import_msg_type()
 
-        return cls(
+        return DynamicsWrapper(
             _name=dynamics_name,
             _component_class=component_class,
             _configuration=configuration,
