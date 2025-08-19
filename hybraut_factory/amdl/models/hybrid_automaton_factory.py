@@ -7,9 +7,9 @@ an AMDL file.
 from hybraut_models import HybridAutomaton
 
 from amdl_to_hybraut_model_factory.state_factory import StateFactory
-from amdl_to_hybraut_model_factory.guard_factory import GuardFactory
+from hybraut_factory.core.guard_factory import GuardFactory
 from amdl_to_hybraut_model_factory.reset_factory import ResetFactory
-from amdl_to_hybraut_model_factory.dynamics_factory import DynamicsFactory
+from hybraut_factory.core.dynamics_factory import DynamicsFactory
 from amdl_to_hybraut_model_factory.invariant_factory import InvariantFactory
 from amdl_to_hybraut_model_factory.transition_factory import TransitionFactory
 from amdl_to_hybraut_model_factory.mode_factory import ModeFactory

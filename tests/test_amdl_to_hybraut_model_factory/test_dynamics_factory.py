@@ -3,7 +3,7 @@
 Test Suite for the dynamics factory
 """
 
-from amdl_to_hybraut_model_factory.dynamics_factory import _DynamicsFactory
+from hybraut_factory.core.dynamics_factory import _DynamicsFactory
 import pytest
 
 
