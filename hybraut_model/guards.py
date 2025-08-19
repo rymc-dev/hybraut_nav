@@ -65,6 +65,9 @@ class GuardRegistry(ComponentRegistry["GuardWrapper"]):
         self._component_type_name = "Guard"
         super().__post_init__()
 
+    def get_num_guards(self):
+        return len(self._components) if self._components is not None else 0
+
     def get_guard_names(self):
         if self._components is None:
             return []
