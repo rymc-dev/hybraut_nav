@@ -4,7 +4,7 @@ Test Suite for the Guard Factory
 """
 
 import pytest
-from hybraut_factory.core.guard_factory import GuardFactory
+from hybraut_factory.amdl.core.guard_factory import GuardFactory
 from hybraut_models.core.guards import GuardWrapper, GuardRegistry
 from typing import Dict
 

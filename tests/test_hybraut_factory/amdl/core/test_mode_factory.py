@@ -4,7 +4,7 @@ test class for mode factory
 """
 
 import pytest
-from amdl_to_hybraut_model_factory.mode_factory import ModeFactory
+from hybraut_factory.amdl.core.mode_factory import ModeFactory
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ These tests verify the correct loading, registration, and registry creation of t
 """
 
 import pytest
-from amdl_to_hybraut_model_factory.transition_factory import TransitionFactory
+from hybraut_factory.amdl.core.transition_factory import TransitionFactory
 from hybraut_models.constants.urgency import UrgencyEnums
 
 
