@@ -33,6 +33,8 @@ from hybraut_models.ctx.evaluation_context import EvaluationContext
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
+from hybraut_interfaces.msg import AutomatonResets
+
 from typing import Tuple, Any
 
 
@@ -107,7 +109,7 @@ class HybridAutomaton:
             metadata={},
         )
 
-    """ === automaton evaluation and executor functions === """
+    """ === automaton evaluation functions === """
 
     def evaluate_transitions(self, mode_id: int) -> TransitionEvaluationsMSG:
         """performs transition evaluations for the current mode"""
@@ -191,7 +193,9 @@ class HybridAutomaton:
                 f"Unexpected error evaluating dynamics for mode {mode_id}: {str(e)}"
             ) from e
 
-    def perform_resets(self, mode_id: int, reset_names: List[str]):
+    """ === Application function - state-changing write functions === """
+
+    def apply_resets(self, mode_id: int, reset_names: List[str]) -> AutomatonResets:
         """execute resets to states"""
         # TODO: Need to finish this.
         if not self._mode_registry.is_mode(mode_id):
