@@ -130,8 +130,6 @@ class State:
             f"current_state={current_state_repr})"
         )
 
-
-
 @dataclass
 class StateRegistry(ComponentRegistry["State"]):
     """Registry specialized for managing State components."""
@@ -157,7 +155,6 @@ class StateRegistry(ComponentRegistry["State"]):
 
 
 """main function for testing the State and StateRegistry classes. not for production use."""
-
 
 def main():
     states = {

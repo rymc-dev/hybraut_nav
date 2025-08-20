@@ -88,7 +88,6 @@ class DynamicsWrapper(WrapperInterface):
 
         return cmd, msg
 
-
 class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     """Registry specialized for managing dynamics"""
 
@@ -126,7 +125,6 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
 
 
 """main is a test function, which is not for use within production"""
-
 
 def main():
 
@@ -197,7 +195,6 @@ def main():
 
     print(cmd)
     print(dynamic_evaluation)
-
 
 if __name__ == "__main__":
     main()

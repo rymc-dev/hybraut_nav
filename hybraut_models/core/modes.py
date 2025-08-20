@@ -108,7 +108,6 @@ class Mode:
             f"  Transitions: {list(self._transition_refs.keys()) if self._transition_refs else 'None'}"
         )
 
-
 class ModeRegistry:
     """ 
     a registry for modes, provides utility functions
