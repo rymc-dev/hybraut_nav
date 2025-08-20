@@ -39,6 +39,33 @@ class State:
         self._error_count = 0
         self._last_update = None
 
+    """ === access modifiers === """
+
+    def get_name(self) -> str:
+        return self._name
+    
+    def get_topic(self) -> str:
+        return self._topic
+    
+    def get_msg_type(self) -> Type: 
+        return self._msg_type
+    
+    def get_update_hz(self) -> int:
+        return self._update_hz
+    
+    def get_timeout_sec(self) -> float:
+        return self._timeout_sec
+
+    def get_max_errors(self) -> int:
+        return self._max_errors
+    
+    def get_current_state(self) -> Any:
+        """Get the current state message (read-only property)."""
+        return self._current_state
+
+    def get_error_count(self) -> int: 
+        return self._error_count
+
     """ === util functions === """
 
     def update_state(self, current_state: Any):
@@ -61,10 +88,6 @@ class State:
         except Exception as e:
             self.increment_error_count()
             raise e
-
-    def get_current_state(self) -> Any:
-        """Get the current state message (read-only property)."""
-        return self._current_state
 
     def reset_error_count(self) -> None:
         """Reset the error counter to zero."""

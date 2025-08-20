@@ -155,12 +155,28 @@ class ModeRegistry:
         return reachable
 
     def validate_mode_connectivity(self) -> bool:
-        """Check if all modes are reachable from at least one other mode."""
-        for mode_id in self._modes:
-            reachable = {m.get_id() for m in self.get_reachable_modes(mode_id)}
-            if len(reachable) < len(self._modes) - 1:  # -1 to exclude itself
-                return False
-        return True
+        """Check if all modes are in one weakly connected component."""
+        if not self._modes:
+            return True
+
+        # Build undirected adjacency
+        undirected = {mid: set() for mid in self._modes}
+        for src, targets in self._mode_graph.items():
+            for t in targets:
+                undirected[src].add(t)
+                undirected[t].add(src)
+
+        # DFS/BFS from first node
+        start = next(iter(self._modes))
+        visited = set()
+        stack = [start]
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                stack.extend(undirected[node] - visited)
+
+        return len(visited) == len(self._modes)
 
     def register_mode(cls, mode: Mode):
         pass

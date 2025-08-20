@@ -1,4 +1,9 @@
+""" 
+Test Suite for 
+"""
+
 from hybraut_models.core.modes import Mode, ModeRegistry
+from unittest.mock import MagicMock
 import pytest
 
 
@@ -12,6 +17,30 @@ def sample_mode():
         transition_refs={0: "tick_transition"},
         description="Sample Mode Description",
     )
+
+@pytest.fixture
+def sample_modes():
+    # Fake Mode objects with mocked methods
+    mode0 = MagicMock()
+    mode0.get_id.return_value = 0
+    mode0.get_name.return_value = "Mode0"
+    mode0.get_transition_refs_and_priorities.return_value = {1: None, 2: None}
+
+    mode1 = MagicMock()
+    mode1.get_id.return_value = 1
+    mode1.get_name.return_value = "Mode1"
+    mode1.get_transition_refs_and_priorities.return_value = {2: None}
+
+    mode2 = MagicMock()
+    mode2.get_id.return_value = 2
+    mode2.get_name.return_value = "Mode2"
+    mode2.get_transition_refs_and_priorities.return_value = {}
+
+    return {0: mode0, 1: mode1, 2: mode2}
+
+@pytest.fixture
+def registry(sample_modes):
+    return ModeRegistry(sample_modes)
 
 
 class TestMode:
@@ -107,10 +136,57 @@ class TestMode:
 
         assert expected == str(sample_mode)
 
+class TestModeRegistry:
+    def test_build_graph(self, registry):
+        assert registry._mode_graph == {
+            0: [1, 2],
+            1: [2],
+            2: [],
+        }
 
-    
+    def test_get_reachable_modes(self, registry, sample_modes):
+        reachable_from_0 = registry.get_reachable_modes(0)
+        ids = [m.get_id() for m in reachable_from_0]
+        assert set(ids) == {1, 2}
 
-class TestModeRegistry: ...
+        reachable_from_1 = registry.get_reachable_modes(1)
+        ids = [m.get_id() for m in reachable_from_1]
+        assert ids == [2]
+
+        reachable_from_2 = registry.get_reachable_modes(2)
+        assert reachable_from_2 == []
+
+    def test_validate_mode_connectivity(self, registry):
+        assert registry.validate_mode_connectivity() is True
+
+    def test_get_mode_and_is_mode(self, registry, sample_modes):
+        assert registry.get_mode(0) == sample_modes[0]
+        assert registry.get_mode(999) is None
+        assert registry.is_mode(1) is True
+        assert registry.is_mode(999) is False
+
+    def test_get_mode_ids(self, registry):
+        ids = registry.get_mode_ids()
+        assert set(ids) == {0, 1, 2}
+
+    def test_get_reachable_mode_ids(self, registry):
+        assert registry.get_reachable_mode_ids(0) == [1, 2]
+        assert registry.get_reachable_mode_ids(2) == []
+
+    def test_is_to_mode_reachable_from(self, registry):
+        assert registry.is_to_mode_reachable_from(0, 1) is True
+        assert registry.is_to_mode_reachable_from(0, 99) is False
+
+    # def test_str_and_repr(self, registry):
+    #     s = str(registry)
+    #     assert "ModeRegistry with 3 modes" in s
+    #     assert "Mode 0: Mode0 -> [1, 2]" in s
+    #     assert "Mode 1: Mode1 -> [2]" in s
+    #     assert "Mode 2: Mode2 -> [None" not in s  # should say None when empty
+
+    #     r = repr(registry)
+    #     assert "ModeRegistry(modes=" in r
+    #     assert "graph=" in r
 
 
 if __name__ == "__main__":

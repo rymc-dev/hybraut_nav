@@ -15,7 +15,6 @@ This module is intended to be used as part of a larger Hybraut framework, which 
 evaluation.
 """
 
-from dataclasses import dataclass, field
 from typing import List
 
 from hybraut_utils import now_to_ros_time_msg
@@ -34,6 +33,7 @@ from hybraut_interfaces.msg import TransitionEvaluationsMSG
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from hybraut_interfaces.msg import AutomatonResets
+from hybraut_models.const import ModeConnectivity
 
 from typing import Tuple, Any
 
@@ -61,7 +61,8 @@ class HybridAutomaton:
             guard_registry: GuardRegistry,
             reset_registry: ResetRegistry,
             dynamic_registry: DynamicsRegistry,
-            invariant_registry: InvariantRegistry
+            invariant_registry: InvariantRegistry,
+            mode_connectivity: ModeConnectivity = ModeConnectivity.WEAK # TODO: Implement functionality in the future for different connectivity types, atm we just use WEAK connectivity
     ):
         self._name = name
         self._description = description
@@ -75,6 +76,7 @@ class HybridAutomaton:
         self._reset_registry = reset_registry
         self._dynamic_registry = dynamic_registry
         self._invariant_registry = invariant_registry
+        self._mode_connectivity = mode_connectivity
 
     """ === access modifiers === """
 
@@ -93,6 +95,9 @@ class HybridAutomaton:
     def get_goal_modes(self):
         return self._goal_modes
     
+    def get_mode_connectivity(self):
+        return self._mode_connectivity
+
     """ === utility functions === """
 
     def _generate_evaluation_context(self, current_mode_id: int) -> EvaluationContext:
