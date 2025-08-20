@@ -7,22 +7,16 @@ It also provides a StateRegistry for managing multiple states.
 """
 
 
-import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type
 
-from hybraut_models.ldr.msg_type import MsgType
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
-
-# Set up module-level logger
-logger = logging.getLogger(__name__)
 
 
 class State:
     """
-    Represents a state in the ROS2 system, managing a specific topic and message type.
-    This class handles the lifecycle of the state, including activation, deactivation,
-    and error management.
+    Represents a state in the system, managing a specific topic and message type.
+    This class handles the lifecycle of the state.
     """
 
     def __init__(
@@ -34,7 +28,6 @@ class State:
         timeout_sec: Optional[float] = None,
         max_errors: int = 10,
     ):
-        # stash everything you need
         self._name = name
         self._topic = topic
         self._msg_type = msg_type
@@ -42,16 +35,11 @@ class State:
         self._timeout_sec = timeout_sec
         self._max_errors = max_errors
 
-        # build the bus
         self._current_state = None
         self._error_count = 0
         self._last_update = None
-        # set up your logger
-        self._logger = logging.getLogger(f"{__name__}.State.{self._name}")
 
-    def __post_init__(self):
-        """Initialize the logger after dataclass creation."""
-        self._logger = logging.getLogger(f"{__name__}.State.{self._name}")
+    """ === util functions === """
 
     def update_state(self, current_state: Any):
         """
@@ -70,32 +58,52 @@ class State:
 
             # Reset error count on successful reception
             self.reset_error_count()
-            self._logger.debug(
-                f"Successfully processed message for state '{self._name}'"
-            )
         except Exception as e:
             self.increment_error_count()
-            self._logger.error(
-                f"Error processing message for state '{self._name}': {e}"
-            )
+            raise e
+
+    def get_current_state(self) -> Any:
+        """Get the current state message (read-only property)."""
+        return self._current_state
 
     def reset_error_count(self) -> None:
         """Reset the error counter to zero."""
-        if self._error_count > 0:
-            self._logger.debug(f"Resetting error count for state '{self._name}'")
         self._error_count = 0
 
     def increment_error_count(self) -> None:
         """Increment the error counter and log warnings if threshold exceeded."""
         self._error_count += 1
-        self._logger.warning(
-            f"Error count for state '{self._name}': {self._error_count}"
-        )
 
         if self._error_count >= self._max_errors:
-            self._logger.error(
+            raise Exception(
                 f"State '{self._name}' has exceeded maximum error count ({self._max_errors})"
             )
+        
+    """ === state information in dict format ==="""
+
+    def get_info(self) -> Dict[str, Any]:
+        """
+        Get comprehensive information about the current state.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing all relevant state information
+        """
+        return {
+            "name": self._name,
+            "topic": self._topic,
+            "message_type": getattr(self._msg_type, "__name__", str(self._msg_type)),
+            "update_hz": self._update_hz,
+            "timeout_sec": self._timeout_sec,
+            "error_count": self._error_count,
+            "max_errors": self._max_errors,
+            "last_update": str(self._last_update) if self._last_update else None,
+            "has_current_state": self._current_state is not None,
+            "current_state_summary": (
+                str(self._current_state)[:100] if self._current_state else None
+            ),
+        }
+
+    """ === string representations === """
 
     def __str__(self) -> str:
         """Return a concise, human-readable representation of the state."""
@@ -122,32 +130,6 @@ class State:
             f"current_state={current_state_repr})"
         )
 
-    def get_info(self) -> Dict[str, Any]:
-        """
-        Get comprehensive information about the current state.
-
-        Returns:
-            Dict[str, Any]: Dictionary containing all relevant state information
-        """
-        return {
-            "name": self._name,
-            "topic": self._topic,
-            "message_type": getattr(self._msg_type, "__name__", str(self._msg_type)),
-            "update_hz": self._update_hz,
-            "timeout_sec": self._timeout_sec,
-            "error_count": self._error_count,
-            "max_errors": self._max_errors,
-            "last_update": str(self._last_update) if self._last_update else None,
-            "has_current_state": self._current_state is not None,
-            "current_state_summary": (
-                str(self._current_state)[:100] if self._current_state else None
-            ),
-        }
-
-    @property
-    def current_state(self) -> Any:
-        """Get the current state message (read-only property)."""
-        return self._current_state
 
 
 @dataclass
@@ -178,12 +160,6 @@ class StateRegistry(ComponentRegistry["State"]):
 
 
 def main():
-    # Configure logging
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
     states = {
         "pose_state": {
             "topic": "/state/pose",
@@ -218,8 +194,6 @@ def main():
             states_dict=states
         )
 
-        logger.info(f"Registry status before activation: {_state_registry}")
-
         import time
 
         time.sleep(2.0)
@@ -227,16 +201,13 @@ def main():
         state_names = _state_registry.get_component_names()
         current_states = _state_registry.get_current_states(state_names)
 
-        logger.info(f"Registry status: {_state_registry.get_registry_status()}")
-
         print(f"Registry __str__ representation: {_state_registry}\n")
         print(f"Registry __repr__ representation: {repr(_state_registry)}")
     except Exception as e:
-        logger.error(f"Error in main execution: {e}")
+        print(f"Error in main execution: {e}")
     finally:
         rclpy.shutdown()
         thread.join()
-
 
 if __name__ == "__main__":
     main()

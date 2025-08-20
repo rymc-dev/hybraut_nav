@@ -5,9 +5,8 @@ This module defines the Transition class and TransitionRegistry for managing sta
 It includes methods for evaluating transitions based on guard conditions, executing transitions, and loading transitions from configuration
 files.
 """
-import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Type
+
+from typing import Any, Dict, List, Type, Optional
 
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_models.const.urgency import UrgencyEnums
@@ -22,24 +21,30 @@ from hybraut_interfaces.msg import (
 
 from hybraut_utils import now_to_ros_time_msg
 
-# Set up module-level logger
-logger = logging.getLogger(__name__)
 
-
-@dataclass
 class Transition:
     """
-    Represents a state transition in the system.
+    Represents a transition in the system, managing a specific transition 
+    managing it's guards reference, reset references urgency type and metadata
     """
 
-    _name: str = field(init=True)
-    _target_mode: int = field(init=True)
-    _guard_refs: List[str] = field(init=True)
-    _reset_refs: List[str] = field(init=True, default=None)
-    _urgency: UrgencyEnums = field(
-        init=True, default_factory=lambda: UrgencyEnums.EAGER
-    )  # EAGER urgency for transition means the transition occurs automatically.
-    _metadata: Dict[str, Any] = field(init=True, default_factory=lambda: {})
+    def __init__(
+            self,
+            name: str,
+            target_mode: int,
+            guard_refs: List[str],
+            reset_refs: List[str],
+            urgency: Optional[UrgencyEnums] = UrgencyEnums.EAGER,
+            metadata: Optional[Dict[str, Any]] = {}
+    ):
+        self._name = name
+        self._target_mode = target_mode
+        self._guard_refs = guard_refs
+        self._reset_refs = reset_refs
+        self._urgency = urgency
+        self._metadata = metadata
+
+    """ === access modifiers === """
 
     def get_name(self):
         return self._name
@@ -58,6 +63,8 @@ class Transition:
 
     def get_metadata(self):
         return self._metadata
+
+    """ === utility functions === """
 
     def evaluate_transition(self, ctx: EvaluationContext):
         """
@@ -94,6 +101,8 @@ class Transition:
 
         return msg
 
+    """ === string representations === """
+
     def __repr__(self):
         return (
             f"Transition(name={self._name!r}, target_mode={self._target_mode}, "
@@ -102,12 +111,6 @@ class Transition:
 
     def __str__(self):
         return f"Transition '{self._name}' -> Mode {self._target_mode} | Guards: {self._guard_refs} | Resets: {self._reset_refs} | Urgency: {self._urgency}"
-
-    def execute_transition(self, ctx: EvaluationContext):
-        """
-        This executes the transition, performing the reset and publishing the new mode.
-        """
-        pass
 
 
 class TransitionRegistry(ComponentRegistry):
@@ -197,6 +200,8 @@ class TransitionRegistry(ComponentRegistry):
     def _component_class(cls) -> Type[Transition]:
         return Transition
 
+    """ === String Representations === """
+
     def __repr__(self):
         return f"TransitionRegistry({list(self._components.keys())})"
 
@@ -206,7 +211,6 @@ class TransitionRegistry(ComponentRegistry):
 
 
 """ === Main function for testing or running the module, not for production use === """
-
 
 def main():
     # Example usage of Transition and TransitionrRegistry
