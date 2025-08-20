@@ -28,7 +28,7 @@ from hybraut_models.core.dynamics import DynamicsRegistry
 from hybraut_models.core.states import StateRegistry
 from hybraut_models.core.transitions import TransitionRegistry
 
-from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.ctx.evaluation_context import EvaluationContext
 
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
@@ -36,7 +36,7 @@ from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from typing import Tuple, Any
 
 
-from hybraut_models.exceptions import EvaluationException
+from hybraut_models.exc import EvaluationException
 
 
 @dataclass

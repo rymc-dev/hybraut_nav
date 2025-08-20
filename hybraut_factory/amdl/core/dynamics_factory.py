@@ -8,7 +8,7 @@ the provided AMDL configuration.
 
 from hybraut_models.core.dynamics import DynamicsWrapper, DynamicsRegistry
 from typing import Dict, Any
-from hybraut_models.loaders import ComponentPath, MsgType
+from hybraut_models.ldr import ComponentPath, MsgType
 import logging
 
 logger = logging.getLogger(__name__)

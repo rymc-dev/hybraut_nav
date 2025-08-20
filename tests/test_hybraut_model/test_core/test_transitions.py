@@ -1,5 +1,5 @@
 from hybraut_models.core.transitions import Transition, TransitionRegistry
-from hybraut_models.constants.urgency import UrgencyEnums
+from hybraut_models.const.urgency import UrgencyEnums
 import pytest
 
 

@@ -13,12 +13,12 @@ from typing import Any, Dict, List, Optional, Type
 
 from hybraut_interfaces.msg import AutomatonReset, AutomatonResets
 
-from hybraut_models.loaders.component_path import ComponentPath
+from hybraut_models.ldr.component_path import ComponentPath
 from hybraut_aci import ResetInterface
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
 from hybraut_models.component_interfaces.wrapper_interface import WrapperInterface
 
-from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.ctx.evaluation_context import EvaluationContext
 from hybraut_utils import now_to_ros_time_msg
 
 # Set up module-level logger

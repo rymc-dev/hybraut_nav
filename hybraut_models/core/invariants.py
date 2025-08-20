@@ -18,9 +18,9 @@ from hybraut_interfaces.msg import InvariantEvaluationMSG, InvariantEvaluationsM
 from hybraut_aci import InvariantInterface
 from hybraut_models.component_interfaces import WrapperInterface
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.ctx.evaluation_context import EvaluationContext
 
-from hybraut_models.exceptions import EvaluationException
+from hybraut_models.exc import EvaluationException
 
 
 logger = logging.getLogger(__name__)

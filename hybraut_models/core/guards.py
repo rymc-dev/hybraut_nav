@@ -10,11 +10,11 @@ from typing import Any, Dict, List, Type
 
 from hybraut_interfaces.msg import GuardEvaluationMSG
 from hybraut_aci import GuardInterface
-from hybraut_models.loaders.component_path import ComponentPath
+from hybraut_models.ldr.component_path import ComponentPath
 from hybraut_models.component_interfaces import WrapperInterface
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_models.context.evaluation_context import EvaluationContext
-from hybraut_models.exceptions import EvaluationException
+from hybraut_models.ctx.evaluation_context import EvaluationContext
+from hybraut_models.exc import EvaluationException
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ def main():
 
     state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
 
-    from hybraut_models.context.evaluation_context import EvaluationContext
+    from hybraut_models.ctx.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

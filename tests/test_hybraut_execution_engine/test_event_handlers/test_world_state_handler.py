@@ -88,7 +88,7 @@ class TestWorldStateHandler:
     def test_state_initialization_and_attributes(self):
         try:
             state_name, state_conf = self.get_sample_state_amdl
-            from hybraut_models.loaders.msg_type import MsgType
+            from hybraut_models.ldr.msg_type import MsgType
 
             msg_type = MsgType(**state_conf.get("type", None))
             msg_type = msg_type.import_msg_type()

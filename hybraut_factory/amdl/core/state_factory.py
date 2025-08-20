@@ -7,7 +7,7 @@ configuration, enabling dynamic loading of state definitions.
 """
 
 from hybraut_models.core.states import State, StateRegistry
-from hybraut_models.loaders import MsgType
+from hybraut_models.ldr import MsgType
 from typing import Dict, Any
 import logging
 

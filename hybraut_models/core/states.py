@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type
 
-from hybraut_models.loaders.msg_type import MsgType
+from hybraut_models.ldr.msg_type import MsgType
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
 
 # Set up module-level logger

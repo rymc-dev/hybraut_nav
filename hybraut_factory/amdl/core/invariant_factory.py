@@ -14,7 +14,7 @@ within the Hybraut model.
 
 from hybraut_models.core.invariants import InvariantWrapper, InvariantRegistry
 from typing import Dict, Any, Type
-from hybraut_models.loaders import ComponentPath
+from hybraut_models.ldr import ComponentPath
 import logging
 
 logger = logging.getLogger(__name__)

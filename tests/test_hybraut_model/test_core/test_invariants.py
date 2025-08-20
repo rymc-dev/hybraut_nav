@@ -1,5 +1,5 @@
 from hybraut_models.core.invariants import InvariantWrapper, InvariantRegistry
-from hybraut_models.loaders import ComponentPath
+from hybraut_models.ldr import ComponentPath
 from hybraut_aci import IOSpec, IOSpec, InvariantInterface
 import pytest
 from builtin_interfaces.msg import Time

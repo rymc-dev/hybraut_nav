@@ -13,11 +13,11 @@ from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from hybraut_aci import DynamicsInterface
 from hybraut_aci.core.dynamics_interface import DynamicsInterface
 
-from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.ctx.evaluation_context import EvaluationContext
 from hybraut_models.component_interfaces.wrapper_interface import WrapperInterface
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_models.loaders.component_path import ComponentPath
-from hybraut_models.loaders.msg_type import MsgType
+from hybraut_models.ldr.component_path import ComponentPath
+from hybraut_models.ldr.msg_type import MsgType
 import json
 from typing import Tuple
 from rosidl_runtime_py import message_to_ordereddict
@@ -131,7 +131,7 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
 def main():
 
     import threading
-    from hybraut_models.context.evaluation_context import EvaluationContext
+    from hybraut_models.ctx.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
     from hybraut_models.core.states import StateRegistry
 

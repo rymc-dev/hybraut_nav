@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Type
 
 from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
-from hybraut_models.constants.urgency import UrgencyEnums
-from hybraut_models.context.evaluation_context import EvaluationContext
+from hybraut_models.const.urgency import UrgencyEnums
+from hybraut_models.ctx.evaluation_context import EvaluationContext
 from hybraut_models.core.guards import GuardWrapper
 
 from hybraut_interfaces.msg import (

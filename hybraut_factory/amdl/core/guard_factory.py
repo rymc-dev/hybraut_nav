@@ -9,7 +9,7 @@ the provided AMDL configuration.
 from hybraut_models.core.guards import GuardWrapper, GuardRegistry
 from typing import Dict, Any
 import logging
-from hybraut_models.loaders import ComponentPath
+from hybraut_models.ldr import ComponentPath
 
 logger = logging.getLogger(__name__)
 
