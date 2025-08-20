@@ -2,16 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 This module defines the Mode and ModeRegistry classes for managing modes in a robotic automaton system.
-It include
-s functionality for defining modes, their transitions, and invariants, as well as methods for
+It includes functionality for defining modes, their transitions, and invariants, as well as methods for
 entering and exiting modes, and retrieving enabled transitions.
 """
 
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from hybraut_models.context.evaluation_context import EvaluationContext
-from hybraut_models.core.transitions import Transition
+from hybraut_model._evaluation_context import EvaluationContext
+from hybraut_model._transitions import Transition
 
 
 @dataclass
@@ -24,121 +23,94 @@ class Mode:
     _id: int = field(init=True)
     _name: str = field(init=True)
     _dynamics_ref: str = field(init=True)
-    _invariant_refs: List[str] = field(init=True)
+    _invariants_refs: List[str] = field(init=True)
 
     _description: str = field(init=True, default="no description")
-    _transition_refs: Dict[int, Transition] = field(init=True, default=None)
+    _transitions_ref: Dict[int, Transition] = field(init=True, default=None)
     _entry_actions: List[str] = field(init=True, default=None)
     _exit_actions: List[str] = field(init=True, default=None)
     _is_goal_mode: bool = field(init=True, default=False)
 
-    def get_id(self):
-        return self._id
+    def on_enter(self, context: EvaluationContext): ...
 
-    def get_name(self):
-        return self._name
+    def on_exit(self, context: EvaluationContext): ...
 
-    def get_description(self):
-        return self._description
-
-    def get_dynamics_ref(self):
-        return self._dynamics_ref
-
-    def get_invariant_refs(self):
-        return self._invariant_refs
-
-    def get_transition_refs(self):
-        return self._transition_refs
-
-    def get_entry_actions(self):
-        return self._entry_actions
-
-    def get_exit_actions(self):
-        return self._exit_actions
-
-    def get_is_goal_mode(self):
-        return self._is_goal_mode
-
-    def on_enter(self, ctx: EvaluationContext): ...
-
-    def on_exit(self, ctx: EvaluationContext): ...
+    def get_enabled_transition_refs(self) -> List[str]: ...
 
     def get_dynamics_ref(self) -> str:
         return self._dynamics_ref
 
-    def get_transition_refs_and_priorities(self) -> Dict[int, str]:
-        return self._transition_refs
+    def get_transition_refs(self) -> List[str]:
+        return self._transitions_ref
 
     def get_invariant_refs(self) -> List[str]:
-        return self._invariant_refs
+        return self._invariants_refs
+
+    @classmethod
+    def load_mode_from_amdl(cls, mode_idx, mode_dict):
+        id = mode_idx
+        name = mode_dict["name"]
+        description = mode_dict.get("description")
+        dynamics = mode_dict.get("dynamics")
+        invariants = mode_dict.get("invariants")
+        transitions = mode_dict.get("transitions")
+        entry_actions = None
+        exit_actions = None
+        is_goal_mode = False
+
+        return cls(
+            _id=id,
+            _name=name,
+            _description=description,
+            _dynamics_ref=dynamics,
+            _invariants_refs=invariants,
+            _transitions_ref=transitions,
+            _entry_actions=entry_actions,
+            _exit_actions=exit_actions,
+            _is_goal_mode=is_goal_mode,
+        )
 
 
 @dataclass
 class ModeRegistry:
     _modes: Dict[int, Mode] = field(init=True)
-    _mode_graph: Dict[int, List[int]] = field(init=False)
-
-    def get_mode_ids(self):
-        return list(self._modes.keys())
-
-    def get_mode_names(self):
-        return [mode.get_name() for mode in self._modes.values()]
-
-    def get_num_nodes(self):
-        return len(self._modes)
+    _mode_graph: Dict[int, List[int]] = field(init=False, default_factory=dict)
 
     @classmethod
     def register_mode(cls, mode: Mode):
         pass
 
-    def get_mode(self, mode_id: int) -> Mode:
+    def get_mode(self, mode_id: int):
         return self._modes.get(mode_id)
-
-    def is_mode(self, mode_id: int) -> bool:
+    
+    def is_mode(self, mode_id: int):
         if mode_id in self._modes.keys():
             return True
-
+        
         return False
 
-    def get_reachable_modes(self, from_mode: int) -> List[Mode]:
-        """
-        returns a list of modes that are reachable from_mode id
-        """
-        ...
+    def get_reachable_modes(self, from_mode: int) -> Mode: ...
 
-    def validate_from_to_mode(self, from_mode: int, to_mode: int) -> bool:
-        """validates if a transition from from_mode to to_mode is valid based on the mode graph"""
-        ...
+    def get_reachable_modes(self, from_mode: int) -> List[Mode]: ...
 
-    def validate_mode_connectivity(self) -> bool:
-        """
-        Validates the connectivity of modes in the registry.
-        """
-        ...
+    def validate_mode_connectivity(self) -> bool: ...
+
+    @classmethod
+    def load_modes_registry_from_amdl(cls, mode_dict: dict):
+        modes: Dict[int, Mode] = {}
+        for mode_idx, mode_conf in mode_dict.items():
+            modes[mode_idx] = Mode.load_mode_from_amdl(
+                mode_idx=mode_idx, mode_dict=mode_conf
+            )
+
+        return cls(_modes=modes)
 
 
 """main function for testing purposes, not for production use"""
 
 
 def main():
-    mode_dict = {
-        0: {
-            "name": "Idle",
-            "description": "The robot is idle.",
-            "dynamics": "idle_dynamics",
-            "invariants": ["idle_invariant"],
-            "transitions": {1: "start_transition", 2: "stop_transition"},
-        },
-        1: {
-            "name": "Active",
-            "description": "The robot is active.",
-            "dynamics": "active_dynamics",
-            "invariants": ["active_invariant"],
-            "transitions": {0: "stop_transition", 2: "pause_transition"},
-        },
-    }
-
-    mode_registry = ModeRegistry.load_modes_registry_from_amdl(mode_dict)
+    pass
 
 
 if __name__ == "__main__":

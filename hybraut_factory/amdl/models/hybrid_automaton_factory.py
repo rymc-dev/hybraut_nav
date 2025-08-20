@@ -6,13 +6,13 @@ an AMDL file.
 
 from hybraut_models import HybridAutomaton
 
-from amdl_to_hybraut_model_factory.state_factory import StateFactory
+from hybraut_factory.amdl.core.state_factory import StateFactory
 from hybraut_factory.amdl.core.guard_factory import GuardFactory
-from amdl_to_hybraut_model_factory.reset_factory import ResetFactory
+from hybraut_factory.amdl.core.reset_factory import ResetFactory
 from hybraut_factory.amdl.core.dynamics_factory import DynamicsFactory
-from amdl_to_hybraut_model_factory.invariant_factory import InvariantFactory
-from amdl_to_hybraut_model_factory.transition_factory import TransitionFactory
-from amdl_to_hybraut_model_factory.mode_factory import ModeFactory
+from hybraut_factory.amdl.core.invariant_factory import InvariantFactory
+from hybraut_factory.amdl.core.transition_factory import TransitionFactory
+from hybraut_factory.amdl.core.mode_factory import ModeFactory
 
 
 class HybridAutomatonFactory:
@@ -44,7 +44,7 @@ class HybridAutomatonFactory:
         )
         modes = ModeFactory.load_modes_registry_from_amdl(amdl_dict.get("modes"))
 
-        return cls(
+        return HybridAutomaton(
             _name=name,
             _description=description,
             _version=version,
