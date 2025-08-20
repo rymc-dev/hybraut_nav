@@ -1,32 +1,26 @@
 from hybraut_models.core.invariants import InvariantWrapper, InvariantRegistry
 from hybraut_models.ldr import ComponentPath
-from hybraut_aci import IOSpec, IOSpec, InvariantInterface
-import pytest
+from hybraut_aci import IOSpec, InvariantInterface
 from builtin_interfaces.msg import Time
+import pytest
 from typing import Dict, Any
+from hybraut_interfaces.msg import InvariantEvaluationMSG
+
+# --- Mock Invariant for testing ---
+class SampleInvariant(InvariantInterface):
+    _init_input_spec = [IOSpec.create_io_spec("true_or_false", bool)]
+    _state_input_spec = [IOSpec.create_io_spec("time", Time)]
+
+    def _evaluate(self, **state_kwargs):
+        return getattr(self, "true_or_false", True)
+
+@pytest.fixture
+def sample_invariant_aci_instance():
+    return SampleInvariant  # return the class
 
 
-@pytest.mark.fixture
-def sample_invariant_aci_instance() -> InvariantInterface:
-    """hello world"""
 
-    class SampleInvariant(InvariantInterface):
-        """simple invariant for testing"""
-
-        _init_input_spec = [IOSpec.create_io_spec("true_or_false", bool)]
-        _state_input_spec = [IOSpec.create_io_spec("time", Time)]
-
-        def _evaluate(self, **state_kwargs):
-            print(
-                state_kwargs.get(
-                    "time", "Exception occured retrieving state_kwargs time"
-                )
-            )
-            return self.__getattribute__("true_or_false", None)
-
-    return SampleInvariant
-
-
+# --- Tests for InvariantWrapper ---
 class TestInvariantWrapper:
     @classmethod
     def load_invariant_from_amdl(
@@ -43,21 +37,125 @@ class TestInvariantWrapper:
         )
 
     def test_invariant_wrapper_initialization(self, sample_invariant_aci_instance):
-        """Test the initialization of InvariantWrapper with a sample ACI instance."""
-        invariant_wrapper = InvariantWrapper(
+        wrapper = InvariantWrapper(
             _name="sample",
             _component_class=sample_invariant_aci_instance,
             _configuration={"true_or_false": True},
         )
-        print(invariant_wrapper)
-        print(repr(invariant_wrapper))
+        assert wrapper._name == "sample"
+        assert wrapper._is_initialized
+        assert wrapper._component_instance.true_or_false is True
+
+    def test_invariant_wrapper_evaluate_success(self, sample_invariant_aci_instance):
+        wrapper = InvariantWrapper(
+            _name="sample",
+            _component_class=sample_invariant_aci_instance,
+            _configuration={"true_or_false": True},
+        )
+
+        class DummyContext:
+            def get_state_values(self, state_names):
+                return {"time": Time(sec=1, nanosec=0)}
+
+        context = DummyContext()
+        result = wrapper._evaluate(context)
+        assert isinstance(result, InvariantEvaluationMSG)
+        assert result.holds == True
+        assert result.error == False
+        assert result.message == ''
+
+    def test_invariant_wrapper_evaluate_not_initialized(self, sample_invariant_aci_instance):
+        wrapper = InvariantWrapper(
+            _name="sample",
+            _component_class=sample_invariant_aci_instance,
+            _configuration={"true_or_false": True},
+        )
+        wrapper._is_initialized = False
+        wrapper._component_instance = None
+
+        class DummyContext:
+            def get_state_values(self, state_names):
+                return {"time": Time(sec=0, nanosec=0)}
+
+        context = DummyContext()
+        with pytest.raises(RuntimeError):
+            wrapper._evaluate(context)
+
+    def test_invariant_wrapper_evaluate_component_exception(self, sample_invariant_aci_instance):
+        class FailingInvariant(sample_invariant_aci_instance):
+            def _evaluate(self, **kwargs):
+                raise ValueError("fail!")
+
+        wrapper = InvariantWrapper(
+            _name="failing",
+            _component_class=FailingInvariant,
+            _configuration={"true_or_false": True},
+        )
+
+        class DummyContext:
+            def get_state_values(self, state_names):
+                return {"time": Time(sec=0, nanosec=0)}
+
+        context = DummyContext()
+        msg = wrapper._evaluate(context)
+        assert msg.error
+        assert "exception occured during invariant evaluation" in msg.message.lower()
 
 
-if __name__ == "__main__":
-    TestInvariantWrapper().test_invariant_wrapper_initialization(
-        sample_invariant_aci_instance()
-    )
-
-
+# --- Tests for InvariantRegistry ---
 class TestInvariantRegistry:
-    pass
+    def setup_method(self):
+        self.registry = InvariantRegistry()
+        self.registry._components = {}
+
+        # Add a dummy invariant
+        wrapper = InvariantWrapper(
+            _name="dummy",
+            _component_class=sample_invariant_aci_instance,
+            _configuration={"true_or_false": True},
+        )
+        self.registry._components["dummy"] = wrapper
+
+    def test_get_num_invariants(self):
+        assert self.registry.get_num_invariants() == 1
+
+    def test_get_invariant_names(self):
+        names = self.registry.get_invariant_names()
+        assert names == ["dummy"]
+
+    def test_get_invariant_by_name(self):
+        invariant = self.registry.get_invariant_by_name("dummy")
+        assert isinstance(invariant, InvariantWrapper)
+        assert invariant._name == "dummy"
+        # Non-existent returns None
+        assert self.registry.get_invariant_by_name("nonexistent") is None
+
+    def test_evaluate_invariant_by_name_success(self):
+        class DummyContext:
+            def get_state_values(self, state_names):
+                return {"time": Time(sec=0, nanosec=0)}
+
+        context = DummyContext()
+        msg = self.registry.evaluate_invariant_by_name("dummy", context)
+        assert not msg.error
+        assert msg.invariant_name == "dummy"
+        assert msg.invariant_evaluation is True
+
+    def test_evaluate_invariant_by_name_failure(self):
+        class FailingInvariant(sample_invariant_aci_instance):
+            def _evaluate(self, **kwargs):
+                raise ValueError("fail!")
+
+        self.registry._components["dummy"]._component_instance = FailingInvariant()
+        class DummyContext:
+            def get_state_values(self, state_names):
+                return {"time": Time(sec=0, nanosec=0)}
+
+        context = DummyContext()
+        msg = self.registry.evaluate_invariant_by_name("dummy", context)
+        assert msg.error
+        assert "exception occured during invariant evaluation" in msg.message.lower()
+
+
+if __name__ == '__main__':
+    pytest.main([__file__])

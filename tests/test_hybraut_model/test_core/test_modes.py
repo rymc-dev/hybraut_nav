@@ -9,7 +9,7 @@ def sample_mode():
         _name="Sample Mode",
         _dynamics_ref="sample_dynamics",
         _invariant_refs=["always_holds"],
-        _transition_refs=["tick_transition"],
+        _transition_refs={0: "tick_transition"},
         _description="Sample Mode Description",
     )
 
@@ -21,7 +21,7 @@ class TestMode:
         assert mode.get_name() == "Sample Mode"
         assert mode.get_dynamics_ref() == "sample_dynamics"
         assert mode.get_invariant_refs() == ["always_holds"]
-        assert mode.get_transition_refs() == {0: "tick_transition"}
+        assert mode.get_transition_refs() == ["tick_transition"]
         assert mode.get_description() == "Sample Mode Description"
         assert mode.get_entry_actions() is None
         assert mode.get_exit_actions() is None
@@ -36,11 +36,37 @@ class TestMode:
         assert True
 
     def test_get_transition_refs_and_priorities(self, sample_mode):
-        sample_mode = sample_mode()
-        assert sample_mode.get_transition_refs_and_priorities() == {
+        mode: Mode = sample_mode
+        assert mode.get_transition_refs_and_priorities() == {
             0: "tick_transition"
         }
 
+    def test__repr__(self, sample_mode):
+        mode = sample_mode
+        expected = (
+            "Mode(id=0, name='Sample Mode', dynamics_ref='sample_dynamics', "
+            "invariant_refs=['always_holds'], description='Sample Mode Description', "
+            "transition_refs=[0], entry_actions=None, exit_actions=None, "
+            "is_goal_mode=False)"
+        )
+        assert repr(mode) == expected
+
+    def test__str__(self, sample_mode):
+        mode = sample_mode
+        expected = (
+            "Mode 'Sample Mode' (ID: 0)\n"
+            "  Dynamics: sample_dynamics\n"
+            "  Invariants: always_holds\n"
+            "  Description: Sample Mode Description\n"
+            "  Entry actions: None\n"
+            "  Exit actions: None\n"
+            "  Goal mode: False\n"
+            "  Transitions: [0]"
+        )
+        assert str(mode) == expected
+
+
+    
 
 class TestModeRegistry: ...
 

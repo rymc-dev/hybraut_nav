@@ -11,7 +11,7 @@ from enum import Enum, auto
 from hybraut_models import HybridAutomaton
 
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
-from hybraut_execution_engine.event_handlers.world_state_update_handler import StateBus
+# from hybraut_execution_engine.event_handlers.world_state_update_handler import StateBus
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
 

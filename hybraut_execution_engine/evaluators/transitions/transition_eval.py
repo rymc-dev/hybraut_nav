@@ -97,6 +97,7 @@ import threading
 from rclpy.executors import MultiThreadedExecutor
 import os
 import yaml
+from hybraut_factory.amdl import HybridAutomatonFactory
 
 
 def main() -> None:
@@ -111,7 +112,7 @@ def main() -> None:
     amdl_path = "/home/ryan/ros2_ws/src/hybraut_tb3/amdl/turtlebot3.amdl.yml"
     with open(amdl_path, "r") as f:
         amdl_dict = yaml.safe_load(f)
-        automaton = HybridAutomaton.register_automaton(node=node, amdl_dict=amdl_dict)
+        automaton = HybridAutomatonFactory.register_automaton(amdl_dict=amdl_dict)
 
     state_tracker: EngineStateTracker = EngineStateTracker(
         node=node, initial_mode=0, q_goals=[1]

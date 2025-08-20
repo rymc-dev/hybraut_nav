@@ -100,5 +100,5 @@ class ResetFactory:
     ) -> "ResetRegistry":
         """reset dictionary"""
         resets = cls.register_reset_wrappers_from_amdl(reset_dict)
-        registry = cls(_components=resets)
+        registry = ResetRegistry(_components=resets)
         return registry
