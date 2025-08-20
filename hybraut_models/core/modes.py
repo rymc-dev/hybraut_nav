@@ -74,6 +74,14 @@ class Mode:
 
     def get_invariant_refs(self) -> List[str]:
         return self._invariant_refs
+    
+    def get_entry_actions(self) -> List[Callable[['Mode', EvaluationContext], None]]:
+        """Return a copy of the entry actions to prevent external mutation."""
+        return list(self._entry_actions)
+    
+    def get_exit_actions(self) -> List[Callable[['Mode', EvaluationContext], None]]:
+        """Return a copy of the exit actions to prevent external mutation."""
+        return list(self._exit_actions)
 
     """ === mode logic ==="""
 
