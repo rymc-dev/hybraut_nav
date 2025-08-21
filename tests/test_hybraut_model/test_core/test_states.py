@@ -51,6 +51,17 @@ class TestState:
         state.update_state(PoseStamped())
         assert state.get_current_state() == PoseStamped()
 
+    def test_get_current_state_age(self, state):
+        assert float("inf") == state.get_current_state_age()
+
+        state.update_state(PoseStamped())
+
+        assert int(state.get_current_state_age()) == 0
+        import time
+
+        time.sleep(1.0)
+        assert int(state.get_current_state_age()) == 1
+
     def test_error_count(self, state):
         state.increment_error_count()
         assert state.get_error_count() == 1
@@ -96,6 +107,20 @@ class TestStateRegistry:
         )
         for name in state_registry.get_state_names():
             assert current[name] is None
+
+    def test_get_state_age_by_name(self, state_registry):
+        for name in state_registry.get_state_names():
+            assert state_registry.get_state_age_by_state_name(name) is not None
+
+        for name in state_registry.get_state_names():
+            state_registry.update_state(name, PoseStamped())
+            assert int(state_registry.get_state_age_by_state_name(name)) == 0
+
+        import time
+
+        time.sleep(1.0)
+        for name in state_registry.get_state_names():
+            assert int(state_registry.get_state_age_by_state_name(name)) == 1
 
     def test_get_current_state(self, state_registry):
         for name in state_registry.get_state_names():

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Type
 from hybraut_models.core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
+import time
 
 
 class State:
@@ -39,7 +40,7 @@ class State:
 
         self._current_state = None
         self._error_count = 0
-        self._last_update = None
+        self._last_update: float = None
 
     """ === access modifiers === """
 
@@ -68,6 +69,13 @@ class State:
     def get_error_count(self) -> int:
         return self._error_count
 
+    def get_current_state_age(self) -> int:
+
+        if self._last_update is None:
+            return float("inf")
+
+        return time.time() - self._last_update
+
     """ === util functions === """
 
     def update_state(self, current_state: Any):
@@ -90,6 +98,10 @@ class State:
 
             # Update state data
             self._current_state = current_state
+
+            self._last_update = (
+                time.time()
+            )  # should probably use the header but will change this.
 
             # Reset error count on successful reception
             self.reset_error_count()
@@ -176,6 +188,9 @@ class StateRegistry(ComponentRegistry["State"]):
     def get_state_names(self):
         return self.get_component_names()
 
+    def get_state_by_name(self, state_name: str) -> State:
+        return self.get_components_by_names([state_name]).get(state_name)
+
     def get_states_by_name(self, state_names: List[str]) -> Dict[str, State]:
         return self.get_components_by_names(state_names)
 
@@ -212,6 +227,9 @@ class StateRegistry(ComponentRegistry["State"]):
             current_states[component_name] = component_val._current_state
 
         return current_states
+
+    def get_state_age_by_state_name(self, state_name: str) -> float:
+        return self.get_state_by_name(state_name).get_current_state_age()
 
     @classmethod
     def _component_class(cls) -> Type[State]:

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 from builtin_interfaces.msg import Time, Duration
 
+
 @dataclass
 class EvaluationContext:
     """
@@ -15,31 +16,25 @@ class EvaluationContext:
     Initialized on automaton evaluation time, and passed to evaluation
     functions.
     """
-    states: Any
+
     current_mode: int
     stamp: Time
     metadata: Dict[str, Any]
+
+    states_registry: Any
     guard_registry: Any
     reset_registry: Any
     invariant_registry: Any
 
     def get_state_values(self, state_names: List[str]) -> Dict[str, Any]:
-        return self.states.get_current_states(state_names)
+        return self.states_registry.get_current_states_by_names(state_names)
 
     def get_states(self, state_names: List[str]) -> Dict[str, Any]:
-        return self.states.get_components_by_names(state_names)
+        return self.states_registry.get_current_state_by_name(state_names)
 
-    def get_state_age(self, state_name: str) -> Duration:
+    def get_state_age(self, state_name: str) -> float:
         """Returns the duration since the state was last entered."""
-        state_time: Time = self.states.get_state_time(state_name)
-        duration = Duration()
-        duration.sec = self.stamp.sec - state_time.sec
-        duration.nanosec = self.stamp.nanosec - state_time.nanosec
-        # Normalize negative nanoseconds
-        if duration.nanosec < 0:
-            duration.sec -= 1
-            duration.nanosec += 1_000_000_000
-        return duration
+        return self.states_registry.get_state_age_by_state_name(state_name)
 
     def get_event_history(self) -> List[Any]:
         """Returns the history of events observed (stub for now)."""
