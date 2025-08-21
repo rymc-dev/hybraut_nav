@@ -1,5 +1,5 @@
-from .diag import (
-    HybridAutomatonModelDiagramGenerator,
+from .generator import (
+    HybrautDiag,
 )
 
-__all__ = ["HybridAutomatonModelDiagramGenerator"]
+__all__ = ["HybrautDiag"]

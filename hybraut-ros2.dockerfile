@@ -3,7 +3,7 @@ FROM ros:humble-ros-core-jammy
 LABEL project='hybraut_ros2'
 LABEL maintainer='Ryan McKee <r.mckee@qub.ac.uk>'
 LABEL version='0.0.1'
-LABEL description='ROS-based container for the colav_hybrid_automaton application, providing a UDP-ROS bridge and managing control flow within the colav_gateway namespace.'
+LABEL description='ROS2 based ubuntu container for the hybraut_ros2 application.'
 
 ARG MODE=container
 ENV MODE=${MODE}

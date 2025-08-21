@@ -1,11 +1,10 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+// dev container for the hybraut_ros2 package
 {
 	"name": "hybraut_ros2-devcontainer",
-	"workspaceFolder": "/workspace/ros2_ws/src/colav-hybrid-automaton",
-	"workspaceMount": "source=${localWorkspaceFolder}/colav-hybrid-automaton,target=/workspace/ros2_ws/src//colav-hybrid-automaton,type=bind,consistency=cached",
+	"workspaceFolder": "/workspace/ros2_ws/src/hybraut_ros2",
+	"workspaceMount": "source=${localWorkspaceFolder}/hybraut_ros2,target=/workspace/ros2_ws/src/hybraut_ros2,type=bind,consistency=cached",
 	"build": {
-		"dockerfile": "../hybrid-automaton.dockerfile",
+		"dockerfile": "../hybraut-ros2.dockerfile",
 		"args": {
 			"MODE": "dev"
 		}
