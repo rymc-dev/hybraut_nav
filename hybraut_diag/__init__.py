@@ -1,4 +1,4 @@
-from .hybrid_automaton_model_diagram_generator import (
+from .diag import (
     HybridAutomatonModelDiagramGenerator,
 )
 

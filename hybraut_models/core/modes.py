@@ -67,6 +67,8 @@ class Mode:
         return self._dynamics_ref
 
     def get_transition_refs(self) -> List[str]:
+        if not self._transition_refs:
+            return []
         return list(self._transition_refs.values())
 
     def get_transition_refs_and_priorities(self) -> Dict[str, Transition]:
@@ -135,7 +137,10 @@ class ModeRegistry:
         graph = {}
         for mode_id, mode in self._modes.items():
             # mode.get_transition_refs() returns the transition targets
-            targets = list(mode.get_transition_refs_and_priorities().keys())
+            if isinstance(mode.get_transition_refs_and_priorities(), dict):
+                targets = list(mode.get_transition_refs_and_priorities().keys())
+            else:
+                targets = []
             graph[mode_id] = targets
         return graph
 

@@ -1,0 +1,28 @@
+stateDiagram-v2
+    %% tb3_control:v0.0.1 State Diagram
+
+    %% Initial Mode
+    [*] --> 0
+
+	%% Modes
+	%% navigate Mode details
+    0 : 0.navigate
+    note left of 0
+        <b>invariants</b>: ['invariant.loop']
+        <b>dynamics</b>: dynamics.SimpleVelocityController.navigate
+    end note
+
+	%% navigate transitions.
+    0 --> 1 : <b>Transition to_stop</b>[<b>guards</b> = guard.waypoint_reached, <b>resets</b> = None, <b>priority</b> = -1]
+
+	%% stop Mode details
+    1 : 1.stop
+    note left of 1
+        <b>invariants</b>: ['invariant.fail']
+        <b>dynamics</b>: dynamics.SimpleVelocityController.stop
+    end note
+
+	%% stop transitions.
+
+    %% Goal Modes
+    1 --> [*]

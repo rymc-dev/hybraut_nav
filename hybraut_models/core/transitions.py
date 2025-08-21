@@ -68,6 +68,9 @@ class Transition:
     def get_metadata(self):
         return self._metadata
 
+    def get_priority(self):
+        return self._priority
+
     """ === utility functions === """
 
     def evaluate_transition(self, ctx: EvaluationContext) -> TransitionEvaluationMSG:
@@ -128,6 +131,9 @@ class TransitionRegistry(ComponentRegistry):
     """
 
     _components: dict[str, Transition]
+
+    def get_transition_by_name(self, transition_name: str):
+        return self._components.get(transition_name)
 
     def evaluate_transitions(
         self, transitions: Dict[int, str], ctx: EvaluationContext
