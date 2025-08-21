@@ -1,7 +1,18 @@
 from hybraut_models.core.transitions import Transition, TransitionRegistry
 from hybraut_models.const.urgency import UrgencyEnums
 from hybraut_models.ctx.evaluation_context import EvaluationContext
+from hybraut_models.core.modes import ModeRegistry
+from hybraut_models.core.states import StateRegistry
+from hybraut_models.core.guards import GuardRegistry
+from hybraut_models.core.resets import ResetRegistry
+from hybraut_models.core.dynamics import DynamicsRegistry
+from hybraut_models.core.invariants import InvariantRegistry
+
+from hybraut_interfaces.msg import TransitionEvaluationMSG, TransitionEvaluationsMSG
+
+
 import pytest
+from unittest.mock import Mock
 
 
 @pytest.fixture
@@ -18,8 +29,31 @@ def transition_fixture():
 
 @pytest.fixture
 def mock_ctx_fixture():
+    """"""
+    mock_state_registry = Mock(spec=StateRegistry)
+    mock_guard_registry = Mock(spec=GuardRegistry)
+    mock_transition_registry = Mock(spec=TransitionRegistry)
+    mock_mode_registry = Mock(spec=ModeRegistry)
+    mock_reset_registry = Mock(spec=ResetRegistry)
+    mock_dynamics_registry = Mock(spec=DynamicsRegistry)
+    mock_invariant_registry = Mock(spec=InvariantRegistry)
 
-    EvaluationContext()
+    import time
+
+    ctx = EvaluationContext(
+        current_mode=0,
+        stamp=time.time(),
+        metadata={},
+        mode_registry=mock_mode_registry,
+        transition_registry=mock_transition_registry,
+        states_registry=mock_state_registry,
+        guard_registry=mock_guard_registry,
+        reset_registry=mock_reset_registry,
+        dynamics_registry=mock_dynamics_registry,
+        invariant_registry=mock_invariant_registry,
+    )
+
+    return ctx
 
 
 class TestTransition:
@@ -44,7 +78,8 @@ class TestTransition:
     def test_evaluate_transition(
         self, transition_fixture: Transition, ctx_fixture: EvaluationContext
     ):
-        pass
+        # need to test the guard class first.
+        transition_fixture.evaluate_transition(ctx_fixture)
 
     def test_string_representations(self, transition_fixture: Transition):
         assert (

@@ -27,37 +27,72 @@ class GuardWrapper(WrapperInterface):
     Wrapper for guard components that evaluate transition conditions.
     """
 
-    _component_class: Type[GuardInterface]
+    component_class: Type[GuardInterface]
 
     def __post_init_hook__(self):
         self.initialize()
+
+    """ === access modifiers === """
+
+    def get_guard_name(self) -> List[str]:
+        return self.name
+
+    def get_initialization_configuration_names_and_types(self):
+        names: str = self.component_class.get_init_input_spec_names()
+        types: Type = self.component_class.get_init_input_spec_types()
+
+        # need to combine this
+        return {name: types[i] for i, name in enumerate(names)}
+
+    def get_state_configuration_names_and_types(self):
+        names: str = self.component_class.get_state_input_spec_names()
+        types: Type = self.component_class.get_state_input_spec_types()
+
+        # need to combine this
+        return {name: types[i] for i, name in enumerate(names)}
+
+    def get_initialization_configuration(self):
+        return self.configuration
+
+    """ === TODO: update initialization configuration functions === """
+
+    """ === evaluation === """
 
     def _evaluate(self, context: EvaluationContext) -> GuardEvaluationMSG:
         """
         Evaluates the guard condition using the component instance.
         """
 
-        if not self._is_initialized:
+        if not self.is_initialized:
             raise RuntimeError("Component instance is None. Call activate() first.")
 
         try:
             msg: GuardEvaluationMSG = GuardEvaluationMSG()
-            state_names = self._component_instance.get_state_input_spec_names()
+            state_names = self.component_instance.get_state_input_spec_names()
             states = context.get_state_values(state_names)
-            component_info = self._component_instance.get_component_info()
-            msg.guard_name = component_info["class_name"]
+            msg.guard_name = self.get_guard_name()
 
             try:
-                msg.guard_evaluation = self._component_instance(**states)
+                msg.guard_evaluation = self.component_instance(**states)
             except Exception as e:
                 msg.error = True
                 msg.message = f"exception occured during guard evaluation: '{str(e)}'"
 
             return msg
         except Exception as e:
-            raise EvaluationException(
-                f"Error evaluating guard '{self._name}': {str(e)}"
-            )
+            raise EvaluationException(f"Error evaluating guard '{self.name}': {str(e)}")
+
+    """ === string representations === """
+
+    def __str__(self):
+        return f"GuardWrapper(name={self.name}, class={self.component_class.__name__})"
+
+    def __repr__(self):
+        return (
+            f"<GuardWrapper name={self.name!r}, "
+            f"class={self.component_class.__name__}, "
+            f"initialized={self.is_initialized}>"
+        )
 
 
 class GuardRegistry(ComponentRegistry["GuardWrapper"]):
@@ -66,6 +101,8 @@ class GuardRegistry(ComponentRegistry["GuardWrapper"]):
     def __post_init__(self):
         self._component_type_name = "Guard"
         super().__post_init__()
+
+    """ === access modifiers === """
 
     def get_num_guards(self):
         return len(self._components) if self._components is not None else 0
@@ -78,6 +115,16 @@ class GuardRegistry(ComponentRegistry["GuardWrapper"]):
     def get_guard_by_name(self, guard_name: str):
         if guard_name in self._components.keys():
             return self._components[guard_name]
+
+    def get_guards_by_names(self, guard_names: List[str]) -> List[GuardWrapper]:
+        guards = []
+        for guard_name in guard_names:
+            guard = self.get_guard_by_name(guard_name)
+            if guard:
+                guards.append(guard)
+        return guards
+
+    """ === guard evaluation functions === """
 
     def evaluate_guard_by_name(
         self, guard_name: str, ctx: EvaluationContext
@@ -101,6 +148,22 @@ class GuardRegistry(ComponentRegistry["GuardWrapper"]):
     @classmethod
     def _component_class(cls) -> Type[GuardWrapper]:
         return GuardWrapper
+
+    """ === string representations === """
+
+    def __str__(self):
+        guard_names = self.get_guard_names()
+        return (
+            f"GuardRegistry(num_guards={self.get_num_guards()}, guards={guard_names})"
+        )
+
+    def __repr__(self):
+        guards_repr = []
+        for name, guard in (self._components or {}).items():
+            guard_type = getattr(guard, "component_class", type(guard)).__name__
+            guards_repr.append(f"{name}: {guard_type}")
+        guards_str = ", ".join(guards_repr) if guards_repr else "empty"
+        return f"<GuardRegistry num_guards={self.get_num_guards()}, guards={{ {guards_str} }}>"
 
 
 """ main function for testing the GuardRegistry, not for production use"""

@@ -254,11 +254,10 @@ class HybridAutomaton:
         return "\n".join(lines)
 
 
-"""
-the code below is purely for testing and not to be used in production
-"""
+""" === the code below is purely for testing and not to be used in production ==="""
 
-if __name__ == "__main__":
+
+def main():
     # --- mock registry classes for testing ---
     class MockRegistry:
         def __init__(self, name, items=None):
@@ -306,3 +305,7 @@ if __name__ == "__main__":
     print(repr(automaton))
     print("\n>>> STR:")
     print(str(automaton))
+
+
+if __name__ == "__main__":
+    main()

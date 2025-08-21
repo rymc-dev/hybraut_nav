@@ -1,6 +1,11 @@
+# !/usr/bin/env python
+"""
+and interface for hybraut_models.core wrapper classes for the
+hybraut_aci ACI (Automaton Component Interface) type instances.
+"""
+
 from typing import Any, Type, Optional, Dict, List
 from dataclasses import dataclass, field
-from hybraut_utils import import_class
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
 from hybraut_models.ctx.evaluation_context import EvaluationContext
@@ -11,20 +16,24 @@ from hybraut_aci.core.core_interface.hybrid_automaton_component_interface import
 
 @dataclass
 class WrapperInterface(ABC):
-    _name: str = field(init=True)
-    _component_class: Type[HybridComponentInterface]
-    _component_instance: Optional[HybridComponentInterface] = field(
+    """
+    wrapper interface for ACI (Automaton Component Interface) types instances.
+    """
+
+    name: str = field(init=True)
+    component_class: Type[HybridComponentInterface]
+    component_instance: Optional[HybridComponentInterface] = field(
         default=None, init=False
     )
-    _configuration: Optional[Dict[str, Any]] = field(init=True)
+    configuration: Optional[Dict[str, Any]] = field(init=True)
 
-    _cache_enabled: bool = field(default=True, init=True)
-    _cache_ttl: float = field(
+    cache_enabled: bool = field(default=True, init=True)
+    cache_ttl: float = field(
         default=1.0, init=True
     )  # Time-to-live in seconds for caching evaluation results
-    _last_evaluation: Optional[Any] = field(default=None, init=False)
-    _last_evaluation_time: Optional[Time] = field(default=None, init=False)
-    _is_initialized: bool = field(default=False, init=False)
+    last_evaluation: Optional[Any] = field(default=None, init=False)
+    last_evaluation_time: Optional[Time] = field(default=None, init=False)
+    is_initialized: bool = field(default=False, init=False)
 
     def __post_init__(self):
         """
@@ -32,44 +41,43 @@ class WrapperInterface(ABC):
         Validates the component configuration against the expected constructor arguments.
         """
 
-        expected_names: List[str] = self._component_class.get_init_input_spec_names()
-        expected_types: List[Type] = self._component_class.get_init_input_spec_types()
-
+        expected_names: List[str] = self.component_class.get_init_input_spec_names()
+        expected_types: List[Type] = self.component_class.get_init_input_spec_types()
         for config_name, expected_type in zip(expected_names, expected_types):
-            if config_name not in self._configuration:
+            if config_name not in self.configuration:
                 raise ValueError(
-                    f"Missing configuration for required argument '{config_name}' in component '{self._component_class.__name__}'."
+                    f"Missing configuration for required argument '{config_name}' in component '{self.component_class.__name__}'."
                 )
-            if not isinstance(self._configuration[config_name], expected_type):
+            if not isinstance(self.configuration[config_name], expected_type):
                 raise TypeError(
                     f"Invalid type for configuration key '{config_name}': "
-                    f"expected {expected_type.__name__}, got {type(self._configuration[config_name]).__name__}."
+                    f"expected {expected_type.__name__}, got {type(self.configuration[config_name]).__name__}."
                 )
 
         self.__post_init_hook__()
 
     def get_configuration_names(self) -> List[str]:
-        return self._component_class.init_input_spec_names()
+        return self.component_class.init_input_spec_names()
 
     def get_configuration_types(self) -> List[Type]:
-        return self._component_class.init_input_spec_types()
+        return self.component_class.init_input_spec_types()
 
     def get_state_input_names(self) -> List[str]:
-        return self._component_class.state_input_spec_names()
+        return self.component_class.state_input_spec_names()
 
     def get_state_input_types(self) -> List[Type]:
-        return self._component_class.state_input_spec_types()
+        return self.component_class.state_input_spec_types()
 
     def get_current_configuration(self) -> Dict[str, Any]:
-        return self._configuration
+        return self.configuration
 
     def update_configuration_value(
         self, configuration_name: str, configuration_value: Any
     ):
-        if configuration_name not in self._configuration:
+        if configuration_name not in self.configuration:
             return AttributeError("configuration_name is not in configuration")
 
-        self._configuration[configuration_name] = configuration_value
+        self.configuration[configuration_name] = configuration_value
 
     def __post_init_hook__(self):
         """
@@ -82,22 +90,22 @@ class WrapperInterface(ABC):
         Optional hook to validate the evaluation context before calling `evaluate`.
         Subclasses may override this to perform schema checks or consistency validation.
         """
-        if not self._is_initialized:
+        if not self.is_initialized:
             raise RuntimeError("Tried to evaluate but the component is not activated")
 
     def _is_cache_valid(self, context: EvaluationContext) -> bool:
         """
         Check if cached result is still valid based on TTL and context.
         """
-        if not self._cache_enabled or self._last_evaluation_time is None:
+        if not self.cache_enabled or self.last_evaluation_time is None:
             return False
 
-        if context.current_time is None:
+        if context.stamp is None:
             return False
 
         # Simple TTL check - in real implementation you'd convert Time to seconds
-        time_diff = context.current_time.sec - self._last_evaluation_time.sec
-        return time_diff < self._cache_ttl
+        time_diff = context.stamp - self.last_evaluation_time
+        return time_diff < self.cache_ttl
 
     @abstractmethod
     def _evaluate(self, context: EvaluationContext) -> Any:
@@ -117,26 +125,26 @@ class WrapperInterface(ABC):
         result = self._evaluate(context)
 
         # Update cache
-        if self._cache_enabled:
-            self._last_evaluation = result
-            self._last_evaluation_time = context.current_time
+        if self.cache_enabled:
+            self.last_evaluation = result
+            self.last_evaluation_time = context.stamp
 
         return result
 
     def initialize(self):
         """
         Instantiates the component using the provided configuration dictionary.
-        Sets the `_is_initialized` flag to True.
+        Sets the `` flag to True.
         """
-        self._component_instance = self._component_class(**self._configuration)
-        self._is_initialized = True
+        self.component_instance = self.component_class(**self.configuration)
+        self.is_initialized = True
 
     def shutdown(self):
         """
         Deactivates the component and clears the instance.
         """
-        self._component_instance = None
-        self._is_initialized = False
+        self.component_instance = None
+        self.is_initialized = False
 
     def clear_cache(self) -> None:
         """

@@ -34,7 +34,7 @@ class InvariantWrapper(WrapperInterface):
     Wrapper for invariant components that evaluate conditions that must hold within a state.
     """
 
-    _component_class: Type[InvariantInterface]
+    component_class: Type[InvariantInterface]
 
     def __post_init_hook__(self):
         self.initialize()

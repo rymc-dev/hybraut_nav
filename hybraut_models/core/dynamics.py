@@ -37,7 +37,7 @@ class DynamicsWrapper(WrapperInterface):
 
     _output_topic: str = field(init=True, default=None)
     _output_msg_type: Type = field(init=True, default=None)
-    _component_class: Type[DynamicsInterface]
+    component_class: Type[DynamicsInterface]
 
     def __post_init_hook__(self):
         self.initialize()

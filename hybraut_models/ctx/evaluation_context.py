@@ -18,9 +18,11 @@ class EvaluationContext:
     """
 
     current_mode: int
-    stamp: Time
+    stamp: float
     metadata: Dict[str, Any]
 
+    mode_registry: Any
+    transition_registry: Any
     states_registry: Any
     guard_registry: Any
     reset_registry: Any

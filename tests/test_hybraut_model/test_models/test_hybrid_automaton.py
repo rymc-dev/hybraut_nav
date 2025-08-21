@@ -10,7 +10,7 @@ from hybraut_models.core.invariants import InvariantRegistry
 
 from unittest.mock import Mock, MagicMock, patch
 
-from hybraut_models.mode_registry import ModeRegistry
+from hybraut_models.core.modes import ModeRegistry
 
 
 @pytest.fixture
