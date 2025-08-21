@@ -34,11 +34,12 @@ class TransitionFactory:
             urgency = UrgencyEnums(transition_amdl.get("urgency", 1))
 
             return cls.component_cls(
-                _name=transition_name,
-                _target_mode=target_mode,
-                _guard_refs=guard_ref,
-                _reset_refs=reset_ref,
-                _urgency=urgency,
+                name=transition_name,
+                target_mode=target_mode,
+                guard_refs=guard_ref,
+                reset_refs=reset_ref,
+                priority=-1,  # priority is a value set when transition is loaded into mode
+                urgency=urgency,
             )
         except KeyError as e:
             raise ValueError(f"Missing required transition field: {e}") from e

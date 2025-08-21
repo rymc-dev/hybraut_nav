@@ -35,14 +35,26 @@ class ResetWrapper(WrapperInterface):
     framework and provides a standardized interface for reset components.
     """
 
+    component_class = ResetInterface
+
+    def __post_init_hook__(self):
+        self.initialize()
+
+    """ === access modifiers === """
+
+    def get_name(self) -> str:
+        return self.name
+
+    """ === evaluator functions === """
+
     def _evaluate(self, ctx: EvaluationContext):
-        if not self._is_initialized:
+        if not self.is_initialized:
             raise RuntimeError("can not evaluate uninitialized reset")
 
         states = ctx.get_state_values(
-            self._component_instance.get_state_input_spec_names()
+            self.component_instance.get_state_input_spec_names()
         )
-        outputs = self._component_instance(**states)  # dict of key: output_value
+        outputs = self.component_instance(**states)  # dict of key: output_value
         target_states = ctx.get_states(list(outputs.keys()))
 
         for target_state_key, target_state_value in target_states.items():
@@ -53,8 +65,13 @@ class ResetWrapper(WrapperInterface):
 
         # need to publish the state updates for the correlating topics from the state registry
 
-    def __post_init_hook__(self):
-        self.initialize()
+    """ === string representations === """
+
+    def __str__(self):
+        pass
+
+    def __repr__(self):
+        pass
 
 
 class ResetRegistry(ComponentRegistry["ResetWrapper"]):

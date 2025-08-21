@@ -42,6 +42,36 @@ class DynamicsWrapper(WrapperInterface):
     def __post_init_hook__(self):
         self.initialize()
 
+    """ === access modifiers === """
+
+    def get_dynamic_name(self) -> str:
+        return self.name
+
+    def get_output_topic(self):
+        return self._output_topic
+
+    def get_output_msg_type(self):
+        return self._output_msg_type
+
+    def get_initialization_configuration_names_and_types(self):
+        names: str = self.component_class.get_init_input_spec_names()
+        types: Type = self.component_class.get_init_input_spec_types()
+
+        # need to combine this
+        return {name: types[i] for i, name in enumerate(names)}
+
+    def get_state_configuration_names_and_types(self):
+        names: str = self.component_class.get_state_input_spec_names()
+        types: Type = self.component_class.get_state_input_spec_types()
+
+        # need to combine this
+        return {name: types[i] for i, name in enumerate(names)}
+
+    def get_initialization_configuration(self):
+        return self.configuration
+
+    """ === evaluation function === """
+
     def _evaluate(
         self, ctx: EvaluationContext
     ) -> Tuple[Any, AutomatonDynamicsEvaluation]:
@@ -63,24 +93,24 @@ class DynamicsWrapper(WrapperInterface):
         Raises:
             RuntimeError: If the dynamics component is not initialized.
         """
-        if not self._is_initialized:
+        if not self.is_initialized:
             raise RuntimeError("Component instance is None. Call activate first.")
 
         # Prepare the debug/introspection message
         msg = AutomatonDynamicsEvaluation()
         msg.current_mode = ctx.current_mode
-        msg.dynamic_name = self._component_instance.get_component_name()
-        msg.dynamic_description = self._component_instance.get_component_description()
-        msg.dynamic_output_topic = self._output_topic
+        msg.dynamic_name = self.component_instance.get_component_name()
+        msg.dynamic_description = self.component_instance.get_component_description()
+        msg.dynamic_output_topic = self.get_output_topic()
 
         cmd = None
         try:
             # Gather required state inputs for this dynamics
-            state_names = self._component_instance.get_state_input_spec_names()
+            state_names = self.component_instance.get_state_input_spec_names()
             states = ctx.get_state_values(state_names)
 
             # Execute the dynamics to produce the command
-            cmd = self._component_instance(**states)
+            cmd = self.component_instance(**states)
 
             # Serialize the command to JSON for debugging
             msg.dynamic_output_str = json.dumps(message_to_ordereddict(cmd))
@@ -89,6 +119,23 @@ class DynamicsWrapper(WrapperInterface):
             msg.message = f"Exception occurred during dynamics evaluation: {e!r}"
 
         return cmd, msg
+
+    def __str__(self):
+        return (
+            f"DynamicsWrapper(name={self.name}, "
+            f"class={self.component_class.__name__}, "
+            f"output_topic={self._output_topic}, "
+            f"initialized={self.is_initialized})"
+        )
+
+    def __repr__(self):
+        return (
+            f"<DynamicsWrapper name={self.name!r}, "
+            f"class={self.component_class.__name__}, "
+            f"output_topic={self._output_topic!r}, "
+            f"output_msg_type={getattr(self._output_msg_type, '__name__', self._output_msg_type)}, "
+            f"initialized={self.is_initialized}>"
+        )
 
 
 class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):

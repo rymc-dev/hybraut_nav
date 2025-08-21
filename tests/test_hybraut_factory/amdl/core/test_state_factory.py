@@ -70,6 +70,8 @@ def test_load_state_registry_from_amdl(sample_state_amdl):
     amdl = sample_state_amdl
     registry = StateFactory.load_state_registry_from_amdl(amdl)
 
+    assert registry is not None
+    assert isinstance(registry, StateRegistry)
     assert registry.get_num_states() == len(amdl)
 
     for state_key, state_conf in amdl.items():

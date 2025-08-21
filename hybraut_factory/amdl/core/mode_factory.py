@@ -20,20 +20,21 @@ class ModeFactory:
         dynamics = mode_dict.get("dynamics")
         invariants = mode_dict.get("invariants")
         transitions = mode_dict.get("transitions")
-        entry_actions = None
-        exit_actions = None
+        entry_actions = []
+        exit_actions = []
+        # not sure yet how I should load entry and exit actions, by default for not will keep them as empty lists
         is_goal_mode = False
 
         return Mode(
-            _id=id,
-            _name=name,
-            _description=description,
-            _dynamics_ref=dynamics,
-            _invariant_refs=invariants,
-            _transition_refs=transitions,
-            _entry_actions=entry_actions,
-            _exit_actions=exit_actions,
-            _is_goal_mode=is_goal_mode,
+            id=id,
+            name=name,
+            description=description,
+            dynamics_ref=dynamics,
+            invariant_refs=invariants,
+            transition_refs=transitions,
+            entry_actions=entry_actions,
+            exit_actions=exit_actions,
+            is_goal_mode=is_goal_mode,
         )
 
     @classmethod
@@ -44,4 +45,4 @@ class ModeFactory:
                 mode_idx=mode_idx, mode_dict=mode_conf
             )
 
-        return ModeRegistry(_modes=modes)
+        return ModeRegistry(modes=modes)

@@ -81,3 +81,63 @@ classDiagram
     }
 
     GuardWrapper <|-- component_interfaces.WrapperInterface
+
+    class Transition {
+        - _name: str
+        - _target_mode: int
+        - _guard_refs: List[str]
+        - _reset_refs: List[str]
+        - _priority: int
+        - _urgency: Optional[UrgencyEnums]
+        - _metadata: Optional[Dict[str, Any]]
+
+        + get_name() str
+        + get_target_mode() int
+        + get_guard_refs() List[str]
+        + get_reset_refs() List[str]
+        + get_urgency() Optional[UrgencyEnums]
+        + get_metadata() Optional[Dict[str, Any]]
+        + evaluate_transition(ctx: EvaluationContext) TransitionEvaluationMSG
+        + __repr__() str
+        + __str__() str
+    }
+
+    class InvariantWrapper {
+        - component_class: Type[InvariantInterface]
+        - name: str
+        - configuration: Any
+        - is_initialized: bool
+        - component_instance: InvariantInterface
+
+        + __post_init_hook__() None
+        + get_invariant_name() str
+        + get_initialization_configuration_names_and_types() Dict[str, Type]
+        + get_state_configuration_names_and_types() Dict[str, Type]
+        + get_initialization_configuration() Any
+        + _evaluate(context: EvaluationContext) InvariantEvaluationMSG
+        + __str__() str
+        + __repr__() str
+    }
+
+    InvariantWrapper <|-- component_interfaces.WrapperInterface
+
+    class DynamicsWrapper {
+        - _output_topic: str
+        - _output_msg_type: Type
+        - component_class: Type[DynamicsInterface]
+        - is_initialized: bool
+        - component_instance: DynamicsInterface
+
+        + __post_init_hook__() None
+        + get_dynamic_name() str
+        + get_output_topic() str
+        + get_output_msg_type() Type
+        + get_initialization_configuration_names_and_types() Dict[str, Type]
+        + get_state_configuration_names_and_types() Dict[str, Type]
+        + get_initialization_configuration() Any
+        + _evaluate(ctx: EvaluationContext) Tuple[Any, AutomatonDynamicsEvaluation]
+        + __str__() str
+        + __repr__() str
+    }
+
+    DynamicsWrapper <|-- component_interfaces.WrapperInterface

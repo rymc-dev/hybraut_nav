@@ -1,10 +1,11 @@
 # !/usr/bin/env python3
 """
-test class for mode factory
+Test Suite for the mode factory
 """
 
 import pytest
 from hybraut_factory.amdl.core.mode_factory import ModeFactory
+from hybraut_models.core.modes import Mode, ModeRegistry
 
 
 @pytest.fixture
@@ -42,6 +43,7 @@ def sample_mode_amdl():
 
 
 def test_load_mode_from_amdl(sample_mode_id_and_amdl):
+    """test the load mode from amdl"""
     idx, mode_cfg = sample_mode_id_and_amdl
     mode = ModeFactory.load_mode_from_amdl(idx, mode_cfg)
 
@@ -50,32 +52,34 @@ def test_load_mode_from_amdl(sample_mode_id_and_amdl):
     assert mode.get_description() == mode_cfg["description"]
     assert mode.get_dynamics_ref() == mode_cfg["dynamics"]
     assert mode.get_invariant_refs() == mode_cfg["invariants"]
-    assert mode.get_transition_refs() == mode_cfg["transitions"]
+    assert mode.get_transition_refs() == list(mode_cfg["transitions"].values())
 
-    assert mode.get_entry_actions() == None
-    assert mode.get_exit_actions() == None
+    assert mode.get_entry_actions() == []
+    assert mode.get_exit_actions() == []
     assert mode.get_is_goal_mode() == False
 
 
 def test_load_modes_registry_from_amdl(sample_mode_amdl):
-    amdl = sample_mode_amdl
-    mode_registry = ModeFactory.load_modes_registry_from_amdl(amdl)
+    """test the mode registry"""
+
+    amdl: dict = sample_mode_amdl
+    mode_registry: ModeRegistry = ModeFactory.load_modes_registry_from_amdl(amdl)
 
     assert mode_registry is not None
-    assert mode_registry.get_num_nodes() == len(amdl.keys())
+    assert mode_registry.get_num_modes() == len(amdl.keys())
 
     for mode_id, mode_cfg in amdl.items():
         mode = mode_registry.get_mode(mode_id)
-        assert mode is not None
+        assert isinstance(mode, Mode)
         assert mode.get_id() == mode_id
         assert mode.get_name() == mode_cfg["name"]
         assert mode.get_description() == mode_cfg["description"]
         assert mode.get_dynamics_ref() == mode_cfg["dynamics"]
         assert mode.get_invariant_refs() == mode_cfg["invariants"]
-        assert mode.get_transition_refs() == mode_cfg["transitions"]
+        assert mode.get_transition_refs() == list(mode_cfg["transitions"].values())
 
-        assert mode.get_entry_actions() == None
-        assert mode.get_exit_actions() == None
+        assert mode.get_entry_actions() == []
+        assert mode.get_exit_actions() == []
         assert mode.get_is_goal_mode() == False
 
 

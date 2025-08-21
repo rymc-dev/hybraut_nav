@@ -70,7 +70,7 @@ class ResetFactory:
 
         # Wrap it in a ResetWrapper (assumed abstraction)
         reset_wrapper = ResetWrapper(
-            _name=reset_name, _component_class=component_cls, _configuration=init_kwargs
+            name=reset_name, component_class=component_cls, configuration=init_kwargs
         )
 
         return reset_wrapper

@@ -22,16 +22,16 @@ class Mode:
     """
 
     def __init__(
-            self,
-            id: int,
-            name: str,
-            description: str,
-            dynamics_ref: str,
-            invariant_refs: List[str],
-            transition_refs: Dict[int, str],
-            is_goal_mode: Optional[bool] = False,
-            entry_actions: Optional[List[Callable[['Mode', EvaluationContext], None]]] = [],
-            exit_actions: Optional[List[Callable[['Mode', EvaluationContext], None]]] = []
+        self,
+        id: int,
+        name: str,
+        description: str,
+        dynamics_ref: str,
+        invariant_refs: List[str],
+        transition_refs: Dict[int, str],
+        is_goal_mode: Optional[bool] = False,
+        entry_actions: Optional[List[Callable[["Mode", EvaluationContext], None]]] = [],
+        exit_actions: Optional[List[Callable[["Mode", EvaluationContext], None]]] = [],
     ):
         self._id = id
         self._name = name
@@ -47,25 +47,25 @@ class Mode:
 
     def get_id(self):
         return self._id
-    
+
     def get_name(self):
         return self._name
-    
+
     def get_description(self):
         return self._description
-    
+
     def get_entry_actions(self):
         return self._entry_actions
-    
+
     def get_exit_actions(self):
         return self._exit_actions
-    
+
     def get_is_goal_mode(self):
         return self._is_goal_mode
 
     def get_dynamics_ref(self) -> str:
         return self._dynamics_ref
-    
+
     def get_transition_refs(self) -> List[str]:
         return list(self._transition_refs.values())
 
@@ -74,12 +74,12 @@ class Mode:
 
     def get_invariant_refs(self) -> List[str]:
         return self._invariant_refs
-    
-    def get_entry_actions(self) -> List[Callable[['Mode', EvaluationContext], None]]:
+
+    def get_entry_actions(self) -> List[Callable[["Mode", EvaluationContext], None]]:
         """Return a copy of the entry actions to prevent external mutation."""
         return list(self._entry_actions)
-    
-    def get_exit_actions(self) -> List[Callable[['Mode', EvaluationContext], None]]:
+
+    def get_exit_actions(self) -> List[Callable[["Mode", EvaluationContext], None]]:
         """Return a copy of the exit actions to prevent external mutation."""
         return list(self._exit_actions)
 
@@ -116,8 +116,9 @@ class Mode:
             f"  Transitions: {list(self._transition_refs.keys()) if self._transition_refs else 'None'}"
         )
 
+
 class ModeRegistry:
-    """ 
+    """
     a registry for modes, provides utility functions
     for access visualization of modes within the automaton
     """
@@ -182,23 +183,27 @@ class ModeRegistry:
         pass
 
     """ === access modifiers === """
+
     def get_mode(self, mode_id: int):
         return self._modes.get(mode_id)
-    
+
     def is_mode(self, mode_id: int):
         if mode_id in self._modes.keys():
             return True
-        
+
         return False
 
     def get_mode_ids(self) -> List[int]:
         return list(self._modes.keys())
 
+    def get_num_modes(self) -> int:
+        return len(self._modes)
+
     """ === utility functions === """
 
     def get_reachable_mode_ids(self, from_mode: int) -> List[int]:
         return self._mode_graph.get(from_mode, [])
-    
+
     def is_to_mode_reachable_from(self, from_mode: int, to_mode: int) -> bool:
         """validates if to_mode is reachable from_mode"""
         to_modes: List[int] = self._mode_graph.get(from_mode)
@@ -210,14 +215,13 @@ class ModeRegistry:
         mode_lines = []
         for mode_id, mode in self._modes.items():
             transitions = self._mode_graph.get(mode_id, [])
-            transitions_str = ", ".join(map(str, transitions)) if transitions else "None"
+            transitions_str = (
+                ", ".join(map(str, transitions)) if transitions else "None"
+            )
             mode_lines.append(
                 f"Mode {mode_id}: {mode.get_name()} -> [{transitions_str}]"
             )
-        return (
-            f"ModeRegistry with {len(self._modes)} modes\n"
-            + "\n".join(mode_lines)
-        )
+        return f"ModeRegistry with {len(self._modes)} modes\n" + "\n".join(mode_lines)
 
     def __repr__(self) -> str:
         return (
@@ -228,6 +232,7 @@ class ModeRegistry:
 
 """main function for testing purposes, not for production use"""
 
+
 def main():
     # Mode 0: Idle
     idle_mode = Mode(
@@ -236,7 +241,7 @@ def main():
         description="Waiting for mission start",
         dynamics_ref="dyn_idle",
         invariant_refs=["battery_ok"],
-        transition_refs={1: "to_navigation"},   # Transition to mode 1
+        transition_refs={1: "to_navigation"},  # Transition to mode 1
     )
 
     # Mode 1: Navigate
@@ -246,15 +251,16 @@ def main():
         description="Following waypoints to goal",
         dynamics_ref="dyn_navigation",
         invariant_refs=["gps_ok", "collision_free"],
-        transition_refs={},                     # No outgoing transitions
-        is_goal_mode=True                     # This is the goal mode
+        transition_refs={},  # No outgoing transitions
+        is_goal_mode=True,  # This is the goal mode
     )
     # Put them in a registry for easy access
     modes = {0: idle_mode, 1: navigate_mode}
 
     registry = ModeRegistry(modes)
 
-    print (registry)
+    print(registry)
+
 
 if __name__ == "__main__":
     main()

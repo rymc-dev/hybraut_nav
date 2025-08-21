@@ -38,9 +38,9 @@ class InvariantFactory:
         configuration = invariant_dict.get("configuration", {})
 
         return InvariantWrapper(
-            _name=invariant_name,
-            _component_class=component_class,
-            _configuration=configuration,
+            name=invariant_name,
+            component_class=component_class,
+            configuration=configuration,
         )
 
     @classmethod

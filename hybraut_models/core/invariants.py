@@ -39,45 +39,64 @@ class InvariantWrapper(WrapperInterface):
     def __post_init_hook__(self):
         self.initialize()
 
+    """ === access modifiers === """
+
+    def get_invariant_name(self) -> str:
+        return self.name
+
+    def get_initialization_configuration_names_and_types(self):
+        names: str = self.component_class.get_init_input_spec_names()
+        types: Type = self.component_class.get_init_input_spec_types()
+
+        # need to combine this
+        return {name: types[i] for i, name in enumerate(names)}
+
+    def get_state_configuration_names_and_types(self):
+        names: str = self.component_class.get_state_input_spec_names()
+        types: Type = self.component_class.get_state_input_spec_types()
+
+        # need to combine this
+        return {name: types[i] for i, name in enumerate(names)}
+
+    def get_initialization_configuration(self):
+        return self.configuration
+
+    """ === evaluation_functionality === """
+
     def _evaluate(self, context: EvaluationContext) -> InvariantEvaluationMSG:
         """"""
-        if not self._is_initialized:
+        if not self.is_initialized:
             raise RuntimeError("Component instance is None, call activate() first")
 
         msg: InvariantEvaluationMSG = InvariantEvaluationMSG()
         states = context.get_state_values(
-            self._component_instance.get_state_input_spec_names()
+            self.component_instance.get_state_input_spec_names()
         )
-        component_info = self._component_instance.get_component_info()
+        component_info = self.component_instance.get_component_info()
         msg.invariant_name = component_info["class_name"]
         msg.invariant_description = component_info["description"]
+
         try:
-            msg.holds = self._component_instance(**states)
+            msg.holds = self.component_instance(**states)
         except Exception as e:
             msg.error = True
             msg.message = f"exception occured during invariant evaluation: '{str(e)}'"
 
         return msg
 
-    def __repr__(self) -> str:
-        cls_name = self.__class__.__name__
-        # Prefer the instance’s class if available
-        if getattr(self, "_component_instance", None):
-            comp_cls = self._component_instance.__class__.__name__
-        else:
-            comp_cls = getattr(
-                self._component_class, "__name__", str(self._component_class)
-            )
-        return f"<{cls_name}(component_class={comp_cls})>"
+    """ === string representations === """
 
-    def __str__(self) -> str:
-        if getattr(self, "_component_instance", None):
-            info = self._component_instance.get_component_info()
-            return f"InvariantWrapper for '{info.get('class_name')}' - {info.get('description', '')}"
-        comp_cls = getattr(
-            self._component_class, "__name__", str(self._component_class)
+    def __str__(self):
+        return (
+            f"InvariantWrapper(name={self.name}, class={self.component_class.__name__})"
         )
-        return f"InvariantWrapper(uninitialized, component_class={comp_cls})"
+
+    def __repr__(self):
+        return (
+            f"<InvariantWrapper name={self.name!r}, "
+            f"class={self.component_class.__name__}, "
+            f"initialized={self.is_initialized}>"
+        )
 
 
 class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
@@ -87,6 +106,8 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
         self._component_type_name = "Invariant"
         super().__post_init__()
 
+    """ === access modifiers === """
+
     def get_invariant_names(self):
         if self._components is None:
             return []
@@ -95,9 +116,21 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
     def get_num_invariants(self):
         return self._components is not None and len(self._components) or 0
 
-    def get_invariant_by_name(self, invariant_name: str):
+    def get_invariant_by_name(self, invariant_name: str) -> InvariantWrapper | None:
         if invariant_name in self._components.keys():
             return self._components[invariant_name]
+        return None
+
+    def get_invariants_by_names(
+        self, invariant_names: List[str]
+    ) -> List[InvariantWrapper]:
+        return [
+            self.get_invariant_by_name(name)
+            for name in invariant_names
+            if self.get_invariant_by_name(name) is not None
+        ]
+
+    """ === invariant evaluation functions === """
 
     def evaluate_invariant_by_name(
         self, invariant_name: str, ctx: EvaluationContext
@@ -148,69 +181,41 @@ class InvariantRegistry(ComponentRegistry["InvariantWrapper"]):
 
         return invariant_evaluations_msg
 
+    """ === class functions === """
+
     @classmethod
     def _component_class(cls) -> Type[InvariantWrapper]:
         return InvariantWrapper
 
-    def __repr__(self) -> str:
-        cls_name = self.__class__.__name__
-        n = len(self._components) if self._components else 0
-        return f"<{cls_name}(n_invariants={n})>"
+    """ === string representations === """
 
-    def __str__(self) -> str:
-        if not self._components:
-            return "InvariantRegistry(empty)"
-        names = ", ".join(self._components.keys())
-        return f"InvariantRegistry with {len(self._components)} invariants: [{names}]"
+    def __str__(self):
+        invariant_names = list(self._components.keys()) if self._components else []
+        return (
+            f"InvariantRegistry(num_invariants={len(invariant_names)}, "
+            f"invariants={invariant_names})"
+        )
+
+    def __repr__(self):
+        invariants_repr = []
+        for name, invariant in (self._components or {}).items():
+            invariant_type = getattr(
+                invariant, "component_class", type(invariant)
+            ).__name__
+            invariants_repr.append(f"{name}: {invariant_type}")
+        invariants_str = ", ".join(invariants_repr) if invariants_repr else "empty"
+        return (
+            f"<InvariantRegistry num_invariants={len(self._components or {})}, "
+            f"invariants={{ {invariants_str} }}>"
+        )
+
+
+""" === local testing code below, not for production === """
+
+
+def main():
+    pass
 
 
 if __name__ == "__main__":
-
-    invariant_name = "timeout_invariant"
-    invariants_dict = {
-        "timeout_invariant": {
-            "module": "hybraut_common_behaviours.invariants",
-            "class_name": "TimeoutInvariant",
-            "configuration": {"timeout_sec": 10.0, "entry_time": 1.0},
-        }
-    }
-
-    states = {
-        "current_time": {
-            "topic": "/state/current_time",
-            "description": "the current time for the system",
-            "type": {"pkg": "std_msgs.msg", "msg": "Float64"},
-        }
-    }
-    from hybraut_models.core.states import StateRegistry
-    from std_msgs.msg import Float64
-
-    state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
-    state_registry.get_components_by_names(["current_time"])[
-        "current_time"
-    ].update_state(Float64(data=0.0))
-    from builtin_interfaces.msg import Time
-
-    evaluation_context = EvaluationContext(
-        states=state_registry,
-        reset_registry=None,
-        invariant_registry=None,
-        guard_registry=None,
-        current_mode=1,
-        stamp=Time(),
-        metadata={},
-    )
-
-    invariant_registry: InvariantRegistry = (
-        InvariantRegistry.load_invariant_registry_from_amdl(
-            invariants_dict=invariants_dict
-        )
-    )
-    invariant_evaluations: List[InvariantEvaluationMSG] = (
-        invariant_registry.evaluate_invariants_by_name(
-            invariant_names=invariants_dict.keys(),
-            ctx=evaluation_context,
-        )
-    )
-
-    print(invariant_evaluations)
+    main()
