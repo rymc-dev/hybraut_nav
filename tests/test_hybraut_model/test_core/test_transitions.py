@@ -124,8 +124,128 @@ class TestTransition:
         )
 
 
-class TestTransitionRegistry:
-    def test_transition_registry_initialization_and_attributes(): ...
+from unittest.mock import MagicMock
+
+
+@pytest.fixture
+def mock_guard_pass():
+    """Mock guard that always passes."""
+    guard = MagicMock(spec=GuardWrapper)
+    eval_msg = GuardEvaluationMSG()
+    eval_msg.guard_evaluation = True
+    eval_msg.error = False
+    eval_msg.message = "guard passed"
+    guard._evaluate.return_value = eval_msg
+    return guard
+
+
+@pytest.fixture
+def mock_guard_fail():
+    """Mock guard that always fails."""
+    guard = MagicMock(spec=GuardWrapper)
+    eval_msg = GuardEvaluationMSG()
+    eval_msg.guard_evaluation = False
+    eval_msg.error = False
+    eval_msg.message = "guard failed"
+    guard._evaluate.return_value = eval_msg
+    return guard
+
+
+@pytest.fixture
+def evaluation_context(mock_guard_pass, mock_guard_fail):
+    """Minimal fake evaluation context with a guard registry."""
+    ctx = EvaluationContext(
+        stamp=0,
+        metadata={},
+        mode_registry=MagicMock(),
+        transition_registry=MagicMock(),
+        states_registry=MagicMock(),
+        guard_registry=MagicMock(),
+        reset_registry=MagicMock(),
+        invariant_registry=MagicMock(),
+        current_mode=0,
+    )
+
+    # Patch guard registry to return mocks
+    ctx.guard_registry.get_guards_by_names.return_value = [
+        mock_guard_pass,
+        mock_guard_fail,
+    ]
+    ctx.guard_registry.get_components_by_names.return_value = {
+        "guard_pass": mock_guard_pass,
+        "guard_fail": mock_guard_fail,
+    }
+
+    return ctx
+
+
+class TestTransitionAndRegistry:
+    def test_transition_evaluate_success(self, evaluation_context, mock_guard_pass):
+        transition = Transition(
+            name="T1",
+            target_mode=1,
+            guard_refs=["guard_pass"],
+            reset_refs=["reset1"],
+            priority=1,
+            urgency=UrgencyEnums.EAGER,
+        )
+
+        evaluation_context.guard_registry.get_guards_by_names.return_value = [
+            mock_guard_pass
+        ]
+
+        msg = transition.evaluate_transition(evaluation_context)
+
+        assert msg.name == "T1"
+        assert msg.target_mode == 1
+        assert msg._should_transition is True
+        assert not msg.error
+        assert msg._expected_resets == ["reset1"]
+        assert msg.guards[0].guard_evaluation is True
+
+    def test_transition_evaluate_failure(self, evaluation_context, mock_guard_fail):
+        transition = Transition(
+            name="T2",
+            target_mode=2,
+            guard_refs=["guard_fail"],
+            reset_refs=[],
+            priority=2,
+        )
+
+        evaluation_context.guard_registry.get_guards_by_names.return_value = [
+            mock_guard_fail
+        ]
+
+        msg = transition.evaluate_transition(evaluation_context)
+
+        assert msg._should_transition is False
+        assert not msg.error
+        assert msg.guards[0].guard_evaluation is False
+
+    def test_registry_evaluate_multiple_transitions(
+        self, evaluation_context, mock_guard_pass, mock_guard_fail
+    ):
+        t1 = Transition("T1", 1, ["guard_pass"], ["reset1"], priority=1)
+        t2 = Transition("T2", 2, ["guard_fail"], [], priority=2)
+
+        registry = TransitionRegistry()
+        registry._components = {"T1": t1, "T2": t2}
+
+        transitions = {1: "T1", 2: "T2"}
+        msg = registry.evaluate_transitions(transitions, evaluation_context)
+
+        assert msg.current_mode == evaluation_context.current_mode
+        assert len(msg.transition_evaluations) == 2
+
+        # First transition should pass
+        t1_eval = msg.transition_evaluations[0]
+        assert t1_eval.name == "T1"
+        assert t1_eval.should_transition is True
+
+        # Second transition should fail
+        t2_eval = msg.transition_evaluations[1]
+        assert t2_eval.name == "T2"
+        assert t2_eval.should_transition is False
 
 
 if __name__ == "__main__":

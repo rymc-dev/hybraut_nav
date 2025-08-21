@@ -99,7 +99,7 @@ class Transition:
                     msg._should_transition = False
                 if eval.error:
                     msg.error = True
-                    msg.message.append(eval.message)
+                    msg.message = f"guard evaluation failed: {str(e)}"
 
             msg._expected_resets = self._reset_refs
 
