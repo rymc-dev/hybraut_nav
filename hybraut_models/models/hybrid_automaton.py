@@ -1,5 +1,5 @@
 # !/usr/bin/python3
-# 
+#
 """
 Hybrid Automaton Implementation
 
@@ -49,20 +49,20 @@ class HybridAutomaton:
     """
 
     def __init__(
-            self, 
-            name: str,
-            description: str,
-            version: str,
-            initial_mode: int,
-            goal_modes: List[int],
-            mode_registry: ModeRegistry,
-            state_registry: StateRegistry,
-            transition_registry: TransitionRegistry,
-            guard_registry: GuardRegistry,
-            reset_registry: ResetRegistry,
-            dynamic_registry: DynamicsRegistry,
-            invariant_registry: InvariantRegistry,
-            mode_connectivity: ModeConnectivity = ModeConnectivity.WEAK # TODO: Implement functionality in the future for different connectivity types, atm we just use WEAK connectivity
+        self,
+        name: str,
+        description: str,
+        version: str,
+        initial_mode: int,
+        goal_modes: List[int],
+        mode_registry: ModeRegistry,
+        state_registry: StateRegistry,
+        transition_registry: TransitionRegistry,
+        guard_registry: GuardRegistry,
+        reset_registry: ResetRegistry,
+        dynamic_registry: DynamicsRegistry,
+        invariant_registry: InvariantRegistry,
+        mode_connectivity: ModeConnectivity = ModeConnectivity.WEAK,  # TODO: Implement functionality in the future for different connectivity types, atm we just use WEAK connectivity
     ):
         self._name = name
         self._description = description
@@ -82,19 +82,19 @@ class HybridAutomaton:
 
     def get_name(self):
         return self._name
-    
-    def get_description(self): 
+
+    def get_description(self):
         return self._description
-    
+
     def get_version(self):
         return self._version
-    
+
     def get_initial_mode(self):
         return self._initial_mode
-    
+
     def get_goal_modes(self):
         return self._goal_modes
-    
+
     def get_mode_connectivity(self):
         return self._mode_connectivity
 
@@ -158,7 +158,9 @@ class HybridAutomaton:
             invariant_names = current_mode.get_invariant_refs()
             ctx = self._generate_evaluation_context(mode_id)
             invariant_evaluations: InvariantEvaluationsMSG = (
-                self._invariant_registry.evaluate_invariants_by_name(invariant_names, ctx)
+                self._invariant_registry.evaluate_invariants_by_name(
+                    invariant_names, ctx
+                )
             )
 
             return invariant_evaluations
@@ -171,7 +173,9 @@ class HybridAutomaton:
                 f"Unexpected error evaluating invariants for mode {mode_id}: {str(e)}"
             ) from e
 
-    def evaluate_dynamics(self, mode_id: int) -> Tuple[Any, AutomatonDynamicsEvaluation]:
+    def evaluate_dynamics(
+        self, mode_id: int
+    ) -> Tuple[Any, AutomatonDynamicsEvaluation]:
         """performs dynamics evaluations for the current mode"""
 
         if not self._mode_registry.is_mode(mode_id):
@@ -249,11 +253,12 @@ class HybridAutomaton:
         ]
         return "\n".join(lines)
 
+
 """
 the code below is purely for testing and not to be used in production
 """
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # --- mock registry classes for testing ---
     class MockRegistry:
         def __init__(self, name, items=None):
@@ -271,7 +276,6 @@ if __name__ == '__main__':
         def __init__(self, items=None):
             super().__init__("ModeRegistry", items)
             self._modes = items if items is not None else []
-
 
     # --- create a sample HybridAutomaton instance ---
     mode_registry = MockModeRegistry(items=["mode1", "mode2"])
@@ -302,5 +306,3 @@ if __name__ == '__main__':
     print(repr(automaton))
     print("\n>>> STR:")
     print(str(automaton))
-
-

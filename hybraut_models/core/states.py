@@ -10,7 +10,9 @@ It also provides a StateRegistry for managing multiple states.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type
 
-from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
+from hybraut_models.core.component_interfaces.registry_interface import (
+    ComponentRegistry,
+)
 
 
 class State:
@@ -43,27 +45,27 @@ class State:
 
     def get_name(self) -> str:
         return self._name
-    
+
     def get_topic(self) -> str:
         return self._topic
-    
-    def get_msg_type(self) -> Type: 
+
+    def get_msg_type(self) -> Type:
         return self._msg_type
-    
+
     def get_update_hz(self) -> int:
         return self._update_hz
-    
+
     def get_timeout_sec(self) -> float:
         return self._timeout_sec
 
     def get_max_errors(self) -> int:
         return self._max_errors
-    
+
     def get_current_state(self) -> Any:
         """Get the current state message (read-only property)."""
         return self._current_state
 
-    def get_error_count(self) -> int: 
+    def get_error_count(self) -> int:
         return self._error_count
 
     """ === util functions === """
@@ -80,6 +82,12 @@ class State:
             state_msg (Any): Received ROS2 message
         """
         try:
+            if not isinstance(current_state, self._msg_type):
+                raise TypeError(
+                    f"Expected message type {self._msg_type}, "
+                    f"but got {type(self._current_state)}"
+                )
+
             # Update state data
             self._current_state = current_state
 
@@ -101,7 +109,7 @@ class State:
             raise Exception(
                 f"State '{self._name}' has exceeded maximum error count ({self._max_errors})"
             )
-        
+
     """ === state information in dict format ==="""
 
     def get_info(self) -> Dict[str, Any]:
@@ -153,6 +161,7 @@ class State:
             f"current_state={current_state_repr})"
         )
 
+
 @dataclass
 class StateRegistry(ComponentRegistry["State"]):
     """Registry specialized for managing State components."""
@@ -164,11 +173,43 @@ class StateRegistry(ComponentRegistry["State"]):
     def get_num_states(self):
         return len(self._components)
 
-    def get_current_states(self, state_names: List[str]) -> Dict[str, Any]:
+    def get_state_names(self):
+        return self.get_component_names()
+
+    def get_states_by_name(self, state_names: List[str]) -> Dict[str, State]:
+        return self.get_components_by_names(state_names)
+
+    def update_state(self, state_name: str, current_state: Any) -> None:
+
+        if not isinstance(current_state, self._components[state_name].get_msg_type()):
+            raise TypeError(f"invalid current state type for state '{state_name}'")
+
+        self._components[state_name].update_state(current_state)
+
+    def update_states(self, state_name_and_current_state: Dict[str, Any]) -> None:
+        """
+        Update multiple states with their current state messages.
+
+        Args:
+            state_names (List[str]): List of state names to update.
+            current_states (Dict[str, Any]): Dictionary of current states keyed by state names.
+        """
+        for state_name, current_state in state_name_and_current_state.items():
+            if state_name in self._components:
+                self.update_state(state_name, current_state)
+
+    def get_current_state_by_state_name(self, state_name: str) -> Any:
+        if state_name in self._components:
+            return self._components[state_name].get_current_state()
+        return None
+
+    def get_current_states_by_state_names(
+        self, state_names: List[str]
+    ) -> Dict[str, Any]:
         components = self.get_components_by_names(state_names)
         current_states = {}
         for component_name, component_val in components.items():
-            current_states[component_name] = component_val.current_state
+            current_states[component_name] = component_val._current_state
 
         return current_states
 
@@ -176,8 +217,28 @@ class StateRegistry(ComponentRegistry["State"]):
     def _component_class(cls) -> Type[State]:
         return State
 
+    """ === string representations === """
+
+    def __str__(self) -> str:
+        """Return a concise, human-readable representation of the registry."""
+        state_names = self.get_state_names()
+        return (
+            f"StateRegistry with {len(state_names)} states: "
+            f"{', '.join(state_names) if state_names else 'No states registered'}"
+        )
+
+    def __repr__(self) -> str:
+        """Return a detailed representation for debugging."""
+        state_names = self.get_state_names()
+        return (
+            f"{self.__class__.__name__}("
+            f"num_states={len(state_names)}, "
+            f"state_names={state_names})"
+        )
+
 
 """main function for testing the State and StateRegistry classes. not for production use."""
+
 
 def main():
     states = {
@@ -228,6 +289,7 @@ def main():
     finally:
         rclpy.shutdown()
         thread.join()
+
 
 if __name__ == "__main__":
     main()

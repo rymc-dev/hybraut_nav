@@ -14,8 +14,10 @@ from hybraut_aci import DynamicsInterface
 from hybraut_aci.core.dynamics_interface import DynamicsInterface
 
 from hybraut_models.ctx.evaluation_context import EvaluationContext
-from hybraut_models.component_interfaces.wrapper_interface import WrapperInterface
-from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
+from hybraut_models.core.component_interfaces.wrapper_interface import WrapperInterface
+from hybraut_models.core.component_interfaces.registry_interface import (
+    ComponentRegistry,
+)
 from hybraut_models.ldr.component_path import ComponentPath
 from hybraut_models.ldr.msg_type import MsgType
 import json
@@ -88,6 +90,7 @@ class DynamicsWrapper(WrapperInterface):
 
         return cmd, msg
 
+
 class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     """Registry specialized for managing dynamics"""
 
@@ -125,6 +128,7 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
 
 
 """main is a test function, which is not for use within production"""
+
 
 def main():
 
@@ -195,6 +199,7 @@ def main():
 
     print(cmd)
     print(dynamic_evaluation)
+
 
 if __name__ == "__main__":
     main()

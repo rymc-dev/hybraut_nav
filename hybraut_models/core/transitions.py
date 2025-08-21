@@ -8,7 +8,9 @@ files.
 
 from typing import Any, Dict, List, Type, Optional
 
-from hybraut_models.component_interfaces.registry_interface import ComponentRegistry
+from hybraut_models.core.component_interfaces.registry_interface import (
+    ComponentRegistry,
+)
 from hybraut_models.const.urgency import UrgencyEnums
 from hybraut_models.ctx.evaluation_context import EvaluationContext
 from hybraut_models.core.guards import GuardWrapper
@@ -24,18 +26,18 @@ from hybraut_utils import now_to_ros_time_msg
 
 class Transition:
     """
-    Represents a transition in the system, managing a specific transition 
+    Represents a transition in the system, managing a specific transition
     managing it's guards reference, reset references urgency type and metadata
     """
 
     def __init__(
-            self,
-            name: str,
-            target_mode: int,
-            guard_refs: List[str],
-            reset_refs: List[str],
-            urgency: Optional[UrgencyEnums] = UrgencyEnums.EAGER,
-            metadata: Optional[Dict[str, Any]] = {}
+        self,
+        name: str,
+        target_mode: int,
+        guard_refs: List[str],
+        reset_refs: List[str],
+        urgency: Optional[UrgencyEnums] = UrgencyEnums.EAGER,
+        metadata: Optional[Dict[str, Any]] = {},
     ):
         self._name = name
         self._target_mode = target_mode
@@ -211,6 +213,7 @@ class TransitionRegistry(ComponentRegistry):
 
 
 """ === Main function for testing or running the module, not for production use === """
+
 
 def main():
     # Example usage of Transition and TransitionrRegistry
