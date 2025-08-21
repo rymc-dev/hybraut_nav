@@ -45,16 +45,16 @@ class HybridAutomatonFactory:
         modes = ModeFactory.load_modes_registry_from_amdl(amdl_dict.get("modes"))
 
         return HybridAutomaton(
-            _name=name,
-            _description=description,
-            _version=version,
-            _initial_mode=initial_mode,
-            _goal_modes=goal_modes,
-            _states=states,
-            _guards=guards,
-            _modes=modes,
-            _resets=resets,
-            _dynamics=dynamics,
-            _invariants=invariants,
-            _transitions=transitions,
+            name=name,
+            description=description,
+            version=version,
+            initial_mode=initial_mode,
+            goal_modes=goal_modes,
+            state_registry=states,
+            guard_registry=guards,
+            mode_registry=modes,
+            reset_registry=resets,
+            dynamic_registry=dynamics,
+            invariant_registry=invariants,
+            transition_registry=transitions,
         )
