@@ -21,7 +21,9 @@ class EvaluationContext:
     stamp: float
     metadata: Dict[str, Any]
 
-    mode_registry: Any
+    mode_registry: (
+        Any  # Any is a placeholder for registry due to circular import violations.
+    )
     transition_registry: Any
     states_registry: Any
     guard_registry: Any
@@ -29,10 +31,10 @@ class EvaluationContext:
     invariant_registry: Any
 
     def get_state_values(self, state_names: List[str]) -> Dict[str, Any]:
-        return self.states_registry.get_current_states_by_names(state_names)
+        return self.states_registry.get_current_states_by_state_names(state_names)
 
     def get_states(self, state_names: List[str]) -> Dict[str, Any]:
-        return self.states_registry.get_current_state_by_name(state_names)
+        return self.states_registry.get_states_by_name(state_names)
 
     def get_state_age(self, state_name: str) -> float:
         """Returns the duration since the state was last entered."""

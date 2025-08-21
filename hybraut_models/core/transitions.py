@@ -36,6 +36,7 @@ class Transition:
         target_mode: int,
         guard_refs: List[str],
         reset_refs: List[str],
+        priority: int,
         urgency: Optional[UrgencyEnums] = UrgencyEnums.EAGER,
         metadata: Optional[Dict[str, Any]] = {},
     ):
@@ -43,6 +44,7 @@ class Transition:
         self._target_mode = target_mode
         self._guard_refs = guard_refs
         self._reset_refs = reset_refs
+        self._priority = priority
         self._urgency = urgency
         self._metadata = metadata
 
@@ -68,7 +70,7 @@ class Transition:
 
     """ === utility functions === """
 
-    def evaluate_transition(self, ctx: EvaluationContext):
+    def evaluate_transition(self, ctx: EvaluationContext) -> TransitionEvaluationMSG:
         """
         evaluates the guard condition for transition, if any
         return as true we get the reset refs and return for the priority
@@ -81,19 +83,23 @@ class Transition:
         msg._should_transition = True
 
         try:
-            guards: List[GuardWrapper] = ctx.guard_registry.get_components_by_names(
+            guards: List[GuardWrapper] = ctx.guard_registry.get_guards_by_names(
                 self._guard_refs
             )
 
             guard_evaluations = []
             for guard in guards:
                 try:
-                    eval: bool = guard._evaluate(ctx)
+                    eval: GuardEvaluationMSG = guard._evaluate(ctx)
+                    msg.guards.append(eval)
                 except Exception as e:
                     msg.error = True
                     msg.message.append(f"guard evaluation failed: {str(e)}")
-                if not eval:
+                if not eval.guard_evaluation:
                     msg._should_transition = False
+                if eval.error:
+                    msg.error = True
+                    msg.message.append(eval.message)
 
             msg._expected_resets = self._reset_refs
 
