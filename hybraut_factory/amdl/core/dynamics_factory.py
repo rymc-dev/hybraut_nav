@@ -31,11 +31,11 @@ class DynamicsFactory:
         msg_type = msg_type_info.import_msg_type()
 
         return DynamicsWrapper(
-            _name=dynamics_name,
-            _component_class=component_class,
-            _configuration=configuration,
-            _output_topic=output_topic,
-            _output_msg_type=msg_type,
+            name=dynamics_name,
+            component_class=component_class,
+            configuration=configuration,
+            output_topic=output_topic,
+            output_msg_type=msg_type,
         )
 
     @classmethod

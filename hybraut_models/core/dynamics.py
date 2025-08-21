@@ -35,8 +35,8 @@ class DynamicsWrapper(WrapperInterface):
     wrapper for a instance of dynamics implementation
     """
 
-    _output_topic: str = field(init=True, default=None)
-    _output_msg_type: Type = field(init=True, default=None)
+    output_topic: str = field(init=True, default=None)
+    output_msg_type: Type = field(init=True, default=None)
     component_class: Type[DynamicsInterface]
 
     def __post_init_hook__(self):
@@ -48,10 +48,10 @@ class DynamicsWrapper(WrapperInterface):
         return self.name
 
     def get_output_topic(self):
-        return self._output_topic
+        return self.output_topic
 
     def get_output_msg_type(self):
-        return self._output_msg_type
+        return self.output_msg_type
 
     def get_initialization_configuration_names_and_types(self):
         names: str = self.component_class.get_init_input_spec_names()

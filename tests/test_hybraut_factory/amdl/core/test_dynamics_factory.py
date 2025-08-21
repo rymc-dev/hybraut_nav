@@ -83,8 +83,8 @@ def test_load_dynamics_from_amdl(sample_dynamics_name_and_cfg):
     )
 
     assert dynamics is not None and isinstance(dynamics, DynamicsWrapper)
-    assert dynamics._name == "pid_controller"
-    assert dynamics._configuration == dynamics_cfg["configuration"]
+    assert dynamics.get_dynamic_name() == "pid_controller"
+    assert dynamics.get_initialization_configuration() == dynamics_cfg["configuration"]
 
 
 def test_register_dynamics_from_amdl(sample_dynamics_controllers_amdl):
@@ -99,8 +99,8 @@ def test_register_dynamics_from_amdl(sample_dynamics_controllers_amdl):
     for _, dynamic_wrapper in dynamics_list.items():
         assert isinstance(dynamic_wrapper, DynamicsWrapper)
         assert (
-            dynamic_wrapper._configuration
-            == amdl[dynamic_wrapper._name]["configuration"]
+            dynamic_wrapper.get_initialization_configuration()
+            == amdl[dynamic_wrapper.get_dynamic_name()]["configuration"]
         )
 
 

@@ -31,9 +31,9 @@ class GuardFactory:
         configuration = guard_dict.get("configuration", None)
 
         return GuardWrapper(
-            _name=guard_name,
-            _component_class=component_class,
-            _configuration=configuration,
+            name=guard_name,
+            component_class=component_class,
+            configuration=configuration,
         )
 
     @classmethod

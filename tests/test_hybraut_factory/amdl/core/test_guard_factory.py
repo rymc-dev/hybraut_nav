@@ -45,8 +45,8 @@ def test_load_guard_from_amdl(sample_guard_name_and_conf):
     guard_name, guard_cfg = sample_guard_name_and_conf
     guard: GuardWrapper = GuardFactory.load_guard_from_amdl(guard_name, guard_cfg)
 
-    assert guard._name == guard_name
-    assert guard._configuration == guard_cfg["configuration"]
+    assert guard.get_guard_name() == guard_name
+    assert guard.get_initialization_configuration() == guard_cfg["configuration"]
 
 
 def test_register_guards_from_amdl(sample_guard_amdl):
@@ -57,8 +57,11 @@ def test_register_guards_from_amdl(sample_guard_amdl):
 
     assert len(guards) == len(sample_guard_amdl)
     for name, guard in guards.items():
-        assert name == guard._name
-        assert guard._configuration == sample_guard_amdl[name]["configuration"]
+        assert name == guard.get_guard_name()
+        assert (
+            guard.get_initialization_configuration()
+            == sample_guard_amdl[name]["configuration"]
+        )
 
 
 def test_load_guards_registry_from_amdl(sample_guard_amdl):
@@ -66,6 +69,7 @@ def test_load_guards_registry_from_amdl(sample_guard_amdl):
     amdl = sample_guard_amdl
     registry: GuardRegistry = GuardFactory.load_guards_registry_from_amdl(amdl)
 
+    assert isinstance(registry, GuardRegistry)
     assert registry.get_num_guards() == len(amdl)
 
 
