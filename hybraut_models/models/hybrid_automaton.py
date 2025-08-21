@@ -80,22 +80,22 @@ class HybridAutomaton:
 
     """ === access modifiers === """
 
-    def get_name(self):
+    def get_name(self) -> str:
         return self._name
 
-    def get_description(self):
+    def get_description(self) -> str:
         return self._description
 
-    def get_version(self):
+    def get_version(self) -> str:
         return self._version
 
-    def get_initial_mode(self):
+    def get_initial_mode(self) -> int:
         return self._initial_mode
 
-    def get_goal_modes(self):
+    def get_goal_modes(self) -> List[int]:
         return self._goal_modes
 
-    def get_mode_connectivity(self):
+    def get_mode_connectivity(self) -> ModeConnectivity:
         return self._mode_connectivity
 
     """ === utility functions === """
