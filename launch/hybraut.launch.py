@@ -1,3 +1,8 @@
+# !/usr/bin/env python
+""" 
+A launch file for hybraut ROS2
+"""
+
 import os
 
 from ament_index_python.packages import get_package_share_directory

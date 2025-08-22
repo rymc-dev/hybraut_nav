@@ -1,6 +1,6 @@
 automaton_name: "tb3_control"
 automaton_description: "simple automaton for turtlebot3 waypoint reaching"
-version: "v0.0.1"
+version: "0.0.1"
 transition_evaluation_frequency_hz: 10.0
 control_frequency_hz: 10.0
 
