@@ -28,6 +28,7 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from hybraut_execution_engine.evaluators.dynamics.dynamic_bus import DynamicsHub
 
 from hybraut_execution_engine.internal_state import EngineStateTracker
+from hybraut_interfaces.msg import AutomatonEvents
 
 
 class DynamicEvaluator:
@@ -40,7 +41,7 @@ class DynamicEvaluator:
         node: Node,
         state_tracker: EngineStateTracker,
         automaton: HybridAutomaton,
-        status_publisher: Publisher,
+        event_publisher: Publisher,
     ):
         """
         Initialize the dynamics evaluator.
@@ -48,9 +49,9 @@ class DynamicEvaluator:
         self.node = node
         self.automaton = automaton
         self.state_tracker = state_tracker
-        self.status_publisher = status_publisher
+        self.event_publisher = event_publisher
         self.dynamics_hub = DynamicsHub(
-            node=node, dynamics_registry=automaton._dynamics
+            node=node, dynamics_registry=automaton._dynamic_registry
         )
 
         self.__post_init__()
@@ -86,7 +87,7 @@ class DynamicEvaluator:
         """evaluates the dynamics for the current automaton mode"""
 
         try:
-            cmd, msg = hybraut_model.evaluate_dynamics(current_mode_id=current_mode)
+            cmd, msg = hybraut_model.evaluate_dynamics(current_mode)
         except RuntimeError as e:
             raise RuntimeError(f"exception occured during _evaluate_dynamics: {str(e)}")
         except Exception as e:
@@ -108,8 +109,8 @@ class DynamicEvaluator:
         and at the same time if anything goes wrong we publish status updates to '/hybrid_automaton/status
         """
         try:
-            current_mode = self.state_tracker.current_mode
-            self._validate_current_mode(current_mode, self.automaton)
+            current_mode = self.state_tracker.get_current_mode()
+            # self._validate_current_mode(current_mode, self.automaton)
 
             cmd, dynamic_evaluation = self._evaluate_dynamics(
                 current_mode=current_mode,
@@ -120,10 +121,10 @@ class DynamicEvaluator:
             if cmd is not None:
                 self.dynamics_hub.publish(name=dynamic_evaluation.dynamic_name, msg=cmd)
         except Exception as e:
-            self.status_publisher.publish(
-                AutomatonStatus(
-                    type=AutomatonStatus.ERROR,
-                    meesage=f"exception occured during dynamics evaluation: {str(e)}",
+            self.event_publisher.publish(
+                AutomatonEvents(
+                    type=AutomatonEvents.HANDLE_RECOVERABLE_ERROR,
+                    message=f"exception occured during dynamics evaluation: {str(e)}",
                     stamp=self.node.get_clock().now().to_msg(),
                 )
             )

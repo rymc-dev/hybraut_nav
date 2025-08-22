@@ -66,15 +66,15 @@ class DynamicsHub:
 
         self._busses: Dict[str, DynamicsBus] = {}
 
-        dynamic_components = dynamics_registry.get_components_by_names(
-            dynamics_registry.get_component_names()
+        dynamic_components = dynamics_registry.get_dynamics_by_names(
+            dynamics_registry.get_dynamics_names()
         )
         for dynamic_name, dynamic_wrapper in dynamic_components.items():
             self._busses[dynamic_name] = DynamicsBus.create_dynamic_bus(
                 node=node,
                 dynamic_name=dynamic_name,
-                dynamic_topic=dynamic_wrapper._output_topic,
-                dynamic_type=dynamic_wrapper._output_msg_type,
+                dynamic_topic=dynamic_wrapper.get_output_topic(),
+                dynamic_type=dynamic_wrapper.get_output_msg_type(),
                 dynamic_qos=qos,
                 dynamic_cb_group=cb_group,
             )

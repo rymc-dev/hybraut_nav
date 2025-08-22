@@ -16,6 +16,8 @@ from threading import Lock
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
 from hybraut_execution_engine.internal_state import EngineStateTracker
 
+from rclpy.publisher import Publisher
+
 
 class TransitionEvaluator:
     """
@@ -27,6 +29,7 @@ class TransitionEvaluator:
         node: Node,
         automaton: HybridAutomaton,
         state_tracker: EngineStateTracker,
+        event_publisher: Publisher,
         qos: QoSProfile = qos_profile_system_default,
         cb_group: CallbackGroup = ReentrantCallbackGroup(),
     ):
@@ -34,6 +37,7 @@ class TransitionEvaluator:
         self.node = node
         self.automaton = automaton
         self.state_tracker = state_tracker
+        self.event_publisher = event_publisher
         self._init_publisher(qos=qos, cb_group=cb_group)
         self.lock = Lock()
 
@@ -59,8 +63,8 @@ class TransitionEvaluator:
         Calls the automaton's evaluation function and publishes the evaluation status.
         """
         try:
-            current_mode = self.state_tracker.current_mode
-            self._validate_current_mode(current_mode)
+            current_mode = self.state_tracker.get_current_mode()
+            # self._validate_current_mode(current_mode)
             evaluations = self.automaton.evaluate_transitions(current_mode)
             self.transition_evaluations_publisher.publish(evaluations)
         except Exception as e:

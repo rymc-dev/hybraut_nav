@@ -21,8 +21,8 @@ class WorldStateHandler:
 
     def __post_init__(self):
         self._state_subscription = self.node.create_subscription(
-            msg_type=self.state._msg_type,
-            topic=self.state._topic,
+            msg_type=self.state.get_msg_type(),
+            topic=self.state.get_topic(),
             callback=lambda msg: self.state.update_state(msg),
             qos_profile=self.qos,
             callback_group=self.cb_group,
@@ -44,8 +44,19 @@ class WorldStateHandler:
         )
 
 
+@dataclass
 class WorldStateHandlerHub:
-    pass
+    state_handlers: dict[str, WorldStateHandler] = field(
+        init=True, default_factory=dict
+    )
+
+    def add_state_handler(self, state_handler: WorldStateHandler):
+        self.state_handlers[state_handler.state.get_name()] = state_handler
+
+    def destroy_state_handlers(self):
+        for state_handler in self.state_handlers.values():
+            state_handler.destroy()
+        self.state_handlers.clear()
 
 
 def main():

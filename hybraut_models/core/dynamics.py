@@ -21,6 +21,8 @@ from hybraut_models.core.component_interfaces.registry_interface import (
 from hybraut_models.ldr.component_path import ComponentPath
 from hybraut_models.ldr.msg_type import MsgType
 import json
+from typing import List
+
 from typing import Tuple
 from rosidl_runtime_py import message_to_ordereddict
 
@@ -157,6 +159,12 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     def get_dynamics_by_name(self, dynamics_name: str):
         if dynamics_name in self._components.keys():
             return self._components[dynamics_name]
+
+    def get_dynamics_by_names(self, dynamic_names: List[str]):
+        dynamics = {}
+        for dynamic_name in dynamic_names:
+            dynamics[dynamic_name] = self.get_dynamics_by_name(dynamic_name)
+        return dynamics
 
     def evaluate_dynamics_by_name(
         self, dynamics_name: str, ctx: EvaluationContext

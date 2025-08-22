@@ -28,6 +28,9 @@ class EngineStateTracker:
         self.transition_count = 0
         self.q_goals = q_goals
 
+    def get_current_mode(self):
+        return self.current_mode
+
     def set_current_mode(self, mode):
         self.current_mode = mode
 

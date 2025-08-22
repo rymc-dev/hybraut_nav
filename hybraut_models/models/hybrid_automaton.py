@@ -106,8 +106,10 @@ class HybridAutomaton:
         """
         return EvaluationContext(
             current_mode=current_mode_id,
-            states=self._state_registry,
+            states_registry=self._state_registry,
             stamp=now_to_ros_time_msg(),
+            mode_registry=self._mode_registry,
+            transition_registry=self._transition_registry,
             guard_registry=self._guard_registry,
             reset_registry=self._reset_registry,
             invariant_registry=self._invariant_registry,

@@ -21,6 +21,9 @@ from hybraut_models import HybridAutomaton
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
 
 from hybraut_execution_engine.internal_state import EngineStateTracker
+from rclpy.publisher import Publisher
+
+from hybraut_interfaces.msg import AutomatonEvents
 
 
 class InvariantEvaluator:
@@ -31,6 +34,7 @@ class InvariantEvaluator:
         node: Node,
         automaton: HybridAutomaton,
         state_tracker: EngineStateTracker,
+        event_publisher: Publisher,
         qos: QoSProfile = qos_profile_system_default,
         cb_group: CallbackGroup = ReentrantCallbackGroup(),
     ) -> None:
@@ -38,6 +42,7 @@ class InvariantEvaluator:
         self.node = node
         self.automaton = automaton
         self.state_tracker = state_tracker
+        self.event_publisher = event_publisher
         self._init_publisher(qos=qos, cb_group=cb_group)
         self.lock = Lock()
 
@@ -66,13 +71,19 @@ class InvariantEvaluator:
         Calls the automaton's evaluation function and publishes the evaluation status.
         """
         try:
-            current_mode = self.state_tracker.current_mode
-            self._validate_current_mode(current_mode)
-            eval_msg = self.automaton.evaluate_invariants(current_mode_id=current_mode)
+            current_mode = self.state_tracker.get_current_mode()
+            # self._validate_current_mode(current_mode)
+            eval_msg = self.automaton.evaluate_invariants(current_mode)
             self.invariant_evaluation_publisher.publish(eval_msg)
         except Exception as e:
             self.node.get_logger().error(f"Invariant evaluation failed: {e}")
-            # TODO: Publish recoverable error status for watchdog here
+            self.event_publisher.publish(
+                AutomatonEvents(
+                    type=AutomatonEvents.HANDLE_CRITICAL_FAILURE,
+                    message=f"Invariant evaluation failed: {e}",
+                    stamp=self.node.get_clock().now().to_msg(),
+                )
+            )
 
     def __call__(self, *args, **kwargs) -> None:
         """Allow the object to be called like a function to evaluate invariants."""

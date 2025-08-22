@@ -11,6 +11,21 @@ from enum import Enum, auto
 from hybraut_models import HybridAutomaton
 
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
+
+from hybraut_execution_engine.event_handlers.world_state_update_handler import (
+    WorldStateHandler,
+    WorldStateHandlerHub,
+)
+
+from hybraut_execution_engine.evaluators import (
+    DynamicEvaluator,
+    InvariantEvaluator,
+    TransitionEvaluator,
+)
+from rclpy.callback_groups import ReentrantCallbackGroup
+
+from rclpy.timer import Timer
+
 # from hybraut_execution_engine.event_handlers.world_state_update_handler import StateBus
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
@@ -30,67 +45,132 @@ class ExecutionEngine(FSM):
     to add custom functionality while maintaining base behavior.
     """
 
-    def evaluate_transitions_callback(): ...
-
-    def evalaute_dynamics_callback(): ...
-
-    def evaluate_invariants_callback(): ...
-
-    def __init__(self, node: Node, hybraut_model: HybridAutomaton):
+    def __init__(
+        self,
+        node: Node,
+        hybraut_model: HybridAutomaton,
+        **cfg_kwargs,  # cfg_kwargs allow for option args for the hee like transition_evaluation_hz, invariant_evaluation_hz, dynamics_evaluation_hz
+    ):
 
         self.state = ExectorState.INACTIVE
         self.node = node
         self.hybraut_model = hybraut_model
+        self._engine_state_tracker = None
+        self._event_publisher = node.create_publisher(
+            AutomatonEvents,
+            "/automaton/events",
+            qos_profile=qos_profile_system_default,
+            callback_group=ReentrantCallbackGroup(),
+        )
+
+        self._initialize_hee_evaluators(**cfg_kwargs)
 
         super().__init__(node=node, cb_group=CB_GROUP, qos=QOS, auto_activate=False)
+
+    def _initialize_hee_evaluators(
+        self,
+        transitions_evaluation_hz: int = 10,
+        invariants_evaluation_hz: int = 10,
+        dynamics_evaluation_hz: int = 10,
+    ):
+
+        transition_evaluator: TransitionEvaluator = TransitionEvaluator(
+            node=self.node,
+            automaton=self.hybraut_model,
+            state_tracker=self._engine_state_tracker,
+            event_publisher=self._event_publisher,
+        )
+
+        dynamics_evaluator: DynamicEvaluator = DynamicEvaluator(
+            node=self.node,
+            automaton=self.hybraut_model,
+            state_tracker=self._engine_state_tracker,
+            event_publisher=self._event_publisher,
+        )
+
+        invariant_evaluator: InvariantEvaluator = InvariantEvaluator(
+            node=self.node,
+            automaton=self.hybraut_model,
+            state_tracker=self._engine_state_tracker,
+            event_publisher=self._event_publisher,
+        )
+
+        self._transition_evaluators_timer: Timer = self.node.create_timer(
+            timer_period_sec=1.0 / transitions_evaluation_hz,
+            callback=transition_evaluator(),
+            callback_group=ReentrantCallbackGroup(),
+            auto_start=False,
+        )
+
+        self._dynamics_evaluator_timer: Timer = self.node.create_timer(
+            timer_period_sec=1.0 / dynamics_evaluation_hz,
+            callback=dynamics_evaluator(),
+            callback_group=ReentrantCallbackGroup(),
+            auto_start=False,
+        )
+
+        self._invariant_evaluator_timer: Timer = self.node.create_timer(
+            timer_period_sec=1.0 / invariants_evaluation_hz,
+            callback=invariant_evaluator(),
+            callback_group=ReentrantCallbackGroup(),
+            auto_start=False,
+        )
+
+    """ === Execution Engine Activation functionality === """
 
     def activate(self, *args, **kwargs):
         if self.state == ExectorState.INACTIVE:
             self.error_count = 0
             self.recovery_attempts = 0
-            super().activate()
-            self.__on_activate_hook__()
+            super().activate()  # activate the base class watchdog
+            self.__on_activate_hook__()  # activate the event handlers and evaluators for hybraut_model.
             self.state = ExectorState.ACTIVE
 
         else:
             print("already active")
 
+    def __on_activate_hook__(
+        self, qos: QoSProfile = QOS, cb_group: CallbackGroup = CB_GROUP
+    ):
+        """Hook called when executor is activated"""
+        try:
+            # Step 1: initialize the world state handlers
+            state_keys = self.hybraut_model._state_registry.get_state_names()
+            states = self.hybraut_model._state_registry.get_states_by_name(state_keys)
+            self.world_state_handler_hub: WorldStateHandlerHub = WorldStateHandlerHub()
+
+            for state in states.values():
+                self.world_state_handler_hub.add_state_handler(
+                    WorldStateHandler.create(
+                        node=self.node,
+                        state=state,
+                        qos=qos,
+                        cb_group=cb_group,
+                    )
+                )
+
+            # step 2: initialize the evaluation entities
+            self._activate_evaluators()
+
+            # step 3: intiialize the main thread event handlers
+            self._activate_event_handlers()
+
+        except Exception as e:
+            raise Exception(
+                f"executor::HybrautExecutorError: error during activation hook: {str(e)}"
+            )
+
     def _activate_evaluators(self):
-        from hybraut_execution_engine.evaluators import (
-            DynamicEvaluator,
-            InvariantEvaluator,
-            TransitionEvaluator,
-        )
+        """=== activates the automaton async evaluators ==="""
+        self._transition_evaluators_timer.start()
+        self._invariant_evaluator_timer.start()
+        self._dynamics_evaluator_timer.start()
 
-        transition_evaluator = TransitionEvaluator(
-            node=self.node, automaton=self.hybraut_model
-        )
+    def _activate_event_handlers(self):
+        """=== will activate the HEE event handlers ==="""
+        ...
 
-        invariant_evaluator = InvariantEvaluator(
-            node=self.node, automaton=self.hybraut_model
-        )
-
-        transition_evaluator = TransitionEvaluator(
-            node=self.node, automaton=self.hybraut_model
-        )
-
-        self.node.create_timer(
-            timer_period_sec=1.0 / 10,
-            callback=transition_evaluator(self.current_mode),
-            callback_group=ReentrantCallbackGroup(),
-        )
-
-        self.node.create_timer(
-            timer_period_sec=1.0 / 10,
-            callback=invariant_evaluator(self.current_mode),
-            callback_group=ReentrantCallbackGroup(),
-        )
-
-        self.node.create_timer(
-            timer_period_sec=1.0 / 10,
-            callback=invariant_evaluator(self.current_mode),
-            callback_group=ReentrantCallbackGroup(),
-        )
+    """" === Execution Engine Deactivation functionality === """
 
     def deactivate(self):
         if self.state == ExectorState.ACTIVE:
@@ -104,29 +184,13 @@ class ExecutionEngine(FSM):
         else:
             print("not active")
 
-    def __on_activate_hook__(
-        self, qos: QoSProfile = QOS, cb_group: CallbackGroup = CB_GROUP
-    ):
-        """Hook called when executor is activated"""
-        try:
-            state_keys = self.hybraut_model._states.get_component_names()
-            states = self.hybraut_model._states.get_components_by_names(state_keys)
-
-            for state in states.values():
-                state._state_bus = StateBus.create(
-                    node=self.node,
-                    topic=state._topic,
-                    msg_type=state._msg_type,
-                    state_callback=state.update_state,
-                    qos=qos,
-                    cb_group=cb_group,
-                )
-        except Exception as e:
-            raise Exception(
-                f"executor::HybrautExecutorError: error during activation hook: {str(e)}"
-            )
-
     def __on_deactivate_hook__(self): ...
+
+    """ === string representations === """
+
+    def __str__(self): ...
+
+    def __repr__(self): ...
 
 
 def main():
