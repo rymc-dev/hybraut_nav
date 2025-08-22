@@ -1,3 +1,7 @@
+# test_velocity_below_threshold_guard.py
+# Unit tests for VelocityBelowThresholdGuard in hybraut_common_behaviours.guards.
+# Verifies that the guard correctly identifies when the velocity is below a specified threshold.
+
 import pytest
 from geometry_msgs.msg import TwistStamped
 from hybraut_common_behaviours.guards import VelocityBelowThresholdGuard

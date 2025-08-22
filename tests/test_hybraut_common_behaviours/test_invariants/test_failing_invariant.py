@@ -1,3 +1,8 @@
+# test_failing_invariant.py
+# Unit test for FailingInvariant from hybraut_common_behaviours.invariants.
+# Verifies that FailingInvariant always evaluates to False.
+# Can be run directly or with pytest.
+
 from hybraut_common_behaviours.invariants import FailingInvariant
 from hybraut_aci import InvariantInterface
 import pytest

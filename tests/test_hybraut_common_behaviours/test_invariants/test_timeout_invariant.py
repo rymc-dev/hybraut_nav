@@ -1,42 +1,27 @@
-from hybraut_common_behaviours.invariants import TimeoutInvariant
+# test_timeout_invariant.py
+# Unit tests for TimeoutInvariant from hybraut_common_behaviours.invariants.
+# Tests are parameterized for various timeout scenarios.
+
 import pytest
 import time
 from std_msgs.msg import Float64
+from hybraut_common_behaviours.invariants import TimeoutInvariant
 
 
-def test_timeout_invariant():
-    # Create an instance of TimeoutInvariant with a timeout of 1 second
+@pytest.mark.parametrize(
+    "timeout_sec, entry_offset, expected, description",
+    [
+        (1.0, 0.5, True, "Invariant should hold within timeout"),
+        (1.0, 1.5, False, "Invariant should not hold after timeout"),
+        (2.0, 2.0, True, "Invariant should hold at the exact timeout limit"),
+        (2.0, 2.1, False, "Invariant should not hold just after the timeout limit"),
+    ],
+)
+def test_timeout_invariant_param(timeout_sec, entry_offset, expected, description):
     entry = time.time()
-    invariant = TimeoutInvariant(timeout_sec=1.0, entry_time=entry)
-
-    # Simulate current time just after entry
-    current = Float64(data=entry + 0.5)  # 0.5 seconds later
-    assert (
-        invariant(current_time=current) is True
-    ), "Invariant should hold within timeout"
-    # Simulate current time after timeout expires
-    current = Float64(data=entry + 1.5)  # 1.5 seconds later
-    assert (
-        invariant(current_time=current) is False
-    ), "Invariant should not hold after timeout"
-
-
-def test_timeout_invariant_edge_case():
-    # Create an instance of TimeoutInvariant with a timeout of 2 seconds
-    entry = time.time()
-    invariant = TimeoutInvariant(timeout_sec=2.0, entry_time=entry)
-
-    # Simulate current time exactly at the timeout limit
-    current = Float64(data=entry + 2.0)  # Exactly 2 seconds later
-    assert (
-        invariant(current_time=current) is True
-    ), "Invariant should hold at the exact timeout limit"
-
-    # Simulate current time just after the timeout limit
-    current = Float64(data=entry + 2.1)  # Just over 2 seconds later
-    assert (
-        invariant(current_time=current) is False
-    ), "Invariant should not hold just after the timeout limit"
+    invariant = TimeoutInvariant(timeout_sec=timeout_sec, entry_time=entry)
+    current = Float64(data=entry + entry_offset)
+    assert invariant(current_time=current) is expected, description
 
 
 if __name__ == "__main__":

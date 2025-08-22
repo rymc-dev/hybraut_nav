@@ -1,12 +1,13 @@
-from hybraut_common_behaviours.invariants import TrivialInvariant
+# test_trivial_invariant.py
+# Unit test for TrivialInvariant from hybraut_common_behaviours.invariants.
+# Verifies that the invariant is always satisfied.
+
 import pytest
+from hybraut_common_behaviours.invariants import TrivialInvariant
 
 
 def test_trivial_invariant():
-    # Create an instance of TrivialInvariant
     invariant = TrivialInvariant()
-
-    # Check that the invariant is always satisfied
     assert invariant() is True
 
 
