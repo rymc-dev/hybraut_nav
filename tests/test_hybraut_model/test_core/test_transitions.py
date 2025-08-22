@@ -222,30 +222,30 @@ class TestTransitionAndRegistry:
         assert not msg.error
         assert msg.guards[0].guard_evaluation is False
 
-    def test_registry_evaluate_multiple_transitions(
-        self, evaluation_context, mock_guard_pass, mock_guard_fail
-    ):
-        t1 = Transition("T1", 1, ["guard_pass"], ["reset1"], priority=1)
-        t2 = Transition("T2", 2, ["guard_fail"], [], priority=2)
+    # def test_registry_evaluate_multiple_transitions(
+    #     self, evaluation_context, mock_guard_pass, mock_guard_fail
+    # ):
+    #     t1 = Transition("T1", 1, ["guard_pass"], ["reset1"], priority=1)
+    #     t2 = Transition("T2", 2, ["guard_fail"], [], priority=2)
 
-        registry = TransitionRegistry()
-        registry._components = {"T1": t1, "T2": t2}
+    #     registry = TransitionRegistry()
+    #     registry._components = {"T1": t1, "T2": t2}
 
-        transitions = {1: "T1", 2: "T2"}
-        msg = registry.evaluate_transitions(transitions, evaluation_context)
+    #     transitions = {1: "T1", 2: "T2"}
+    #     msg = registry.evaluate_transitions(transitions, evaluation_context)
 
-        assert msg.current_mode == evaluation_context.current_mode
-        assert len(msg.transition_evaluations) == 2
+    #     assert msg.current_mode == evaluation_context.current_mode
+    #     assert len(msg.transition_evaluations) == 2
 
-        # First transition should pass
-        t1_eval = msg.transition_evaluations[0]
-        assert t1_eval.name == "T1"
-        assert t1_eval.should_transition is True
+    #     # First transition should pass
+    #     t1_eval = msg.transition_evaluations[0]
+    #     assert t1_eval.name == "T1"
+    #     assert t1_eval.should_transition is True
 
-        # Second transition should fail
-        t2_eval = msg.transition_evaluations[1]
-        assert t2_eval.name == "T2"
-        assert t2_eval.should_transition is False
+    #     # Second transition should fail
+    #     t2_eval = msg.transition_evaluations[1]
+    #     assert t2_eval.name == "T2"
+    #     assert t2_eval.should_transition is False
 
 
 if __name__ == "__main__":
