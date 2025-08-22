@@ -99,21 +99,21 @@ class ExecutionEngine(FSM):
             timer_period_sec=1.0 / transitions_evaluation_hz,
             callback=transition_evaluator(),
             callback_group=ReentrantCallbackGroup(),
-            auto_start=False,
+            autostart=False,
         )
 
         self._dynamics_evaluator_timer: Timer = self.node.create_timer(
             timer_period_sec=1.0 / dynamics_evaluation_hz,
             callback=dynamics_evaluator(),
             callback_group=ReentrantCallbackGroup(),
-            auto_start=False,
+            autostart=False,
         )
 
         self._invariant_evaluator_timer: Timer = self.node.create_timer(
             timer_period_sec=1.0 / invariants_evaluation_hz,
             callback=invariant_evaluator(),
             callback_group=ReentrantCallbackGroup(),
-            auto_start=False,
+            autostart=False,
         )
 
     """ === Execution Engine Activation functionality === """
