@@ -16,7 +16,7 @@ from hybraut_interfaces.msg import TransitionEvaluationMSG, TransitionEvaluation
 
 import pytest
 from unittest.mock import Mock
-from hybraut_model.guards import GuardWrapper
+from hybraut_models.core import GuardWrapper
 
 
 # --- Mock classes for testing ---

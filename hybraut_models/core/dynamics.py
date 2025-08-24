@@ -36,6 +36,12 @@ class DynamicsWrapper(WrapperInterface):
     """
     wrapper for a instance of dynamics implementation
     """
+    
+    # NOTE: For a ROS2 instance we initialize an output topic and an 
+    #       output_msg_type, this can be therefore used by the 
+    #       hybraut_execution_engine to create the correlating topics
+    #       for publishing controller feedback from the closed loop
+    #       dynamic feedback.
 
     output_topic: str = field(init=True, default=None)
     output_msg_type: Type = field(init=True, default=None)
@@ -49,27 +55,27 @@ class DynamicsWrapper(WrapperInterface):
     def get_dynamic_name(self) -> str:
         return self.name
 
-    def get_output_topic(self):
+    def get_output_topic(self) -> str:
         return self.output_topic
 
-    def get_output_msg_type(self):
+    def get_output_msg_type(self) -> Type:
         return self.output_msg_type
 
-    def get_initialization_configuration_names_and_types(self):
+    def get_initialization_configuration_names_and_types(self) -> Dict[str, Type]:
         names: str = self.component_class.get_init_input_spec_names()
         types: Type = self.component_class.get_init_input_spec_types()
 
         # need to combine this
         return {name: types[i] for i, name in enumerate(names)}
 
-    def get_state_configuration_names_and_types(self):
+    def get_state_configuration_names_and_types(self) -> Dict[str, Type]:
         names: str = self.component_class.get_state_input_spec_names()
         types: Type = self.component_class.get_state_input_spec_types()
 
         # need to combine this
         return {name: types[i] for i, name in enumerate(names)}
 
-    def get_initialization_configuration(self):
+    def get_initialization_configuration(self) -> Dict[str, Any]:
         return self.configuration
 
     """ === evaluation function === """
@@ -126,7 +132,7 @@ class DynamicsWrapper(WrapperInterface):
         return (
             f"DynamicsWrapper(name={self.name}, "
             f"class={self.component_class.__name__}, "
-            f"output_topic={self._output_topic}, "
+            f"output_topic={self.output_topic}, "
             f"initialized={self.is_initialized})"
         )
 
@@ -134,8 +140,8 @@ class DynamicsWrapper(WrapperInterface):
         return (
             f"<DynamicsWrapper name={self.name!r}, "
             f"class={self.component_class.__name__}, "
-            f"output_topic={self._output_topic!r}, "
-            f"output_msg_type={getattr(self._output_msg_type, '__name__', self._output_msg_type)}, "
+            f"output_topic={self.output_topic!r}, "
+            f"output_msg_type={getattr(self.output_msg_type, '__name__', self.output_msg_type)}, "
             f"initialized={self.is_initialized}>"
         )
 
@@ -146,6 +152,8 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     def __post_init__(self):
         self._component_type_name = "Dynamics"
         super().__post_init__()
+        
+    """ === utiltiy functionality === """
 
     def get_num_dynamics(self):
         return len(self._components)
@@ -165,6 +173,8 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
         for dynamic_name in dynamic_names:
             dynamics[dynamic_name] = self.get_dynamics_by_name(dynamic_name)
         return dynamics
+    
+    """ === evaluation functionality === """
 
     def evaluate_dynamics_by_name(
         self, dynamics_name: str, ctx: EvaluationContext
@@ -180,6 +190,15 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
     @classmethod
     def _component_class(cls) -> Type[DynamicsWrapper]:
         return DynamicsWrapper
+    
+    
+    """ === string represnetations === """
+    
+    def __str__(self):
+        ...
+        
+    def __repr__(self):
+        ...
 
 
 """main is a test function, which is not for use within production"""

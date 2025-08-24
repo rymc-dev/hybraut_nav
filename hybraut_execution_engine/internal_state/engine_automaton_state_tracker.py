@@ -12,9 +12,9 @@ from typing import List
 # TODO: Lets initialize the watchdog in here
 
 
-class EngineStateTracker:
-    """
-    tracks the execution during runtime for the hybraut model
+class EngineAutomatonStateTracker:
+    """ 
+    State Tracker of an Automaton model for when an Execution Engine is active
     """
 
     def __init__(self, node: Node, initial_mode: int, q_goals: List[int]):
