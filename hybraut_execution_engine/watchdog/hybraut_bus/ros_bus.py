@@ -1,3 +1,9 @@
+""" 
+This class defines an interface for the 
+topic buss in the ROS2 ecosystem, it is 
+utilized within both the status and event bus of the automaton.
+"""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable, Type, Union, Any
@@ -7,18 +13,6 @@ from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from enum import Enum
-
-# Import your message types and enums
-try:
-    from hybraut_interfaces.msg import AutomatonEvents, AutomatonStatus
-    from ..hybraut_consts import EventEnum, StatusEnum
-except ImportError:
-    # Fallback for when imports aren't available
-    AutomatonEvents = None
-    AutomatonStatus = None
-    EventEnum = None
-    StatusEnum = None
-
 
 class ROSBusInterface(ABC):
     """

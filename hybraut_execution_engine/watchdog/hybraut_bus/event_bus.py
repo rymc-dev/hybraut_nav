@@ -1,3 +1,11 @@
+# !/usr/bin/env python3
+""" 
+class defines a composite `EventBus` bus for the ros2 
+events topic utilized by the watchdog FSM, provides utilities to 
+simplify event publishing and subscription 
+for the base FSM class.
+"""
+
 from hybraut_interfaces.msg import AutomatonEvents
 from dataclasses import dataclass
 from typing import Callable
@@ -60,6 +68,8 @@ class EventBus(BaseBus):
         """Factory function to create an EventBus."""
         return EventBus(node=node, event_callback=event_callback, **kwargs)
 
+
+""" === code below is only an example of EventBus usage, not for production use === """
 
 def main():
     """

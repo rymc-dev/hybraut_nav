@@ -15,19 +15,16 @@ to allow for custom functionality while maintaining the base behavior.
 
 # Third-party imports
 from transitions import Machine
-from typing import Any, Optional, Callable
+from typing import Callable
 
 # ROS 2 imports
 import rclpy
 from rclpy.node import Node
-from rclpy.publisher import Publisher
-from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
-from builtin_interfaces.msg import Time
 
 # Message imports
-from hybraut_interfaces.msg import AutomatonEvents, AutomatonStatus
+from hybraut_interfaces.msg import AutomatonEvents
 
 # Local imports
 from hybraut_executor_watchdog.hybraut_consts import StatusEnum, EventEnum
@@ -47,21 +44,23 @@ class FSM:
     - Override hooks allow extending functionality without replacing base behavior
     """
 
-    # Define all states
     states = [status for status in StatusEnum]
-
-    # Map incoming EventEnum to trigger method names
-    transition_function_map = {
-        EventEnum.VALID_MISSION_REQUEST: "activate_mission",
-        EventEnum.TRANSITION_GUARD_ENABLED: "enable_guard",
-        EventEnum.TRANSITION_COMPLETE: "complete_transition",
-        EventEnum.RECOVERABLE_ERROR: "handle_recoverable_error",
-        EventEnum.ATTEMPT_FIX: "attempt_fix_process",
-        EventEnum.RECOVERED: "complete_recovery",
-        EventEnum.RECOVERY_FAILED: "fail_recovery",
+    event_action_map = {
+        EventEnum.ACTIVATE_MISSION: "handle_activate_mission",              # System Initialization
+        
+        EventEnum.ENABLE_GUARD: "handle_enable_guard",                      # Transition Events
+        EventEnum.COMPLETE_TRANSITION: "handle_complete_transition",        
+        
+        EventEnum.COMPLETE_RECOVERY: "handle_complete_recovery",            # Error and Recovery Events
+        EventEnum.FAIL_RECOVERY: "handle_fail_recovery",              
         EventEnum.CRITICAL_FAILURE: "handle_critical_failure",
-        EventEnum.MISSION_COMPLETE: "finish_mission",
-        EventEnum.SHUTDOWN: "shutdown_system",
+        EventEnum.SHUTDOWN_SYSTEM: "handle_recoverable_error",
+        
+        EventEnum.FINISH_MISSION: "handle_finish_mission",                  # Mission Termination Events
+        EventEnum.DEACTIVATE_MISSION: "handle_deactivate_mission",
+        
+        EventEnum.RECOVERABLE_EXCEPTION: "handle_recoverable_exception",    # Exception Events
+        EventEnum.UNRECOVERABLE_EXCEPTION: "handle_unrecoverable_exception"
     }
 
     def __init__(

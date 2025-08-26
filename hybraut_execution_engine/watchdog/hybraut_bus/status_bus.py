@@ -1,3 +1,11 @@
+# !/usr/bin/env python3
+""" 
+class defines a composite `StatusBus` bus for the ros2 
+events topic utilized by the watchdog FSM, provides utilities to 
+simplify event publishing and subscription 
+for the base FSM class.
+"""
+
 from dataclasses import dataclass
 from rclpy.node import Node
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
