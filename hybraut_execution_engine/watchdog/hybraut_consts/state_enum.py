@@ -7,10 +7,10 @@ defined in `hybraut_interfaces.msg.AutomatonStatus"
 """
 
 from enum import Enum
-from hybraut_interfaces.msg import AutomatonStatus
+from hybraut_interfaces.msg import State
 
 
-class StatusEnum(Enum):
+class StateEnum(Enum):
     """ 
     watchdog FSM formal definition for states is:
     
@@ -27,16 +27,16 @@ class StatusEnum(Enum):
     """
     
     """ === Initialization and Idle States"""
-    INACTIVE=AutomatonStatus.INACTIVE                 # q0
+    INACTIVE=State.INACTIVE                 # q0
     
     """ === Operation States === """
-    ACTIVE=AutomatonStatus.ACTIVE                     # q1
-    TRANSITIONING=AutomatonStatus.TRANSITIONING       # q2
+    ACTIVE=State.ACTIVE                     # q1
+    TRANSITIONING=State.TRANSITIONING       # q2
     
     """ === Health Monitoring States === """
-    ERROR=AutomatonStatus.ERROR                       # q3
-    RECOVERING=AutomatonStatus.RECOVERING             # q4
+    ERROR=State.ERROR                       # q3
+    RECOVERING=State.RECOVERING             # q4
 
     """ === Terminal States === """
-    FATAL=AutomatonStatus.FATAL                       # q5
-    MISSION_COMPLETE=AutomatonStatus.MISSION_COMPLETE # q6
+    FATAL=State.FATAL                       # q5
+    MISSION_COMPLETE=State.MISSION_COMPLETE # q6

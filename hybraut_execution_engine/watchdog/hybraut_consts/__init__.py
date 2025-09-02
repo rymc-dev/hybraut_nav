@@ -1,7 +1,7 @@
-from .event_enum import EventEnum
-from .status_enum import StatusEnum
+from .transition_event_enum import TransitionEventEnum
+from .state_enum import StateEnum
 
 __all__ = [
-    "EventEnum",
-    "StatusEnum"
+    "TransitionEventEnum",
+    "StateEnum"
 ]

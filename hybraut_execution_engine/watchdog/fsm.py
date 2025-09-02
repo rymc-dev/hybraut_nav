@@ -24,11 +24,11 @@ from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
 # Message imports
-from hybraut_interfaces.msg import AutomatonEvents
+from hybraut_interfaces.msg import TransitionEvent
 
 # Local imports
-from hybraut_executor_watchdog.hybraut_consts import StatusEnum, EventEnum
-from hybraut_executor_watchdog.hybraut_bus import StatusBus, EventBus
+from hybraut_execution_engine.watchdog.hybraut_consts import StateEnum, TransitionEventEnum
+from hybraut_execution_engine.watchdog.hybraut_bus import StatusBus, EventBus
 
 QOS = QoSProfile(depth=10, reliability=qos_profile_system_default.reliability)
 
@@ -44,23 +44,26 @@ class FSM:
     - Override hooks allow extending functionality without replacing base behavior
     """
 
-    states = [status for status in StatusEnum]
+    states = [status for status in StateEnum]
+    
     event_action_map = {
-        EventEnum.ACTIVATE_MISSION: "handle_activate_mission",              # System Initialization
+        TransitionEventEnum.ACTIVATE_MISSION: "handle_activate_mission",              # System Initialization
         
-        EventEnum.ENABLE_GUARD: "handle_enable_guard",                      # Transition Events
-        EventEnum.COMPLETE_TRANSITION: "handle_complete_transition",        
+        TransitionEventEnum.ENABLE_GUARD: "handle_enable_guard",                      # Transition Events
+        TransitionEventEnum.COMPLETE_TRANSITION: "handle_complete_transition",        
         
-        EventEnum.COMPLETE_RECOVERY: "handle_complete_recovery",            # Error and Recovery Events
-        EventEnum.FAIL_RECOVERY: "handle_fail_recovery",              
-        EventEnum.CRITICAL_FAILURE: "handle_critical_failure",
-        EventEnum.SHUTDOWN_SYSTEM: "handle_recoverable_error",
+        TransitionEventEnum.COMPLETE_RECOVERY: "handle_complete_recovery",            # Error and Recovery Events
+        TransitionEventEnum.FAIL_RECOVERY: "handle_fail_recovery",              
+        TransitionEventEnum.CRITICAL_FAILURE: "handle_critical_failure",
+        TransitionEventEnum.SHUTDOWN_SYSTEM: "handle_recoverable_error",
         
-        EventEnum.FINISH_MISSION: "handle_finish_mission",                  # Mission Termination Events
-        EventEnum.DEACTIVATE_MISSION: "handle_deactivate_mission",
+        TransitionEventEnum.FINISH_MISSION: "handle_finish_mission",                  # Mission Termination Events
+        TransitionEventEnum.DEACTIVATE_MISSION: "handle_deactivate_mission",
         
-        EventEnum.RECOVERABLE_EXCEPTION: "handle_recoverable_exception",    # Exception Events
-        EventEnum.UNRECOVERABLE_EXCEPTION: "handle_unrecoverable_exception"
+        TransitionEventEnum.RECOVERABLE_EXCEPTION: "handle_recoverable_exception",    # Exception Events
+        TransitionEventEnum.UNRECOVERABLE_EXCEPTION: "handle_unrecoverable_exception",
+        
+        TransitionEventEnum.ATTEMPT_RECOVERY: "attempt_recovery"                      # Recovery Transition
     }
 
     def __init__(
@@ -68,7 +71,7 @@ class FSM:
         node: Node,
         cb_group: CallbackGroup = None,
         qos: QoSProfile = None,
-        initial_state: StatusEnum = StatusEnum.ACTIVE,
+        initial_state: StateEnum = StateEnum.ACTIVE,
     ):
         if cb_group is None:
             cb_group = ReentrantCallbackGroup()
@@ -87,67 +90,97 @@ class FSM:
         self.__post_init__(node=node, cb_group=cb_group, qos=qos)
 
     def _add_transitions(self):
-        """Add all state transitions with their callback handlers."""
+        """
+        Initializes the transitions defined for the watchdog
+        TODO: Create the transitions formal definition
+        transitions are defined as sigma
+        
+        sigma = {
+            q0 --> q1: 0
+            q1 --> q2: 1 
+        } 
+        
+        """
         # Normal operational flow
         self.machine.add_transition(
-            trigger="enable_guard",
-            source=StatusEnum.ACTIVE,
-            dest=StatusEnum.TRANSITIONING,
-            after=self._safe_callback_wrapper("on_guard_enabled")
+            trigger=TransitionEventEnum.ACTIVATE_MISSION,
+            source=StateEnum.INACTIVE,
+            dest=StateEnum.ACTIVE,
+            after=self._safe_callback_wrapper("on_activate_mission")
         )
         self.machine.add_transition(
-            trigger="complete_transition",
-            source=StatusEnum.TRANSITIONING,
-            dest=StatusEnum.ACTIVE,
-            after=self._safe_callback_wrapper("on_transition_complete")
+            trigger=TransitionEventEnum.ENABLE_GUARD,
+            source=StateEnum.ACTIVE,
+            dest=StateEnum.TRANSITIONING,
+            after=self._safe_callback_wrapper("on_enable_guard")
         )
         self.machine.add_transition(
-            trigger="finish_mission",
-            source=StatusEnum.ACTIVE,
-            dest=StatusEnum.MISSION_COMPLETE,
-            after=self._safe_callback_wrapper("on_mission_complete")
+            trigger=TransitionEvent.COMPLETE_TRANSITION,
+            source=StateEnum.TRANSITIONING,
+            dest=StateEnum.ACTIVE,
+            after=self._safe_callback_wrapper("on_complete_transition")
+        )
+        self.machine.add_transition(
+            trigger=TransitionEventEnum.FINISH_MISSION,
+            source=StateEnum.ACTIVE,
+            dest=StateEnum.MISSION_COMPLETE,
+            after=self._safe_callback_wrapper("on_finish_mission")
+        )
+        self.machine.add_transition(
+            trigger=TransitionEventEnum.DEACTIVATE_MISSION,
+            source=StateEnum.MISSION_COMPLETE,
+            dest=StateEnum.INACTIVE,
+            after=self._safe_callback_wrapper("on_deactivate_mission")
         )
 
-        # Error handling
+        """ === Exception handling === """
         self.machine.add_transition(
-            trigger="handle_recoverable_error",
-            source=[StatusEnum.ACTIVE, StatusEnum.TRANSITIONING],
-            dest=StatusEnum.ERROR,
+            trigger=TransitionEventEnum.RECOVERABLE_EXCEPTION,
+            source=[StateEnum.ACTIVE, StateEnum.TRANSITIONING],
+            dest=StateEnum.ERROR,
             after=self._safe_callback_wrapper("on_recoverable_error")
         )
         self.machine.add_transition(
-            trigger="attempt_fix_process",
-            source=StatusEnum.ERROR,
-            dest=StatusEnum.RECOVERING,
-            after=self._safe_callback_wrapper("on_attempt_fix")
+            trigger = TransitionEventEnum.UNRECOVERABLE_EXCEPTION,
+            source = [StateEnum.ACTIVE, StateEnum.TRANSITIONING], 
+            dest=StateEnum.FATAL,
+            after=self._safe_callback_wrapper("on_unrecoverable_exception")
+        )
+        
+        # Recovery
+        self.machine.add_transition(
+            trigger=TransitionEventEnum.ATTEMPT_RECOVERY,
+            source=StateEnum.ERROR,
+            dest=StateEnum.RECOVERING,
+            after=self._safe_callback_wrapper("on_attempt_recovery")
         )
         self.machine.add_transition(
-            trigger="complete_recovery",
-            source=StatusEnum.RECOVERING,
-            dest=StatusEnum.ACTIVE,
-            after=self._safe_callback_wrapper("on_recovered")
+            trigger=TransitionEvent.COMPLETE_RECOVERY,
+            source=StateEnum.RECOVERING,
+            dest=StateEnum.ACTIVE,
+            after=self._safe_callback_wrapper("on_complete_recovery")
         )
         self.machine.add_transition(
-            trigger="fail_recovery",
-            source=StatusEnum.RECOVERING,
-            dest=StatusEnum.ERROR,
-            after=self._safe_callback_wrapper("on_recovery_failed")
+            trigger=TransitionEventEnum.FAIL_RECOVERY,
+            source=StateEnum.RECOVERING,
+            dest=StateEnum.FATAL,
+            after=self._safe_callback_wrapper("on_fail_recovery")
         )
         self.machine.add_transition(
-            trigger="handle_critical_failure",
-            source=[StatusEnum.ERROR, StatusEnum.RECOVERING],
-            dest=StatusEnum.FATAL,
+            trigger=TransitionEventEnum.UNRECOVERABLE_EXCEPTION,
+            source=[StateEnum.ERROR, StateEnum.RECOVERING],
+            dest=StateEnum.FATAL,
             after=self._safe_callback_wrapper("on_critical_failure")
         )
 
-        # Shutdown from any non-fatal state
-        for state in StatusEnum:
-            if state != StatusEnum.FATAL:
+        """ === System Shutdown transitions === """
+        for state in StateEnum:
+            if state != StateEnum.FATAL:
                 self.machine.add_transition(
-                    trigger="shutdown_system",
+                    trigger=TransitionEventEnum.SHUTDOWN_SYSTEM,
                     source=state,
-                    dest=StatusEnum.FATAL,
-                    after=self._safe_callback_wrapper("on_shutdown")
+                    dest=StateEnum.FATAL,
+                    after=self._safe_callback_wrapper("on_shutdown_system")
                 )
 
     def _safe_callback_wrapper(self, callback_name: str) -> Callable:
@@ -219,12 +252,12 @@ class FSM:
         except Exception as e:
             self.node.get_logger().error(f"Failed to publish status: {e}")
 
-    def trigger_transition(self, event: AutomatonEvents):
+    def trigger_transition(self, event: TransitionEvent):
         """Process incoming events and trigger appropriate transitions."""
-        if not isinstance(event, AutomatonEvents):
+        if not isinstance(event, TransitionEvent):
             self.node.get_logger().error(f"Invalid event type: {type(event)}")
             return
-        enum_dict = {enum.value: enum for enum in EventEnum}
+        enum_dict = {enum.value: enum for enum in TransitionEventEnum}
         if event.type not in enum_dict:
             self.node.get_logger().warn(f"Unknown event: {event.type}")
             return
@@ -232,7 +265,7 @@ class FSM:
         self.node.get_logger().info(f"Processing event: {event_enum}")
         self.perform_event_driven_transition(event_enum)
 
-    def perform_event_driven_transition(self, event: EventEnum):
+    def perform_event_driven_transition(self, event: TransitionEventEnum):
         """Execute the appropriate transition for the given event."""
         trigger = self.transition_function_map.get(event)
         if not trigger:
@@ -247,7 +280,25 @@ class FSM:
     # These methods can be overridden by subclasses to provide custom behavior
     # =============================================================================
 
-    def on_guard_enabled(self, event):
+    def on_activate_mission(self, event):
+        """ 
+        Called when guard is enabled for transitioning from INACTIVE to ACTIVE
+        """
+        self.node.get_logger().info(f"Guard enabled, transition: {event}")
+        self._call_hook("pre_guard_enabled", event)
+        self._execute_activate_mission_logic(event)
+        self._call_hook("post_guard_enabled", event)
+        
+    def on_deactivate_mission(self, event):
+        """ 
+        Called when guard is enabled from MISSION_COMPLETE to INACTIVE
+        """
+        self.node.get_logger().info(f"Guard enabled, transition: {event}")
+        self._call_hook("pre_guard_enabled", event)
+        self._execute_deactive_mission_logic(event)
+        self._call_hook("post_guard_enabled", event)
+    
+    def on_enable_guard(self, event):
         """
         Called when guard is enabled and transitioning to TRANSITIONING state.
         Override this method to add custom behavior.
@@ -261,7 +312,7 @@ class FSM:
         self._execute_guard_enabled_logic(event)
         self._call_hook("post_guard_enabled", event)
 
-    def on_transition_complete(self, event):
+    def on_complete_transition(self, event):
         """
         Called when transition is complete and returning to ACTIVE state.
         Override this method to add custom behavior.
@@ -274,7 +325,7 @@ class FSM:
         self._execute_transition_complete_logic(event)
         self._call_hook("post_transition_complete", event)
 
-    def on_mission_complete(self, event):
+    def on_finish_mission(self, event):
         """
         Called when mission is completed.
         Override this method to add custom behavior.
@@ -431,7 +482,7 @@ class FSM:
     # UTILITY METHODS
     # =============================================================================
 
-    def get_current_state(self) -> StatusEnum:
+    def get_current_state(self) -> StateEnum:
         """Get the current state of the FSM."""
         return self.state
 
@@ -441,7 +492,7 @@ class FSM:
 
     def is_terminal_state(self) -> bool:
         """Check if current state is terminal (FATAL)."""
-        return self.state == StatusEnum.FATAL
+        return self.state == StateEnum.FATAL
 
 # =============================================================================
 # EXAMPLE SUBCLASS DEMONSTRATING OVERRIDABLE FUNCTIONALITY
@@ -520,7 +571,7 @@ def main():
         
         # Create event publisher for testing
         event_publisher = node.create_publisher(
-            AutomatonEvents, "/automaton/events", 
+            TransitionEvent, "/automaton/transition_event", 
             qos_profile=QOS, callback_group=ReentrantCallbackGroup()
         )
         
@@ -529,21 +580,21 @@ def main():
         
         # Test sequence including error scenarios
         test_events = [
-            (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
-            (EventEnum.TRANSITION_COMPLETE, "transition completed"),
-            (EventEnum.RECOVERABLE_ERROR, "recoverable error occurred"),
-            (EventEnum.ATTEMPT_FIX, "attempting recovery"),
-            (EventEnum.RECOVERED, "system recovered"),
-            (EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
-            (EventEnum.TRANSITION_COMPLETE, "transition completed"),
-            (EventEnum.MISSION_COMPLETE, "mission has completed"),
+            (TransitionEventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
+            (TransitionEventEnum.TRANSITION_COMPLETE, "transition completed"),
+            (TransitionEventEnum.RECOVERABLE_ERROR, "recoverable error occurred"),
+            (TransitionEventEnum.ATTEMPT_FIX, "attempting recovery"),
+            (TransitionEventEnum.RECOVERED, "system recovered"),
+            (TransitionEventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
+            (TransitionEventEnum.TRANSITION_COMPLETE, "transition completed"),
+            (TransitionEventEnum.MISSION_COMPLETE, "mission has completed"),
         ]
         
         print(f"Starting Custom FSM demo. Initial state: {fsm.get_current_state()}")
         
         for event_type, message in test_events:
             print(f"\nPublishing event: {event_type.name}")
-            event_msg = AutomatonEvents(type=event_type.value, message=message)
+            event_msg = TransitionEvent(type=event_type.value, message=message)
             event_publisher.publish(event_msg)
             time.sleep(0.5)
             print(f"Current state: {fsm.get_current_state()}")

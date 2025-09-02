@@ -10,38 +10,42 @@ stateDiagram-v2
     direction LR
 
     %% Entry point
-    [*] --> ACTIVE: ON_VALID_MISSION_REQUEST
+    [*] --> q0
+    q0 --> q1: 0
 
     %% Main operational flow (horizontal)
-    ACTIVE --> TRANSITIONING: TRANSITION_GUARD_ENABLED
-    TRANSITIONING --> ACTIVE: TRANSITION_COMPLETE
-    ACTIVE --> MISSION_COMPLETE: MISSION_COMPLETE
+    q1 --> q2: 1
+    q2 --> q1: 2
+    q1 --> q6: 7
+    %% NOTE: q1 --> q0 transition is an auto transition that occurs
+    %% when mission completion state is achieved
+    q1 --> q0: 8
 
     %% Error handling (shared async error trigger)
-    ACTIVE --> ERROR: RECOVERABLE_ERROR
-    TRANSITIONING --> ERROR: RECOVERABLE_ERROR
-    ERROR --> RECOVERING: ATTEMPT_FIX
-    ERROR --> FATAL: CRITICAL_FAILURE
-    RECOVERING --> ACTIVE: RECOVERED
-    RECOVERING --> FATAL: RECOVERY_FAILED
+    q1 --> q3: 9
+    q2 --> q3: 9
+    q3 --> q4: 11
+    q3 --> q5: 10
+    q4 --> q1: 3
+    q4 --> q5: 4
   
     %% Terminal state
-    FATAL --> [*]: SHUTDOWN
-    MISSION_COMPLETE --> [*]: RETURN TO INACTIVE STATE
+    q5 --> [*]: SHUTDOWN
+    q6 --> [*]: RETURN TO INACTIVE STATE
 
     %% State styling
     classDef inactiveState fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
     classDef activeState fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
     classDef transitionState fill:#fff3e0,stroke:#ff9800,stroke-width:2px
     classDef warningState fill:#fff8e1,stroke:#ffc107,stroke-width:2px
-    classDef errorState fill:#ffebee,stroke:#f44336,stroke-width:2px
-    classDef fatalState fill:#ffcdd2,stroke:#d32f2f,stroke-width:3px
+    classDef 3State fill:#ffebee,stroke:#f44336,stroke-width:2px
+    classDef 5State fill:#ffcdd2,stroke:#d32f2f,stroke-width:3px
     classDef completeState fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
 
-    class INACTIVE inactiveState
-    class ACTIVE activeState
-    class TRANSITIONING transitionState
-    class ERROR errorState
-    class RECOVERING errorState
-    class FATAL fatalState
-    class MISSION_COMPLETE completeState
+    class 0 inactiveState
+    class 1 activeState
+    class 2 transitionState
+    class 3 3State
+    class 4 3State
+    class 5 5State
+    class 6 completeState
