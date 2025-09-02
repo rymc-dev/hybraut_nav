@@ -54,4 +54,3 @@ class TransitionEventEnum(Enum):
     
     """ === Attempt Recovery === """
     ATTEMPT_RECOVERY = TransitionEvent.ATTEMPT_RECOVERY
-    

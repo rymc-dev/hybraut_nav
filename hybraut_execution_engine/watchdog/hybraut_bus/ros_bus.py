@@ -1,3 +1,5 @@
+# -*- coding: utf-8  -*-
+# !/usr/bin/env python3
 """ 
 This class defines an interface for the 
 topic buss in the ROS2 ecosystem, it is 

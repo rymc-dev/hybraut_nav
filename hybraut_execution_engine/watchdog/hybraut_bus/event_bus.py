@@ -1,3 +1,4 @@
+# -*- coding: utf-8  -*-
 # !/usr/bin/env python3
 """ 
 class defines a composite `EventBus` bus for the ros2 

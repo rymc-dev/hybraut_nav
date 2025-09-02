@@ -96,36 +96,91 @@ class FSM:
         transitions are defined as sigma
         
         sigma = {
+            // main flow
             q0 --> q1: 0
-            q1 --> q2: 1 
+            q1 --> q2: 1
+            q2 --> q1: 2 
+            q1 --> q6: 7
+            q6 --> q1: 8
+            
+            // recoverable exception 
+            [q1, q2] --> q3: 9
+            q3 --> q4: 11
+            q4 --> q1: 3
+            q4 --> q5: 4
+            
+            // unrecoverable exception
+            [q1, q2] --> q5: 10
+            
+            
+            // manual system shutdown
+            [**] --> q6: 6
+            
+            // SYSTEM Shutdown always occurs on fatal exception
+            q5 --> q6
         } 
+        """ 
         
-        """
-        # Normal operational flow
+        # TRANSITION: q0 --> q1: 0
+        #
+        # where: 
+        #   q0 = INACTIVE
+        #   q1 = ACTIVE
+        
         self.machine.add_transition(
             trigger=TransitionEventEnum.ACTIVATE_MISSION,
             source=StateEnum.INACTIVE,
             dest=StateEnum.ACTIVE,
             after=self._safe_callback_wrapper("on_activate_mission")
         )
+        
+        # TRANSITION: q1 -> q2: 1
+        # 
+        # where: 
+        #   q1 = ACTIVE
+        #   q2 = TRANSITIONING
+        #   1: ENABLE_GUARD
+
         self.machine.add_transition(
             trigger=TransitionEventEnum.ENABLE_GUARD,
             source=StateEnum.ACTIVE,
             dest=StateEnum.TRANSITIONING,
             after=self._safe_callback_wrapper("on_enable_guard")
         )
+        
+        # TRANSITION: q2 --> q1: 2
+        # 
+        # where: 
+        #   q2 = INACTIVE
+        #   q1 = ACTIVE
+        #   2 = COMPLETE_TRANSITION
+        
         self.machine.add_transition(
             trigger=TransitionEvent.COMPLETE_TRANSITION,
             source=StateEnum.TRANSITIONING,
             dest=StateEnum.ACTIVE,
             after=self._safe_callback_wrapper("on_complete_transition")
         )
+        
+        # TRANSITION: q1 --> q6
+        #
+        # where: 
+        #   q1 = ACTIVE
+        #   q6 = MISSION_COMPLETE
+        
         self.machine.add_transition(
             trigger=TransitionEventEnum.FINISH_MISSION,
             source=StateEnum.ACTIVE,
             dest=StateEnum.MISSION_COMPLETE,
             after=self._safe_callback_wrapper("on_finish_mission")
         )
+        
+        # TRANSITION: q6 --> q0
+        #
+        # where: 
+        #   q6 = MISSION_COMPLETE
+        #   q0 = INACTIVE
+        
         self.machine.add_transition(
             trigger=TransitionEventEnum.DEACTIVATE_MISSION,
             source=StateEnum.MISSION_COMPLETE,
@@ -134,12 +189,26 @@ class FSM:
         )
 
         """ === Exception handling === """
+        
+        # TRANSITION
+        # 
+        # 
+        # 
+        # 
+        
         self.machine.add_transition(
             trigger=TransitionEventEnum.RECOVERABLE_EXCEPTION,
             source=[StateEnum.ACTIVE, StateEnum.TRANSITIONING],
             dest=StateEnum.ERROR,
             after=self._safe_callback_wrapper("on_recoverable_error")
         )
+        
+        # TRANSITION
+        # 
+        # 
+        # 
+        # 
+        
         self.machine.add_transition(
             trigger = TransitionEventEnum.UNRECOVERABLE_EXCEPTION,
             source = [StateEnum.ACTIVE, StateEnum.TRANSITIONING], 
@@ -147,25 +216,45 @@ class FSM:
             after=self._safe_callback_wrapper("on_unrecoverable_exception")
         )
         
-        # Recovery
+        """ === Recovery === """
+        
+        # TRANSITION: 
+        # 
+        # 
+        
         self.machine.add_transition(
             trigger=TransitionEventEnum.ATTEMPT_RECOVERY,
             source=StateEnum.ERROR,
             dest=StateEnum.RECOVERING,
             after=self._safe_callback_wrapper("on_attempt_recovery")
         )
+        
+        # TRANSITION: 
+        # 
+        #
+        
         self.machine.add_transition(
             trigger=TransitionEvent.COMPLETE_RECOVERY,
             source=StateEnum.RECOVERING,
             dest=StateEnum.ACTIVE,
             after=self._safe_callback_wrapper("on_complete_recovery")
         )
+        
+        # TRANSITION: 
+        # 
+        #
+         
         self.machine.add_transition(
             trigger=TransitionEventEnum.FAIL_RECOVERY,
             source=StateEnum.RECOVERING,
             dest=StateEnum.FATAL,
             after=self._safe_callback_wrapper("on_fail_recovery")
         )
+        
+        # TRANSITION
+        # 
+        # 
+        
         self.machine.add_transition(
             trigger=TransitionEventEnum.UNRECOVERABLE_EXCEPTION,
             source=[StateEnum.ERROR, StateEnum.RECOVERING],
@@ -174,6 +263,10 @@ class FSM:
         )
 
         """ === System Shutdown transitions === """
+        # TRANSITION
+        # 
+        # 
+        
         for state in StateEnum:
             if state != StateEnum.FATAL:
                 self.machine.add_transition(
