@@ -7,7 +7,7 @@ simplify event publishing and subscription
 for the base FSM class.
 """
 
-from hybraut_interfaces.msg import AutomatonEvents
+from hybraut_interfaces.msg import TransitionEvent
 from dataclasses import dataclass
 from typing import Callable
 
@@ -30,7 +30,7 @@ class EventBus(BaseBus):
     
     def __init__(self, node: Node, event_callback: Callable, 
                  topic: str = "/automaton/events", 
-                 msg_type: Type = AutomatonEvents,
+                 msg_type: Type = TransitionEvent,
                  qos: QoSProfile = None,
                  cb_group: CallbackGroup = None):
         
@@ -39,7 +39,7 @@ class EventBus(BaseBus):
         if cb_group is None:
             cb_group = ReentrantCallbackGroup()
         if msg_type is None:
-            msg_type = AutomatonEvents
+            msg_type = TransitionEvent
             
         super().__init__(
             node=node,
@@ -51,9 +51,9 @@ class EventBus(BaseBus):
         )
     
     def _create_message(self, event: Union[Enum, Any], message: str) -> Any:
-        """Create an AutomatonEvents message."""
-        if AutomatonEvents:
-            return AutomatonEvents(
+        """Create an TransitionEvent message."""
+        if TransitionEvent:
+            return TransitionEvent(
                 type=event.value if isinstance(event, Enum) else event,
                 message=message,
                 stamp=self.node.get_clock().now().to_msg(),

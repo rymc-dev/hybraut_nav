@@ -419,7 +419,7 @@ class AutomatonLifecycleNode(LifecycleNode):
             # TODO: Then do invariants
             # Should add script to move automaton to inactive mode to launch before starting mission manager.
             
-            self._mode_subscription = 
+            self._mode_subscription = None
 
             # Todo: Remove this when ready.
             # self._invariant_subscription = self.create_subscription(

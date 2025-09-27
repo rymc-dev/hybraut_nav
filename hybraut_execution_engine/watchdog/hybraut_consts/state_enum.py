@@ -36,7 +36,7 @@ class StateEnum(Enum):
     """ === Health Monitoring States === """
     ERROR=State.ERROR                       # q3
     RECOVERING=State.RECOVERING             # q4
-    SYSTEM_SHUTDOWN=State.SYSTEM_SHUTDOWN   # q7
+    SYSTEM_SHUTDOWN=7                       # q7, This is an explicit terminal state
 
     """ === Terminal States === """
     FATAL=State.FATAL                       # q5

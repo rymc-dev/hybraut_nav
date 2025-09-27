@@ -26,8 +26,8 @@ from rclpy.timer import Timer
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
-from hybraut_interfaces.msg import AutomatonEvents, AutomatonStatus
-from hybraut_executor_watchdog.fsm import FSM
+from hybraut_interfaces.msg import TransitionEvent
+from hybraut_execution_engine.watchdog.fsm import FSM
 
 from hybraut_models import HybridAutomaton
 
@@ -202,7 +202,7 @@ class ExecutionEngine(FSM):
             self._activate_event_handlers()
             
             self._event_publisher = self._node.create_publisher(
-                AutomatonEvents,
+                TransitionEvent,
                 "/automaton/events",
                 qos_profile=qos_profile_system_default,
                 callback_group=ReentrantCallbackGroup(),
@@ -257,7 +257,7 @@ def main():
         executor.add_node(node)
 
         event_publisher = node.create_publisher(
-            AutomatonEvents,
+            TransitionEvent,
             "/automaton/events",
             qos_profile=QOS,
             callback_group=ReentrantCallbackGroup(),
@@ -280,14 +280,14 @@ def main():
         executor.toggle()
 
         test_events = [
-            (AutomatonEvents.ACTIVATE_MISSION, "mission activated"),
-            (AutomatonEvents.ENABLE_GUARD, "mode guard activated"),
-            (AutomatonEvents.COMPLETE_TRANSITION, "transition completed"),
-            (AutomatonEvents.HANDLE_RECOVERABLE_ERROR, "recoverable error occurred"),
-            (AutomatonEvents.ATTEMPT_FIX_PROCESS, "attempting recovery"),
-            (AutomatonEvents.COMPLETE_RECOVERY, "system recovered"),
-            (AutomatonEvents.FINISH_MISSION, "mission finished"),
-            (AutomatonEvents.DEACTIVATE_MISSION, "mission has completed"),
+            (TransitionEvent.ACTIVATE_MISSION, "mission activated"),
+            (TransitionEvent.ENABLE_GUARD, "mode guard activated"),
+            (TransitionEvent.COMPLETE_TRANSITION, "transition completed"),
+            (TransitionEvent.HANDLE_RECOVERABLE_ERROR, "recoverable error occurred"),
+            (TransitionEvent.ATTEMPT_FIX_PROCESS, "attempting recovery"),
+            (TransitionEvent.COMPLETE_RECOVERY, "system recovered"),
+            (TransitionEvent.FINISH_MISSION, "mission finished"),
+            (TransitionEvent.DEACTIVATE_MISSION, "mission has completed"),
         ]
 
         print(
@@ -298,7 +298,7 @@ def main():
 
         for event_type, message in test_events:
             print(f"\nPublishing event: {event_type}")
-            event_msg = AutomatonEvents(type=event_type, message=message)
+            event_msg = TransitionEvent(type=event_type, message=message)
             event_publisher.publish(event_msg)
             time.sleep(0.5)
             print(f"Current state: {executor.get_current_state()}")

@@ -12,7 +12,7 @@ from rclpy.node import Node
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from typing import Type, Callable, Any
-from hybraut_interfaces.msg import AutomatonStatus
+from hybraut_interfaces.msg import State
 from enum import Enum
 
 from hybraut_executor_watchdog.hybraut_consts import StatusEnum
@@ -28,7 +28,7 @@ class StatusBus(BaseBus):
     
     def __init__(self, node: Node, status_callback: Callable,
                  topic: str = "/automaton/status",
-                 msg_type: Type = AutomatonStatus,
+                 msg_type: Type = State,
                  qos: QoSProfile = None,
                  cb_group: CallbackGroup = None):
         
@@ -37,7 +37,7 @@ class StatusBus(BaseBus):
         if cb_group is None:
             cb_group = ReentrantCallbackGroup()
         if msg_type is None:
-            msg_type = AutomatonStatus
+            msg_type = State
             
         super().__init__(
             node=node,
@@ -49,9 +49,9 @@ class StatusBus(BaseBus):
         )
     
     def _create_message(self, status: Union[Enum, Any], message: str) -> Any:
-        """Create an AutomatonStatus message."""
-        if AutomatonStatus:
-            return AutomatonStatus(
+        """Create an State message."""
+        if State:
+            return State(
                 type=status.value if isinstance(status, Enum) else status,
                 message=message,
                 stamp=self.node.get_clock().now().to_msg(),
