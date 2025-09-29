@@ -674,14 +674,18 @@ def main():
         
         # Test sequence including error scenarios
         test_events = [
-            (TransitionEventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
-            (TransitionEventEnum.TRANSITION_COMPLETE, "transition completed"),
-            (TransitionEventEnum.RECOVERABLE_ERROR, "recoverable error occurred"),
-            (TransitionEventEnum.ATTEMPT_FIX, "attempting recovery"),
-            (TransitionEventEnum.RECOVERED, "system recovered"),
-            (TransitionEventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated"),
-            (TransitionEventEnum.TRANSITION_COMPLETE, "transition completed"),
-            (TransitionEventEnum.MISSION_COMPLETE, "mission has completed"),
+            (TransitionEventEnum.ACTIVATE_MISSION, "activate the mission"),
+            (TransitionEventEnum.ENABLE_GUARD, "mode guard activated"),
+            (TransitionEventEnum.COMPLETE_TRANSITION, "transition completed"),
+            (TransitionEventEnum.RECOVERABLE_EXCEPTION, "recoverable error occurred"),
+            (TransitionEventEnum.ATTEMPT_RECOVERY, "attempting recovery"),
+            (TransitionEventEnum.COMPLETE_RECOVERY, "system recovered"),
+            (TransitionEventEnum.ENABLE_GUARD, "mode guard activated"),
+            (TransitionEventEnum.COMPLETE_TRANSITION, "transition completed"),
+            (TransitionEventEnum.FINISH_MISSION, "finish the current mission return to inactive state"),
+            (TransitionEventEnum.ENABLE_GUARD, "mode guard enabled"),
+            (TransitionEventEnum.UNRECOVERABLE_EXCEPTION, "Unrecoverable exception occured"),
+            (TransitionEventEnum.SHUTDOWN_SYSTEM, "manual shotdown")
         ]
         
         print(f"Starting Custom FSM demo. Initial state: {fsm.get_current_state()}")
