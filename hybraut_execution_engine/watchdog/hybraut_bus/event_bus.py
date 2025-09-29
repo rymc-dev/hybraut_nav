@@ -7,6 +7,7 @@ simplify event publishing and subscription
 for the base FSM class.
 """
 
+from hybraut_execution_engine.watchdog.hybraut_consts import TransitionEventEnum
 from hybraut_interfaces.msg import TransitionEvent
 from dataclasses import dataclass
 from typing import Callable
@@ -15,8 +16,8 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
-from hybraut_executor_watchdog.hybraut_bus.ros_bus import BaseBus
-from hybraut_executor_watchdog.hybraut_consts import EventEnum
+from hybraut_execution_engine.watchdog.hybraut_bus.ros_bus import BaseBus
+from hybraut_execution_engine.watchdog.hybraut_consts import TransitionEventEnum
 from typing import Type, Union, Any
 from enum import Enum
 
@@ -94,17 +95,17 @@ def main():
         event_bus: EventBus = EventBus(
             node=node,
             event_callback=lambda msg: print(
-                f"Received event: {msg.type}, Message: {msg.message}"
+                f"transition event: {msg.type}, Message: {msg.message}"
             ),
         )
-        event_bus.publish(EventEnum.TRANSITION_GUARD_ENABLED, "mode guard activated")
+        event_bus.publish(TransitionEventEnum.ENABLE_GUARD, "enable guard")
         import time
 
         time.sleep(0.01)
-        event_bus.publish(EventEnum.TRANSITION_COMPLETE, "transition completed")
+        event_bus.publish(TransitionEventEnum.COMPLETE_TRANSITION, "complete transition")
         time.sleep(0.01)
 
-        event_bus.publish(EventEnum.RECOVERY_FAILED, "mode guard deactivated")
+        event_bus.publish(TransitionEventEnum.FAIL_RECOVERY, "fail recovery")
         time.sleep(0.01)
     except KeyboardInterrupt:
         print("Shutting down gracefully...")

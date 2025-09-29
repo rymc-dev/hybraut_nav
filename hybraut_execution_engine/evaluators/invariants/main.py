@@ -7,9 +7,9 @@ from rclpy.executors import MultiThreadedExecutor
 import yaml
 from hybraut_factory.amdl import HybridAutomatonFactory
 from rclpy.publisher import Publisher
-from hybraut_interfaces.msg import AutomatonEvents
+from hybraut_interfaces.msg import TransitionEvent
 
-from hybraut_execution_engine.internal_state import EngineStateTracker
+from hybraut_execution_engine.internal_state import EngineAutomatonStateTracker
 
 
 QOS = rclpy.qos.qos_profile_system_default
@@ -31,14 +31,14 @@ def main(**kwargs):
     executor = MultiThreadedExecutor(num_threads=4)
     node = Node("node")
     event_publisher: Publisher = node.create_publisher(
-        AutomatonEvents, "/automaton/events", qos_profile=QOS, callback_group=CB_GROUP
+        TransitionEvent, "/automaton/events", qos_profile=QOS, callback_group=CB_GROUP
     )
     executor.add_node(node)
 
     thread = threading.Thread(target=executor.spin)
     thread.start()
 
-    engine_state_tracker: EnvironmentError = EngineStateTracker(
+    engine_state_tracker: EnvironmentError = EngineAutomatonStateTracker(
         node=node, initial_mode=0, q_goals=[1]
     )
 

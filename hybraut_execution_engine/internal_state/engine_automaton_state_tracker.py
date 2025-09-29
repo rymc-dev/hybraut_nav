@@ -4,9 +4,7 @@
 runtime tracker for the hybraut execution engine
 """
 
-import rclpy
 from rclpy.node import Node
-from rclpy.time import Duration
 from typing import List
 
 # TODO: Lets initialize the watchdog in here
@@ -58,44 +56,44 @@ class EngineAutomatonStateTracker:
         self.transition_count = 0
 
 
-# def main():
-#     import rclpy
-#     from rclpy.node import Node
-#     import threading
-#     from rclpy.executors import SingleThreadedExecutor
+def main():
+    import rclpy
+    from rclpy.node import Node
+    import threading
+    from rclpy.executors import SingleThreadedExecutor
 
 
-#     rclpy.init()
+    rclpy.init()
 
-#     mock_node = Node('mock_node')
-#     executor = SingleThreadedExecutor()
-#     executor.add_node(mock_node)
+    mock_node = Node('mock_node')
+    executor = SingleThreadedExecutor()
+    executor.add_node(mock_node)
 
-#     thread = threading.Thread(target=executor.spin)
-#     thread.start()
+    thread = threading.Thread(target=executor.spin)
+    thread.start()
 
-#     runtime_tracker = RuntimeTracker(
-#         node = mock_node,
-#         initial_mode=0,
-#         q_goals=[1]
-#     )
+    engine_automaton_state_tracker = EngineAutomatonStateTracker(
+        node = mock_node,
+        initial_mode=0,
+        q_goals=[1]
+    )
 
-#     print (runtime_tracker.get_runtime_state())
+    print (engine_automaton_state_tracker.get_runtime_state())
 
-#     import time
-#     time.sleep(1.0)
-#     runtime_tracker.record_transition()
-#     print (runtime_tracker.get_runtime_state())
+    import time
+    time.sleep(1.0)
+    engine_automaton_state_tracker.record_transition()
+    print (engine_automaton_state_tracker.get_runtime_state())
 
-#     time.sleep(1.0)
-#     runtime_tracker.record_transition()
-#     print (runtime_tracker.get_runtime_state())
+    time.sleep(1.0)
+    engine_automaton_state_tracker.record_transition()
+    print (engine_automaton_state_tracker.get_runtime_state())
 
-#     time.sleep(5.0)
-#     print (runtime_tracker.get_runtime_state())
+    time.sleep(5.0)
+    print (engine_automaton_state_tracker.get_runtime_state())
 
-#     executor.shutdown()
-#     rclpy.shutdown()
+    executor.shutdown()
+    rclpy.shutdown()
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()

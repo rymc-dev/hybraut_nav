@@ -1,7 +1,7 @@
 from .event_bus import EventBus
-from .status_bus import StatusBus
+from .state_bus import StateBus
 
 __all__ = [
     "EventBus",
-    "StatusBus"
+    "StateBus"
 ]

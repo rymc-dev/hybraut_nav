@@ -20,10 +20,10 @@ from rclpy.qos import QoSProfile, qos_profile_system_default
 from hybraut_models import HybridAutomaton
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
 
-from hybraut_execution_engine.internal_state import EngineStateTracker
+from hybraut_execution_engine.internal_state import EngineAutomatonStateTracker
 from rclpy.publisher import Publisher
 
-from hybraut_interfaces.msg import AutomatonEvents
+from hybraut_interfaces.msg import TransitionEvent
 
 
 class InvariantEvaluator:
@@ -33,7 +33,7 @@ class InvariantEvaluator:
         self,
         node: Node,
         automaton: HybridAutomaton,
-        state_tracker: EngineStateTracker,
+        state_tracker: EngineAutomatonStateTracker,
         event_publisher: Publisher,
         qos: QoSProfile = qos_profile_system_default,
         cb_group: CallbackGroup = ReentrantCallbackGroup(),
@@ -78,8 +78,8 @@ class InvariantEvaluator:
         except Exception as e:
             self.node.get_logger().error(f"Invariant evaluation failed: {e}")
             self.event_publisher.publish(
-                AutomatonEvents(
-                    type=AutomatonEvents.HANDLE_CRITICAL_FAILURE,
+                TransitionEvent(
+                    type=TransitionEvent.CRITICAL_FAILURE,
                     message=f"Invariant evaluation failed: {e}",
                     stamp=self.node.get_clock().now().to_msg(),
                 )
@@ -120,9 +120,9 @@ def main() -> None:
     amdl_path = "/home/ryan/ros2_ws/src/hybraut_tb3/amdl/turtlebot3.amdl.yml"
     with open(amdl_path, "r") as f:
         amdl_dict = yaml.safe_load(f)
-        automaton = HybridAutomaton.register_automaton(node=node, amdl_dict=amdl_dict)
+        automaton: HybridAutomaton = HybridAutomaton.register_automaton(node=node, amdl_dict=amdl_dict)
 
-    state_tracker: EngineStateTracker = EngineStateTracker(
+    state_tracker: EngineAutomatonStateTracker = EngineAutomatonStateTracker(
         node=node, initial_mode=0, q_goals=[1]
     )
 

@@ -6,6 +6,9 @@
 # from hyb
 
 
+class EngineAutomatonWatchdog:
+    pass
+
 # class RuntimeWatchdog(FSM):
 #     def __init__(self, node: Node, hybraut_model: HybridAutomaton):
 

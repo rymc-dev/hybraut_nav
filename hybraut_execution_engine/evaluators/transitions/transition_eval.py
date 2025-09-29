@@ -14,7 +14,7 @@ from hybraut_models import HybridAutomaton
 from threading import Lock
 
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
-from hybraut_execution_engine.internal_state import EngineStateTracker
+from hybraut_execution_engine.internal_state import EngineAutomatonStateTracker
 
 from rclpy.publisher import Publisher
 
@@ -28,7 +28,7 @@ class TransitionEvaluator:
         self,
         node: Node,
         automaton: HybridAutomaton,
-        state_tracker: EngineStateTracker,
+        state_tracker: EngineAutomatonStateTracker,
         event_publisher: Publisher,
         qos: QoSProfile = qos_profile_system_default,
         cb_group: CallbackGroup = ReentrantCallbackGroup(),
@@ -118,7 +118,7 @@ def main() -> None:
         amdl_dict = yaml.safe_load(f)
         automaton = HybridAutomatonFactory.register_automaton(amdl_dict=amdl_dict)
 
-    state_tracker: EngineStateTracker = EngineStateTracker(
+    state_tracker: EngineAutomatonStateTracker = EngineAutomatonStateTracker(
         node=node, initial_mode=0, q_goals=[1]
     )
 

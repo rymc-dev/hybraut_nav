@@ -27,8 +27,9 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from hybraut_interfaces.msg import TransitionEvent
 
 # Local imports
-from hybraut_execution_engine.watchdog.hybraut_consts import StateEnum, TransitionEventEnum
-from hybraut_execution_engine.watchdog.hybraut_bus import StatusBus, EventBus
+from hybraut_execution_engine.watchdog.hybraut_consts.state_enum import StateEnum 
+from hybraut_execution_engine.watchdog.hybraut_consts.transition_event_enum import TransitionEventEnum
+from hybraut_execution_engine.watchdog.hybraut_bus import StateBus, EventBus
 
 QOS = QoSProfile(depth=10, reliability=qos_profile_system_default.reliability)
 

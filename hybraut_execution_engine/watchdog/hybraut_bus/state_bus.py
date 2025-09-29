@@ -1,7 +1,7 @@
 # -*- coding: utf-8  -*-
 # !/usr/bin/env python3
 """ 
-class defines a composite `StatusBus` bus for the ros2 
+class defines a composite `StateBus` bus for the ros2 
 events topic utilized by the watchdog FSM, provides utilities to 
 simplify event publishing and subscription 
 for the base FSM class.
@@ -15,14 +15,14 @@ from typing import Type, Callable, Any
 from hybraut_interfaces.msg import State
 from enum import Enum
 
-from hybraut_executor_watchdog.hybraut_consts import StatusEnum
-from hybraut_executor_watchdog.hybraut_bus.ros_bus import BaseBus
+from hybraut_execution_engine.watchdog.hybraut_consts import StateEnum
+from hybraut_execution_engine.watchdog.hybraut_bus.ros_bus import BaseBus
 from typing import Union
 
 @dataclass
-class StatusBus(BaseBus):
+class StateBus(BaseBus):
     """
-    StatusBus implementation using the base bus functionality.
+    StateBus implementation using the base bus functionality.
     Manages the state of the watchdog FSM.
     """
     
@@ -63,9 +63,9 @@ class StatusBus(BaseBus):
         self.publish(status, message)
 
     @classmethod
-    def create_status_bus(node: Node, status_callback: Callable, **kwargs) -> 'StatusBus':
-        """Factory function to create a StatusBus."""
-        return StatusBus(node=node, status_callback=status_callback, **kwargs)
+    def create_status_bus(node: Node, status_callback: Callable, **kwargs) -> 'StateBus':
+        """Factory function to create a StateBus."""
+        return StateBus(node=node, status_callback=status_callback, **kwargs)
 
 
 def main():
@@ -87,21 +87,24 @@ def main():
     thread.start()
 
     try:
-        status_bus: StatusBus = StatusBus(
+        status_bus: StateBus = StateBus(
             node=node,
             status_callback=lambda msg: print(
-                f"Received status: {msg.type}, Message: {msg.message}"
+                f"Received state: {msg.type}, Message: {msg.message}"
             ),
         )
-        status_bus.publish(StatusEnum.ACTIVE, "hybraut is active")
+        status_bus.publish(StateEnum.ACTIVE, "watchdog state: ACTIVE")
         import time
 
         time.sleep(0.01)
-        status_bus.publish(StatusEnum.TRANSITIONING, "hybraut is transitioning")
+        status_bus.publish(StateEnum.TRANSITIONING, "watchdog state: TRANSITIONING")
         time.sleep(0.01)
 
-        status_bus.publish(StatusEnum.FATAL, "hybraut is in a fatal state")
         time.sleep(0.01)
+        status_bus.publish(StateEnum.FATAL, "watchdog state: FATAL")
+        time.sleep(0.01)
+        
+        status_bus.publish(StateEnum.SYSTEM_SHUTDOWN, "watchdog state: SYSTEM_SHUTDOWN")
     except KeyboardInterrupt:
         print("Shutting down gracefully...")
     finally:
