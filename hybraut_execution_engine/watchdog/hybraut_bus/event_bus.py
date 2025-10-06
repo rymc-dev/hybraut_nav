@@ -98,10 +98,12 @@ def main():
                 f"transition event: {msg.type}, Message: {msg.message}"
             ),
         )
+        
         event_bus.publish(TransitionEventEnum.ENABLE_GUARD, "enable guard")
         import time
 
         time.sleep(0.01)
+        
         event_bus.publish(TransitionEventEnum.COMPLETE_TRANSITION, "complete transition")
         time.sleep(0.01)
 

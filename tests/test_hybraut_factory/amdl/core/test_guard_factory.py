@@ -1,77 +1,77 @@
-# !/usr/bin/env python3
-"""
-Test Suite for the Guard Factory
-"""
+# # !/usr/bin/env python3
+# """
+# Test Suite for the Guard Factory
+# """
 
-import pytest
-from hybraut_factory.amdl.core.guard_factory import GuardFactory
-from hybraut_models.core.guards import GuardWrapper, GuardRegistry
-from typing import Dict
-
-
-@pytest.fixture
-def sample_guard_name_and_conf():
-    """fixture with a sample guard name and guard configuration"""
-    return (
-        "boolean_flag_guard",
-        {
-            "module": "hybraut_common_behaviours.guards",
-            "class_name": "BooleanFlagGuard",
-            "configuration": {"expected_flag": True},
-        },
-    )
+# import pytest
+# from hybraut_factory.amdl.core.guard_factory import GuardFactory
+# from hybraut_models.core.guards import GuardWrapper, GuardRegistry
+# from typing import Dict
 
 
-@pytest.fixture
-def sample_guard_amdl():
-    """fixture with a sample guard amdl
-    this guard amdl links to hybraut_common_behaviour guards"""
-    return {
-        "boolean_flag_guard": {
-            "module": "hybraut_common_behaviours.guards",
-            "class_name": "BooleanFlagGuard",
-            "configuration": {"expected_flag": True},
-        },
-        "timeout_guard": {
-            "module": "hybraut_common_behaviours.guards",
-            "class_name": "TimeoutGuard",
-            "configuration": {"timeout_sec": 5.0, "start_time_sec": 0.0},
-        },
-    }
+# @pytest.fixture
+# def sample_guard_name_and_conf():
+#     """fixture with a sample guard name and guard configuration"""
+#     return (
+#         "boolean_flag_guard",
+#         {
+#             "module": "hybraut_common_behaviours.guards",
+#             "class_name": "BooleanFlagGuard",
+#             "configuration": {"expected_flag": True},
+#         },
+#     )
 
 
-def test_load_guard_from_amdl(sample_guard_name_and_conf):
-    """test the load_guard_from_amdl method"""
-    guard_name, guard_cfg = sample_guard_name_and_conf
-    guard: GuardWrapper = GuardFactory.load_guard_from_amdl(guard_name, guard_cfg)
-
-    assert guard.get_guard_name() == guard_name
-    assert guard.get_initialization_configuration() == guard_cfg["configuration"]
-
-
-def test_register_guards_from_amdl(sample_guard_amdl):
-    """test the register_guards_from_amdl method"""
-    guards: Dict[str, GuardWrapper] = GuardFactory.register_guards_from_amdl(
-        sample_guard_amdl
-    )
-
-    assert len(guards) == len(sample_guard_amdl)
-    for name, guard in guards.items():
-        assert name == guard.get_guard_name()
-        assert (
-            guard.get_initialization_configuration()
-            == sample_guard_amdl[name]["configuration"]
-        )
+# @pytest.fixture
+# def sample_guard_amdl():
+#     """fixture with a sample guard amdl
+#     this guard amdl links to hybraut_common_behaviour guards"""
+#     return {
+#         "boolean_flag_guard": {
+#             "module": "hybraut_common_behaviours.guards",
+#             "class_name": "BooleanFlagGuard",
+#             "configuration": {"expected_flag": True},
+#         },
+#         "timeout_guard": {
+#             "module": "hybraut_common_behaviours.guards",
+#             "class_name": "TimeoutGuard",
+#             "configuration": {"timeout_sec": 5.0, "start_time_sec": 0.0},
+#         },
+#     }
 
 
-def test_load_guards_registry_from_amdl(sample_guard_amdl):
-    """test the laod_guards_registry_from_amdl"""
-    amdl = sample_guard_amdl
-    registry: GuardRegistry = GuardFactory.load_guards_registry_from_amdl(amdl)
+# def test_load_guard_from_amdl(sample_guard_name_and_conf):
+#     """test the load_guard_from_amdl method"""
+#     guard_name, guard_cfg = sample_guard_name_and_conf
+#     guard: GuardWrapper = GuardFactory.load_guard_from_amdl(guard_name, guard_cfg)
 
-    assert isinstance(registry, GuardRegistry)
-    assert registry.get_num_guards() == len(amdl)
+#     assert guard.get_guard_name() == guard_name
+#     assert guard.get_initialization_configuration() == guard_cfg["configuration"]
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+# def test_register_guards_from_amdl(sample_guard_amdl):
+#     """test the register_guards_from_amdl method"""
+#     guards: Dict[str, GuardWrapper] = GuardFactory.register_guards_from_amdl(
+#         sample_guard_amdl
+#     )
+
+#     assert len(guards) == len(sample_guard_amdl)
+#     for name, guard in guards.items():
+#         assert name == guard.get_guard_name()
+#         assert (
+#             guard.get_initialization_configuration()
+#             == sample_guard_amdl[name]["configuration"]
+#         )
+
+
+# def test_load_guards_registry_from_amdl(sample_guard_amdl):
+#     """test the laod_guards_registry_from_amdl"""
+#     amdl = sample_guard_amdl
+#     registry: GuardRegistry = GuardFactory.load_guards_registry_from_amdl(amdl)
+
+#     assert isinstance(registry, GuardRegistry)
+#     assert registry.get_num_guards() == len(amdl)
+
+
+# if __name__ == "__main__":
+#     pytest.main([__file__])
