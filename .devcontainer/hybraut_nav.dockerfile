@@ -1,9 +1,9 @@
 FROM ros:humble-ros-core-jammy
 
-LABEL project='hybraut_ros2'
+LABEL project='hybraut_nav'
 LABEL maintainer='Ryan McKee <r.mckee@qub.ac.uk>'
 LABEL version='0.0.1'
-LABEL description='ROS2 based ubuntu container for the hybraut_ros2 application.'
+LABEL description='ROS2 based ubuntu container for the hybraut_nav application.'
 
 ARG MODE=container
 ENV MODE=${MODE}

@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 from glob import glob
 
-package_name = 'hybraut_ros2'
+package_name = 'hybraut_nav'
 
 setup(
     name=package_name,
@@ -18,7 +18,7 @@ setup(
     maintainer='Ryan McKee',
     maintainer_email='r.mckee@qub.ac.uk',
     description=(
-        'hybraut_ros2 is a rclpy-ros2 framework for Hybrid Automaton generation.'
+        'hybraut_nav is a ros2-rclpy navigation stack based on enabling hybrid automaton tactical layer for informed control.'
     ),
     license='MIT',
     entry_points={
