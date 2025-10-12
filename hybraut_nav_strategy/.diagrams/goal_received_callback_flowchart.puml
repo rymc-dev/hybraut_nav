@@ -1,0 +1,24 @@
+@startuml GoalReceivedCallbackFlowchart
+start
+
+:Goal Received Callback;
+
+if (is valid goal pose?) then (yes)
+    :Generate Path Plan;
+
+    if (is error?) then (yes)
+        :Return invalid goal pose response;
+        stop
+    else (no)
+        :Toggle dynamic planner state to ACTIVE;
+        :Start hybraut_nav/vw topic subscription;
+        :Start replan timer;
+        :Return goal accepted response;
+    endif
+else (no)
+    :Return invalid goal pose response;
+    stop
+endif
+
+stop
+@enduml

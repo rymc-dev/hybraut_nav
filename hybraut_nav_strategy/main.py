@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 import threading
-from hybraut_planner import PlannerNode
+from hybraut_nav_strategy import PlannerNode
 
 rclpy.init()
 

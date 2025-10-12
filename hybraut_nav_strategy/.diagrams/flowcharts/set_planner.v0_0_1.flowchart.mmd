@@ -1,0 +1,40 @@
+%% StrategyNode::set_planner(new_planner: Union[PlannerType, str]) 
+%% Improved function flowchart
+%% version: 0.0.2
+
+flowchart TD
+    A([Start]) --> B[Input: new_planner_type, reset_replan_timer=False]
+
+    B --> C{Is new_planner_type a PlannerType?}
+    %% C -->[Yes] D[set planner_type new_planner_type]
+    C -->[No] E[planner_type = PlannerType.from_string(new_planner_type)]
+
+    %% D --> F[Initialize new_planner = PlannerType.initialize_planner(planner_type)]
+    %% E --> F
+
+    %% F --> G{Exception raised?}
+    %% G -- Yes --> H[Log error: "Failed to set planner: {e}"]
+    %% H --> I[Raise Exception]
+    %% I --> Z([End])
+
+    %% G -- No --> J[Set ROS2 parameter: ('planner_Type', DOUBLE, planner_type.value)]
+
+    %% J --> K{Has __replan_lock attribute?}
+    %% K -- Yes --> L[Acquire __replan_lock]
+    %% K -- No --> M[Skip acquiring lock]
+
+    %% L --> N[Set self.__planner = new_planner]
+    %% M --> N
+
+    %% N --> O{Has __replan_lock attribute?}
+    %% O -- Yes --> P[Release __replan_lock]
+    %% O -- No --> Q[Skip releasing lock]
+
+    %% P --> R{reset_replan_timer == True?}
+    %% Q --> R
+
+    %% R -- Yes --> S[Call reset_timer()]
+    %% R -- No --> T[Do nothing]
+
+    %% S --> Z([End])
+    %% T --> Z([End])
