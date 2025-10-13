@@ -33,15 +33,31 @@ def test_strategy_node_get_state(strategy_node: StrategyNode, expected_state: St
 
 """ === setter tests === """
 
-def test_set_planner_valid_path_string(self):
+def test_set_planner_valid_path_string():
     """ 
     
     """
     pass
 
-def test_set_planner_valid_path_plannertype(self):
+def test_set_planner_valid_path_plannertype():
     pass
 
+
+# def test_set_replan_frequency_valid(strategy_node: StrategyNode):
+#     strategy_node.set_replnan_frequency(1.0)
+#     assert
+
+
+def test_is_active(strategy_node: StrategyNode):
+    assert not strategy_node.is_active()
+    strategy_node.state = StrategyState.ACTIVE
+    assert strategy_node.is_active()
+    
+def test_toggle_replan_timer(strategy_node: StrategyNode):
+    strategy_node.toggle_replan_timer()
+    assert strategy_node.is_active()
+    strategy_node.__toggle_replan_timer()
+    assert not strategy_node.is_active()
 
 if __name__ == '__main__':
     pytest.main([__file__])

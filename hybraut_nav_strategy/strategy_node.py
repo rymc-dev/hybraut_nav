@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# TODO: Need to make strategic replans event driven not time driven.
+
 """ 
 Layer one of the hybraut navigation stack: the global planner.
 
@@ -172,7 +174,7 @@ class StrategyNode(Node):
     
     # publishers
     __plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>>
-    __goal_point_pub: Optional[Publisher] = None  # <<geometry_msgs/msg/Point>> 
+    __waypoint_pub: Optional[Publisher] = None  # <<geometry_msgs/msg/Point>> 
     
     # subscription
     __map_sub: Optional[Subscription] = None      # <<nav_msgs/msg/OccupancyGrid>>
@@ -211,8 +213,7 @@ class StrategyNode(Node):
         self.__init_parameters__()
         
         # Initialize planner
-        planner_type_str = self.get_parameter('planner_type').value
-        self.set_planner(PlannerType.from_string(planner_type_str))
+        self.set_planner(self.get_parameter('planner_type').value)
 
         # Setup services
         self.__init_services__()
@@ -362,10 +363,10 @@ class StrategyNode(Node):
             qos_profile=qos_profile,
             callback_group=ReentrantCallbackGroup()
         )
-        
-        self.goal_pose_pub = self.create_publisher(
-            PoseStamped,
-            'planner/goal_pose',
+        # waypoint pub publishes the imminent waypoint 
+        self.waypoint_pub = self.create_publisher(
+            Point, 
+            'planner/waypoint', 
             qos_profile=qos_profile,
             callback_group=ReentrantCallbackGroup()
         )
@@ -449,7 +450,7 @@ class StrategyNode(Node):
     def get_state(self) -> StrategyState: 
         """
         Getter for the current state of the planner."""
-        return self.state
+        return self.__state
     
     """ === setters === """
     # TODO: Complete
@@ -486,7 +487,7 @@ class StrategyNode(Node):
             raise
 
         # update ros2 param for parameter planner type with new planner type
-        self.set_parameters([rclpy.parameter.Parameter('planner_Type', rclpy.Parameter.Type.DOUBLE, planner_type.value)])
+        self.set_parameters([rclpy.parameter.Parameter('planner_type', rclpy.Parameter.Type.STRING, planner_type.value)])
         
         # Acquire the replan lock to prevent race conditions while changing planner
         if hasattr(self, '__replan_lock'):
@@ -519,12 +520,19 @@ class StrategyNode(Node):
         Args:
             new_frequency: New frequency in Hz
         """
+        if not isinstance(new_replan_frequency, (float, int)):
+            raise ValueError("Replan frequency must be a number")
+        
+        if not (0.01 <= new_replan_frequency <= 10.0):
+            self.get_logger().warning("Replan frequency out of bounds (0.01 - 10.0 Hz). Clamping to valid range.")
+            return
+        
         self.set_parameters([rclpy.parameter.Parameter('replan_frequency', rclpy.Parameter.Type.DOUBLE, new_replan_frequency)])
         if hasattr(self, 'planner_timer') and self.planner_timer is not None:
             self.planner_timer.cancel()
         self.planner_timer = self.create_timer(
             1.0 / new_replan_frequency,
-            self._plan_path_callback,
+            self._replan_callback,
             autostart=(self.state == StrategyState.ACTIVE),
             callback_group=ReentrantCallbackGroup()
         )
@@ -533,47 +541,22 @@ class StrategyNode(Node):
     # TODO: NEEDS COMPLETED
     def set_max_planning_time(self, new_max_planning_time: float, reset_replan_timer): 
         ...
+    
+    def set_state(self, state: StrategyState):
+        """Set the current state of the planner."""
+        if not isinstance(state, StrategyState):
+            raise Exception("State must be an instance of StrategyState Enum")
+        
+        # should prob validate that if setting state to false 
+        # timer is not running and vice versa
+        self.__state = state
         
     """ === helper functions === """
     # NOTE: DONE: NEEDS TESTED
     def is_active(self) -> bool:
         """Check if planner is in active state."""
-        return bool(self.state == StrategyState.ACTIVE)
-    
-    # NOTE: DONE: NEEDS TESTED
-    def __toggle_state(self, is_active: bool):
-        """
-        Update the planner active state.
-        
-        Args:
-            is_active: True to activate, False to deactivate
-        """
-        new_state = StrategyState.ACTIVE if is_active else StrategyState.INACTIVE
-        self.state = new_state
-        self.get_logger().info(f'Planner state changed to: {new_state.value}')
+        return bool(self.__state == StrategyState.ACTIVE)
 
-        # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-   
-    def __toggle_replan_timer(self): 
-       ... 
-       
-   
-   # NOTE: DONE: NEEDS TESTED
-    def _publish_plan(self, path: Path) -> Tuple[bool, str]:
-        """
-        Publish computed path.
-        
-        Args:
-            path: Path to publish
-        
-        Returns: 
-            Tuple indicating success status and message
-        """
-        try:
-            self.__plan_pub.publish(path)
-            return (True, "Path published successfully")
-        except Exception as e:
-            return (False, f"Failed to publish path due to exception: {str(e)}")
 
     """ === Callback Functions === """
     """ === planner callback functions === """
@@ -665,7 +648,7 @@ class StrategyNode(Node):
                 return (grid, start_pt, goal_pt)
             
             grid, start_pt, goal_pt = _convert_msg_to_planner_args(self.__map, self.__start_point, request.pose)
-            path:Path = self.planner.plan_path(grid, start_pt, goal_pt)
+            path:Path = self.__planner.plan_path(grid, start_pt, goal_pt)
         except Exception as e: 
             response.success = False
             response.message = f"Planning failed: {str(e)}"
@@ -683,7 +666,7 @@ class StrategyNode(Node):
         self.__goal_point = request.pose
         self.__toggle_state(self.__is_active()) # Toggle state to active is not already active
         self._activate_replan_timer()
-        self._publish_plan(path)
+        self.__plan_pub.publish(path)
         
         response.success = True
         response.message = "Goal set and planner activated"
@@ -824,7 +807,74 @@ class StrategyNode(Node):
 
     """ === planner functions === """
 
-    # TODO: NEED TO UPDATE THIS FUNCTION TO MATCH NEW ALGORITHM
+
+
+    """ === Timer State Togglers"""
+    
+    def __toggle_replan_timer(self): 
+        """Toggler the replan timer state"""
+        if self.is_active():
+            self._deactivate_replan_timer() 
+            self.__state = StrategyState.INACTIVE
+        else:
+            self._activate_replan_timer()
+            self.set_state
+    
+    def _reconfigure_replan_timer(self):
+        """
+        reconfigures the replan timer with updated frequency.
+        
+        @flowchart: .diagrams/flowcharts/reconfigure_replan_timer_flowchart.puml
+        Tests: 
+        ...
+        """
+        autostart = False
+        if self.is_active():
+            autostart = True
+
+        self.__replan_timer.destroy()
+
+        self.__replan_timer = self.create_timer(
+            1.0 / self.get_replan_frequency(),
+            self._replan_callback,
+            autostart=autostart,
+            callback_group=ReentrantCallbackGroup()
+        )
+    
+    # NOTE: FUNCTION COMPLETE, NEEDS TESTING
+    def _activate_replan_timer(self) -> Tuple[bool, str]:
+        """
+        Activate the replanning timer if not already active without reconfiguration.
+        Returns:
+            Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
+        """
+        try: 
+            if self.planner_timer.is_canceled():
+                self.planner_timer.reset()
+                return (True, "Replan timer activated successfully")
+            else: 
+                return (False, "Replan timer already active")
+        except Exception as e:
+            return (False, f"Failed to activate replan timer due to exception: {str(e)}")
+
+    # NOTE: FUNCTION COMPLETE, NEEDS TESTING
+    def _deactivate_replan_timer(self) -> Tuple[bool, str]: 
+        """ 
+        Deactivate the replanning timer if active without reconfiguration.
+        Returns:
+            Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
+        """
+        try: 
+            if not self.planner_timer.is_canceled():
+                self.planner_timer.cancel()
+                return (True, "Replan timer deactivated successfully")
+            else: 
+                return (False, "Replan timer already inactive")
+        except Exception as e:
+            return (False, f"Failed to deactivate replan timer due to exception: {str(e)}")
+
+        # TODO: NEED TO UPDATE THIS FUNCTION TO MATCH NEW ALGORITHM
+    
     def _replan_callback(self):
         """
         Timer callback to plan and publish path.
@@ -863,39 +913,6 @@ class StrategyNode(Node):
                 self._deactivate_callback(Trigger.Request(), Trigger.Response())
         except Exception as e:
             self.get_logger().error(f"Planning failed: {str(e)}")
-
-    """ === Timer State Togglers"""
-    # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-    def _activate_replan_timer(self) -> Tuple[bool, str]:
-        """
-        Activate the replanning timer if not already active.
-        Returns:
-            Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
-        """
-        try: 
-            if self.planner_timer.is_canceled():
-                self.planner_timer.reset()
-                return (True, "Replan timer activated successfully")
-            else: 
-                return (False, "Replan timer already active")
-        except Exception as e:
-            return (False, f"Failed to activate replan timer due to exception: {str(e)}")
-
-    # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-    def _deactivate_replan_timer(self) -> Tuple[bool, str]: 
-        """ 
-        Deactivate the replanning timer if active.
-        Returns:
-            Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
-        """
-        try: 
-            if not self.planner_timer.is_canceled():
-                self.planner_timer.cancel()
-                return (True, "Replan timer deactivated successfully")
-            else: 
-                return (False, "Replan timer already inactive")
-        except Exception as e:
-            return (False, f"Failed to deactivate replan timer due to exception: {str(e)}")
 
 # ============================================================================
 # Independent Testing Code
