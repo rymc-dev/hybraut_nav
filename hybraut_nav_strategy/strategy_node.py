@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-# TODO: Need to make strategic replans event driven not time driven.
-
 """ 
 Layer one of the hybraut navigation stack: the global planner.
 
@@ -42,7 +40,7 @@ import os
 
 # Import path planning modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from path_planning import (
+from hybraut_nav_strategy.path_planning import (
     RRTStar, RRT, Dijkstra, AStar, Planner,
     Grid as PlannerGrid, Point as PlannerPoint
 )
@@ -81,7 +79,7 @@ class StrategyState(Enum):
 
 class PlannerType(Enum):
     """Enumeration for planner algorithm types."""
-    ASTAR = 'AStar'
+    ASTAR = 'A*'
     DIJKSTRA = 'Dijkstra'
     RRT = 'RRT'
     RRTSTAR = 'RRT*'
@@ -163,32 +161,32 @@ class StrategyNode(Node):
     DEFAULT_PLANNER_TYPE: str = PlannerType.ASTAR.value # DEFAULT planner type is A* 
 
     # World State Variables
-    __map: Optional[PlannerGrid] = None          # stores the latest version of the cost map
-    __start_point: Optional[PlannerPoint] = None # stores the agent states point position for planning
-    __goal_point: Optional[PlannerPoint] = None  # stores latest valid goal point received on send_goal_srv if goal point mission is active
-    __vw_point: Optional[PlannerPoint] = None    # Stores latest virtual waypoint value received on vw topic
+    _map: Optional[PlannerGrid] = None          # stores the latest version of the cost map
+    _start_point: Optional[PlannerPoint] = None # stores the agent states point position for planning
+    _goal_point: Optional[PlannerPoint] = None  # stores latest valid goal point received on send_goal_srv if goal point mission is active
+    _vw_point: Optional[PlannerPoint] = None    # Stores latest virtual waypoint value received on vw topic
     
     # Node State Variables
-    __state: StrategyState = StrategyState.INACTIVE # State of StrategyNode by default always INACTIVE
-    __planner: Optional[Planner] = None           # planner class instance utilized for making path planning  
+    _state: StrategyState = StrategyState.INACTIVE # State of StrategyNode by default always INACTIVE
+    _planner: Optional[Planner] = None           # planner class instance utilized for making path planning  
     
     # publishers
-    __plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>>
-    __waypoint_pub: Optional[Publisher] = None  # <<geometry_msgs/msg/Point>> 
+    _plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>>
+    _goal_point_pub: Optional[Publisher] = None  # <<geometry_msgs/msg/Point>> 
     
     # subscription
-    __map_sub: Optional[Subscription] = None      # <<nav_msgs/msg/OccupancyGrid>>
-    __agent_sub: Optional[Subscription] = None    # <<nav_msgs/msg/AgentState>> 
-    __vw_sub: Optional[Subscription] = None       # <<geometry_msgs/msg/Point>>
+    _map_sub: Optional[Subscription] = None      # <<nav_msgs/msg/OccupancyGrid>>
+    _agent_sub: Optional[Subscription] = None    # <<nav_msgs/msg/AgentState>> 
+    _vw_sub: Optional[Subscription] = None       # <<geometry_msgs/msg/Point>>
     
     # Services 
-    __send_goal_srv: Optional[Service] = None     # <<hybraut_interfaces/srv/SendGoal>> :: callback = goal_received_callback
-    __cancel_goal_srv: Optional[Service] = None   # <<std_srvs/srv/Trigger>> :: callback = cancel_goal_callback
+    _activate_srv: Optional[Service] = None     # <<hybraut_interfaces/srv/SendGoal>> :: callback = goal_received_callback
+    _deactivate_srv: Optional[Service] = None   # <<std_srvs/srv/Trigger>> :: callback = cancel_goal_callback
     
     #  Timers
-    __replan_timer: Optional[Timer] = None         # operates at value of 1.0 / replan_frequency node param value, every time calling
-                                                     # replan_callback
-    __replan_lock: threading.Lock                               
+    _replan_timer: Optional[Timer] = None         # operates at value of 1.0 / replan_frequency node param value, every time calling                                      # replan_callback
+    _replan_lock: threading.Lock                               
+    
     """ === Node Initialization === """
 
     def __init__(self, *args, **kwargs):
@@ -207,19 +205,19 @@ class StrategyNode(Node):
         Raises:
             Exception: if any initialization step fails
         """
-        super().__init__('planner', namespace='hybraut_nav', *args, **kwargs)
+        super().__init__('strategy_node', namespace='hybraut_nav', *args, **kwargs)
         
         # Declare and initialize parameters
         self.__init_parameters__()
         
         # Initialize planner
-        self.set_planner(self.get_parameter('planner_type').value)
+        self.set_planner(self.get_parameter('planner').value)
 
         # Setup services
         self.__init_services__()
 
         # Setup parameter change callback
-        self.add_on_set_parameters_callback(self._parameter_callback)
+        self.add_on_set_parameters_callback(self._parameter_update_cb)
 
         # Setup subscriptions
         self.__init_subscriptions__()
@@ -246,16 +244,16 @@ class StrategyNode(Node):
         Raises:
             Exception: if parameters cannot be declared
         """
+        # self.declare_parameter(
+        #     'replan_frequency', 
+        #     self.DEFAULT_REPLAN_FREQUENCY, 
+        #     ParameterDescriptor(
+        #         description='Frequency to replan the global path in Hz '
+        #                    f'(default: {self.DEFAULT_REPLAN_FREQUENCY} Hz)'
+        #     )
+        # )
         self.declare_parameter(
-            'replan_frequency', 
-            self.DEFAULT_REPLAN_FREQUENCY, 
-            ParameterDescriptor(
-                description='Frequency to replan the global path in Hz '
-                           f'(default: {self.DEFAULT_REPLAN_FREQUENCY} Hz)'
-            )
-        )
-        self.declare_parameter(
-            'planner_type', 
+            'planner', 
             self.DEFAULT_PLANNER_TYPE,
             ParameterDescriptor(
                 description='Type of global planner to use. '
@@ -263,14 +261,14 @@ class StrategyNode(Node):
                            f'(default: {self.DEFAULT_PLANNER_TYPE})'
             )
         )
-        self.declare_parameter(
-            'max_planning_time', 
-            self.DEFAULT_MAX_PLANNING_TIME,
-            ParameterDescriptor(
-                description='Maximum time allowed for planning in seconds '
-                           f'(default: {self.DEFAULT_MAX_PLANNING_TIME}s)'
-            )
-        )
+        # self.declare_parameter(
+        #     'max_planning_time', 
+        #     self.DEFAULT_MAX_PLANNING_TIME,
+        #     ParameterDescriptor(
+        #         description='Maximum time allowed for planning in seconds '
+        #                    f'(default: {self.DEFAULT_MAX_PLANNING_TIME}s)'
+        #     )
+        # )
         self.declare_parameter(
             'description',
             self.__doc__ or "Global Planner Node for Hybraut Navigation Stack",
@@ -292,17 +290,17 @@ class StrategyNode(Node):
         Raises: 
             Exception: if services cannot be created
         """
-        self.__send_goal_srv = self.create_service(
+        self._activate_srv = self.create_service(
             SendPose,
-            'planner/send_goal',
-            self._goal_received_callback,
+            'planner/activate',
+            self._goal_rcv_cb,
             callback_group=MutuallyExclusiveCallbackGroup()
         )
         
-        self.__cancel_goal_srv = self.create_service(
+        self._deactivate_srv = self.create_service(
             Trigger,
-            'planner/cancel_goal',
-            self.__cancel_goal_callback,
+            'planner/deactivate',
+            self._cancel_goal_cb,
             callback_group=MutuallyExclusiveCallbackGroup()
         )
 
@@ -322,26 +320,26 @@ class StrategyNode(Node):
         Raises: 
             None
         """
-        self.__map_sub = self.create_subscription(
+        self._map_sub = self.create_subscription(
             OccupancyGrid,
             '/map',
-            self.__map_callback,
+            lambda msg: self._map_rcv_cb(msg),
             map_qos,
             callback_group=ReentrantCallbackGroup()
         )
         
-        self.__agent_sub = self.create_subscription(
+        self._agent_sub = self.create_subscription(
             AgentState,
             '/agent_state',
-            self._agent_state_callback,
+            lambda msg: self._agent_state_rcv_cb(msg),
             QOS_DEPTH,
             callback_group=ReentrantCallbackGroup()
         )
         
-        self.__vw_sub = self.create_subscription(
+        self._vw_sub = self.create_subscription(
             PoseStamped,
-            '/tactical/virtual_waypoint',
-            self._virtual_waypoint_callback,
+            'tactical/virtual_waypoint',
+            lambda msg: self._vw_rcv_cb(msg),
             qos_profile=qos_profile,
             callback_group=ReentrantCallbackGroup()
         )
@@ -357,16 +355,16 @@ class StrategyNode(Node):
         Raises:
             Exception: if publishers cannot be created        
         """
-        self.plan_pub = self.create_publisher(
+        self._plan_pub = self.create_publisher(
             Path,
             'planner/plan',
             qos_profile=qos_profile,
             callback_group=ReentrantCallbackGroup()
         )
-        # waypoint pub publishes the imminent waypoint 
-        self.waypoint_pub = self.create_publisher(
-            Point, 
-            'planner/waypoint', 
+        
+        self._goal_pose_pub = self.create_publisher(
+            PoseStamped,
+            'planner/goal_pose',
             qos_profile=qos_profile,
             callback_group=ReentrantCallbackGroup()
         )
@@ -387,28 +385,29 @@ class StrategyNode(Node):
         Raises: 
             Exception: if timer cannot be created  
         """
-        self.__replan_timer = self.create_timer(
-            1.0 / self.get_replan_frequency(),
-            self._replan_callback,
-            autostart=(self.get_state() == StrategyState.ACTIVE),
-            callback_group=ReentrantCallbackGroup()
-        )
+        pass
+        # self.__replan_timer = self.create_timer(
+        #     1.0 / self.get_replan_frequency(),
+        #     self._replan_callback,
+        #     autostart=(self.get_state() == StrategyState.ACTIVE),
+        #     callback_group=ReentrantCallbackGroup()
+        # )
 
     """ === getters === """
     
-    def get_replan_frequency(self) -> float:
-        """ 
-        Getter for the replanning frequency in Hz. 
-        Returns: 
-            float: Replanning frequency in Hz
+    # def get_replan_frequency(self) -> float:
+    #     """ 
+    #     Getter for the replanning frequency in Hz. 
+    #     Returns: 
+    #         float: Replanning frequency in Hz
 
-        Example: 
-            >> freq = planner_node.get_replan_frequency()
-            >> print(f"Replan Frequency: {freq} Hz")
+    #     Example: 
+    #         >> freq = planner_node.get_replan_frequency()
+    #         >> print(f"Replan Frequency: {freq} Hz")
             
-        Test: tests/hybraut_nav_strategy/unit_tests/test_strategy_node:TestStrategy_node::test_get_replan_frequency 
-        """
-        return float(self.get_parameter('replan_frequency').value)
+    #     Test: tests/hybraut_nav_strategy/unit_tests/test_strategy_node:TestStrategy_node::test_get_replan_frequency 
+    #     """
+    #     return float(self.get_parameter('replan_frequency').value)
     
     def get_planner_type(self) -> str: 
         """ 
@@ -423,20 +422,20 @@ class StrategyNode(Node):
             
         Test: tests/hybraut_nav_strategy/unit_tests/test_strategy_node:TestStrategy_node::test_get_planner_type
         """
-        return str(self.get_parameter('planner_type').value)
+        return str(self.get_parameter('planner').value)
 
-    def get_max_planning_time(self) -> float:
-        """
-        getter for the maximum allowed planning time in seconds.
+    # def get_max_planning_time(self) -> float:
+    #     """
+    #     getter for the maximum allowed planning time in seconds.
 
-        Returns:
-            float: Maximum planning time in seconds
+    #     Returns:
+    #         float: Maximum planning time in seconds
             
-        Example: 
-            >> max_time = planner_node.get_max_planning_time()
-            >> print(f"Max Planning Time: {max_time} seconds")
-        """ 
-        return float(self.get_parameter('max_planning_time').value)
+    #     Example: 
+    #         >> max_time = planner_node.get_max_planning_time()
+    #         >> print(f"Max Planning Time: {max_time} seconds")
+    #     """ 
+    #     return float(self.get_parameter('max_planning_time').value)
     
     def get_description(self) -> str:
         """
@@ -487,13 +486,13 @@ class StrategyNode(Node):
             raise
 
         # update ros2 param for parameter planner type with new planner type
-        self.set_parameters([rclpy.parameter.Parameter('planner_type', rclpy.Parameter.Type.STRING, planner_type.value)])
+        # self.set_parameters([rclpy.parameter.Parameter('planner_type', rclpy.Parameter.Type.STRING, planner_type.value)])
         
         # Acquire the replan lock to prevent race conditions while changing planner
         if hasattr(self, '__replan_lock'):
             self.__replan_lock.acquire()
         try:
-            self.__planner = new_planner
+            self._planner = new_planner
         finally:
             # Release the lock after updating planner
             if hasattr(self, '__replan_lock'):
@@ -512,35 +511,35 @@ class StrategyNode(Node):
         # except ValueError as e:
         #     self.get_logger().error(str(e))
      
-    # TODO: Add logic for if reste_replan_timer is set
-    def set_replan_frequency(self, new_replan_frequency: float, reset_replan_timer:Optional[bool] = False):
-        """
-        Update the replanning frequency.
+    # # TODO: Add logic for if reste_replan_timer is set
+    # def set_replan_frequency(self, new_replan_frequency: float, reset_replan_timer:Optional[bool] = False):
+    #     """
+    #     Update the replanning frequency.
 
-        Args:
-            new_frequency: New frequency in Hz
-        """
-        if not isinstance(new_replan_frequency, (float, int)):
-            raise ValueError("Replan frequency must be a number")
+    #     Args:
+    #         new_frequency: New frequency in Hz
+    #     """
+    #     if not isinstance(new_replan_frequency, (float, int)):
+    #         raise ValueError("Replan frequency must be a number")
         
-        if not (0.01 <= new_replan_frequency <= 10.0):
-            self.get_logger().warning("Replan frequency out of bounds (0.01 - 10.0 Hz). Clamping to valid range.")
-            return
+    #     if not (0.01 <= new_replan_frequency <= 10.0):
+    #         self.get_logger().warning("Replan frequency out of bounds (0.01 - 10.0 Hz). Clamping to valid range.")
+    #         return
         
-        self.set_parameters([rclpy.parameter.Parameter('replan_frequency', rclpy.Parameter.Type.DOUBLE, new_replan_frequency)])
-        if hasattr(self, 'planner_timer') and self.planner_timer is not None:
-            self.planner_timer.cancel()
-        self.planner_timer = self.create_timer(
-            1.0 / new_replan_frequency,
-            self._replan_callback,
-            autostart=(self.state == StrategyState.ACTIVE),
-            callback_group=ReentrantCallbackGroup()
-        )
-        self.get_logger().info(f'Replan frequency set to {new_replan_frequency} Hz')   
+    #     self.set_parameters([rclpy.parameter.Parameter('replan_frequency', rclpy.Parameter.Type.DOUBLE, new_replan_frequency)])
+    #     if hasattr(self, 'planner_timer') and self.planner_timer is not None:
+    #         self.planner_timer.cancel()
+    #     self.planner_timer = self.create_timer(
+    #         1.0 / new_replan_frequency,
+    #         self._replan_callback,
+    #         autostart=(self.state == StrategyState.ACTIVE),
+    #         callback_group=ReentrantCallbackGroup()
+    #     )
+    #     self.get_logger().info(f'Replan frequency set to {new_replan_frequency} Hz')   
 
     # TODO: NEEDS COMPLETED
-    def set_max_planning_time(self, new_max_planning_time: float, reset_replan_timer): 
-        ...
+    # def set_max_planning_time(self, new_max_planning_time: float, reset_replan_timer): 
+    #     ...
     
     def set_state(self, state: StrategyState):
         """Set the current state of the planner."""
@@ -560,8 +559,15 @@ class StrategyNode(Node):
 
     """ === Callback Functions === """
     """ === planner callback functions === """
+    
+    # def _replan_event(self): 
+    #     """ 
+    #     Event handler triggered by replan events such as deviation from course
+    #     """
+    #     ...
+    
     # NOTE: DONE: NEEDS TESTED
-    def _goal_received_callback(self, request: SendPose.Request, 
+    def _goal_rcv_cb(self, request: SendPose.Request, 
                           response: SendPose.Response) -> SendPose.Response:
         """
         Service callback to set a new goal pose and activate the planner.
@@ -648,7 +654,7 @@ class StrategyNode(Node):
                 return (grid, start_pt, goal_pt)
             
             grid, start_pt, goal_pt = _convert_msg_to_planner_args(self.__map, self.__start_point, request.pose)
-            path:Path = self.__planner.plan_path(grid, start_pt, goal_pt)
+            path:Path = self._planner.plan_path(grid, start_pt, goal_pt)
         except Exception as e: 
             response.success = False
             response.message = f"Planning failed: {str(e)}"
@@ -681,7 +687,7 @@ class StrategyNode(Node):
         return response
 
     # NOTE: DONE: NEEDS TESTED
-    def __cancel_goal_callback(self, request: Trigger.Request, 
+    def _cancel_goal_cb(self, request: Trigger.Request, 
                             response: Trigger.Response) -> Trigger.Response:
         """
         Service callback to deactivate the planning for current goal.
@@ -703,15 +709,15 @@ class StrategyNode(Node):
                 response.message = "Planner is already inactive"
                 return response
             
-            # Step 2: deactivate replan timer
-            self._deactivate_replan_timer()
+            # # Step 2: deactivate replan timer
+            # self._deactivate_replan_timer()
 
             # Step 3: reset goal related state variables
             self.__goal_point = None
             self.__vw_point = None
 
             # Step 4: toggle state to inactive
-            self.__toggle_state(self.is_active())        
+            # self.toggle_state(self.is_active())        
             
             # set successful deactivation response
             response.success = True
@@ -727,7 +733,7 @@ class StrategyNode(Node):
 
     """ === World State Callback Functions === """
 
-    def __map_callback(self, msg: OccupancyGrid):
+    def _map_rcv_cb(self, msg: OccupancyGrid):
         """
         Callback for cost map updates. 
         
@@ -739,6 +745,8 @@ class StrategyNode(Node):
         raises: Exception logger message if message is invalid
         """
         # Basic validation: check message type and dimensions
+        
+        # should check if there is a difference betwene previous map and current map 
         if not isinstance(msg, OccupancyGrid):
             self.get_logger().error("Received cost map is not of type OccupancyGrid")
             return
@@ -752,7 +760,7 @@ class StrategyNode(Node):
         # If valid, update the current cost map
         self.current_cost_map = msg
         
-    def _agent_state_callback(self, msg: AgentState):
+    def _agent_state_rcv_cb(self, msg: AgentState):
         """Callback for agent state updates."""
         if not isinstance(msg, AgentState): 
             self.get_logger().error("Received agent state is not of type AgentState")
@@ -772,14 +780,18 @@ class StrategyNode(Node):
             f"Updated agent pose: x={msg.pose.position.x}, y={msg.pose.position.y}, frame_id={msg.header.frame_id}"
         )
     
-    # TODO: Work on virtual waypoint callback function
-    def _virtual_waypoint_callback(self, msg: PoseStamped):
+    def _vw_rcv_cb(self, msg: PoseStamped):
         if not isinstance(msg, PoseStamped):
             self.get_logger().error("Received virtual waypoint state.")
-        
+            return
+        self.current_virtual_waypoint = PoseStamped(header=msg.header, pose=msg.pose)
+        self.get_logger().debug(
+            f"Updated virtual waypoint: x={msg.pose.position.x}, y={msg.pose.position.y}, frame_id={msg.header.frame_id}"
+        )
+
     """ === dynamic configuration callback functions === """
     # NOTE: Done needs tested.
-    def _parameter_callback(self, params: List[Parameter]) -> SetParametersResult:
+    def _parameter_update_cb(self, params: List[Parameter]) -> SetParametersResult:
         """
         Handle dynamic parameter changes.
         
@@ -796,12 +808,12 @@ class StrategyNode(Node):
             -   
         """
         for param in params:
-            if param.name == 'planner_frequency':
-                self.set_replan_frequency(param.value)
-            elif param.name == 'planner_type':
-                self._set_planner_type(param.value)
-            elif param.name == 'max_planning_time':
-                self.set_max_planning_time(param.value)
+            # if param.name == 'planner_frequency':
+            #     self.set_replan_frequency(param.value)
+            if param.name == 'planner':
+                self.set_planner(param.value)
+            # elif param.name == 'max_planning_time':
+            #     self.set_max_planning_time(param.value)
 
         return SetParametersResult(successful=True)
 
@@ -809,110 +821,110 @@ class StrategyNode(Node):
 
 
 
-    """ === Timer State Togglers"""
+    # """ === Timer State Togglers"""
     
-    def __toggle_replan_timer(self): 
-        """Toggler the replan timer state"""
-        if self.is_active():
-            self._deactivate_replan_timer() 
-            self.__state = StrategyState.INACTIVE
-        else:
-            self._activate_replan_timer()
-            self.set_state
+    # def _toggle_replan_timer(self): 
+    #     """Toggler the replan timer state"""
+    #     if self.is_active():
+    #         self._deactivate_replan_timer() 
+    #         self.__state = StrategyState.INACTIVE
+    #     else:
+    #         self._activate_replan_timer()
+    #         self.set_state
     
-    def _reconfigure_replan_timer(self):
-        """
-        reconfigures the replan timer with updated frequency.
+    # def _reconfigure_replan_timer(self):
+    #     """
+    #     reconfigures the replan timer with updated frequency.
         
-        @flowchart: .diagrams/flowcharts/reconfigure_replan_timer_flowchart.puml
-        Tests: 
-        ...
-        """
-        autostart = False
-        if self.is_active():
-            autostart = True
+    #     @flowchart: .diagrams/flowcharts/reconfigure_replan_timer_flowchart.puml
+    #     Tests: 
+    #     ...
+    #     """
+    #     autostart = False
+    #     if self.is_active():
+    #         autostart = True
 
-        self.__replan_timer.destroy()
+    #     self.__replan_timer.destroy()
 
-        self.__replan_timer = self.create_timer(
-            1.0 / self.get_replan_frequency(),
-            self._replan_callback,
-            autostart=autostart,
-            callback_group=ReentrantCallbackGroup()
-        )
+    #     self.__replan_timer = self.create_timer(
+    #         1.0 / self.get_replan_frequency(),
+    #         self._replan_callback,
+    #         autostart=autostart,
+    #         callback_group=ReentrantCallbackGroup()
+    #     )
     
-    # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-    def _activate_replan_timer(self) -> Tuple[bool, str]:
-        """
-        Activate the replanning timer if not already active without reconfiguration.
-        Returns:
-            Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
-        """
-        try: 
-            if self.planner_timer.is_canceled():
-                self.planner_timer.reset()
-                return (True, "Replan timer activated successfully")
-            else: 
-                return (False, "Replan timer already active")
-        except Exception as e:
-            return (False, f"Failed to activate replan timer due to exception: {str(e)}")
+    # # NOTE: FUNCTION COMPLETE, NEEDS TESTING
+    # def _activate_replan_timer(self) -> Tuple[bool, str]:
+    #     """
+    #     Activate the replanning timer if not already active without reconfiguration.
+    #     Returns:
+    #         Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
+    #     """
+    #     try: 
+    #         if self.planner_timer.is_canceled():
+    #             self.planner_timer.reset()
+    #             return (True, "Replan timer activated successfully")
+    #         else: 
+    #             return (False, "Replan timer already active")
+    #     except Exception as e:
+    #         return (False, f"Failed to activate replan timer due to exception: {str(e)}")
 
-    # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-    def _deactivate_replan_timer(self) -> Tuple[bool, str]: 
-        """ 
-        Deactivate the replanning timer if active without reconfiguration.
-        Returns:
-            Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
-        """
-        try: 
-            if not self.planner_timer.is_canceled():
-                self.planner_timer.cancel()
-                return (True, "Replan timer deactivated successfully")
-            else: 
-                return (False, "Replan timer already inactive")
-        except Exception as e:
-            return (False, f"Failed to deactivate replan timer due to exception: {str(e)}")
+    # # NOTE: FUNCTION COMPLETE, NEEDS TESTING
+    # def _deactivate_replan_timer(self) -> Tuple[bool, str]: 
+    #     """ 
+    #     Deactivate the replanning timer if active without reconfiguration.
+    #     Returns:
+    #         Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
+    #     """
+    #     try: 
+    #         if not self.planner_timer.is_canceled():
+    #             self.planner_timer.cancel()
+    #             return (True, "Replan timer deactivated successfully")
+    #         else: 
+    #             return (False, "Replan timer already inactive")
+    #     except Exception as e:
+    #         return (False, f"Failed to deactivate replan timer due to exception: {str(e)}")
 
-        # TODO: NEED TO UPDATE THIS FUNCTION TO MATCH NEW ALGORITHM
+    #     # TODO: NEED TO UPDATE THIS FUNCTION TO MATCH NEW ALGORITHM
     
-    def _replan_callback(self):
-        """
-        Timer callback to plan and publish path.
+    # def _replan_callback(self):
+    #     """
+    #     Timer callback to plan and publish path.
         
-        Tests: 
-        Unit and Integration tests for this function can be found @ 
-            -    
-            -   
-            -   
+    #     Tests: 
+    #     Unit and Integration tests for this function can be found @ 
+    #         -    
+    #         -   
+    #         -   
             
-        """
-        # Publish current goal pose
-        if self.current_goal_pose:
-            self.goalpose_publisher.publish(self.current_goal_pose)
+    #     """
+    #     # Publish current goal pose
+    #     if self.current_goal_pose:
+    #         self.goalpose_publisher.publish(self.current_goal_pose)
         
-        # Check if planner should be active
-        if not self.is_active():
-            self.planner_timer.cancel()
-            return
+    #     # Check if planner should be active
+    #     if not self.is_active():
+    #         self.planner_timer.cancel()
+    #         return
 
-        # Verify all required data is available
-        if not self._has_required_data():
-            self.get_logger().debug("Missing required data for planning")
-            return
+    #     # Verify all required data is available
+    #     if not self._has_required_data():
+    #         self.get_logger().debug("Missing required data for planning")
+    #         return
 
-        # Attempt to plan and publish path
-        try:
-            path:Path = self._compute_path()
+    #     # Attempt to plan and publish path
+    #     try:
+    #         path:Path = self._compute_path()
 
-            if path:
-                path.header.frame_id = 'map'
-                path.header.stamp = self.get_clock().now().to_msg()
-                self._publish_plan(path)
-            else: 
-                self.get_logger().warn("Path planning returned no valid path, deactiving planner for current goal")
-                self._deactivate_callback(Trigger.Request(), Trigger.Response())
-        except Exception as e:
-            self.get_logger().error(f"Planning failed: {str(e)}")
+    #         if path:
+    #             path.header.frame_id = 'map'
+    #             path.header.stamp = self.get_clock().now().to_msg()
+    #             self._publish_plan(path)
+    #         else: 
+    #             self.get_logger().warn("Path planning returned no valid path, deactiving planner for current goal")
+    #             self._deactivate_callback(Trigger.Request(), Trigger.Response())
+    #     except Exception as e:
+    #         self.get_logger().error(f"Planning failed: {str(e)}")
 
 # ============================================================================
 # Independent Testing Code
