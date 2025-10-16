@@ -6,6 +6,9 @@ class Controller:
         """
         pass
 
+    def update_continous_dynamics(self, *args, **kwargs):
+        raise NotImplementedError("update_continous_dynamics() must be implemented in subclass.")
+
     def update_state(self, *args, **kwargs):
         """
         Update the controller's internal state.

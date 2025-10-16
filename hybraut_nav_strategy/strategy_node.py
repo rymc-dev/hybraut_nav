@@ -46,17 +46,7 @@ from hybraut_nav_strategy.path_planning import (
 )
 
 from rclpy.qos import HistoryPolicy, ReliabilityPolicy, DurabilityPolicy
-
-
-# Constants
-QOS_DEPTH = 10
-
-map_qos = QoSProfile(
-    history=HistoryPolicy.KEEP_LAST,
-    depth=1,
-    reliability=ReliabilityPolicy.RELIABLE,
-    durability=DurabilityPolicy.TRANSIENT_LOCAL
-)
+from hybraut_nav.qos import map_qos, world_state_qos
 
 
 from rclpy.subscription import Subscription
@@ -66,69 +56,8 @@ from typing import Optional
 from geometry_msgs.msg import Point
 from rclpy.service import Service
 import threading
-
-# QoS Profile
-qos_profile = QoSProfile(depth=QOS_DEPTH, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
-
-
-class StrategyState(Enum):
-    """Enumeration for planner states."""
-    INACTIVE = "inactive"
-    ACTIVE = "active"
-
-
-class PlannerType(Enum):
-    """Enumeration for planner algorithm types."""
-    ASTAR = 'A*'
-    DIJKSTRA = 'Dijkstra'
-    RRT = 'RRT'
-    RRTSTAR = 'RRT*'
-    
-    @staticmethod
-    def from_string(planner_type_str: str) -> 'PlannerType':
-        """
-        Convert string to PlannerType enum.
-        
-        Args:
-            planner_type_str: String representation of planner type
-            
-        Returns:
-            Corresponding PlannerType enum member
-            
-        Raises:
-            ValueError: If planner type string is not recognized
-        """
-        for pt in PlannerType:
-            if pt.value == planner_type_str:
-                return pt
-        raise ValueError(f'Unknown planner type string: {planner_type_str}')
-
-    @staticmethod
-    def initialize_planner(planner_type: 'PlannerType') -> Planner:
-        """
-        Factory method to create planner instance.
-        
-        Args:
-            planner_type: Type of planner to create
-            
-        Returns:
-            Initialized planner instance
-            
-        Raises:
-            ValueError: If planner type is not recognized
-        """
-        planner_map = {
-            PlannerType.ASTAR: AStar,
-            PlannerType.DIJKSTRA: Dijkstra,
-            PlannerType.RRT: RRT,
-            PlannerType.RRTSTAR: RRTStar
-        }
-        
-        planner_class = planner_map.get(planner_type)
-        if planner_class is None:
-            raise ValueError(f'Unknown planner type: {planner_type}')
-        
-        return planner_class()
+from hybraut_nav_strategy.path_planning import PlannerType
+from hybraut_nav.state import NodeState
 
 
 class StrategyNode(Node):
@@ -167,7 +96,7 @@ class StrategyNode(Node):
     _vw_point: Optional[PlannerPoint] = None    # Stores latest virtual waypoint value received on vw topic
     
     # Node State Variables
-    _state: StrategyState = StrategyState.INACTIVE # State of StrategyNode by default always INACTIVE
+    _state: NodeState = NodeState.INACTIVE # State of StrategyNode by default always INACTIVE
     _planner: Optional[Planner] = None           # planner class instance utilized for making path planning  
     
     # publishers
@@ -332,15 +261,7 @@ class StrategyNode(Node):
             AgentState,
             '/agent_state',
             lambda msg: self._agent_state_rcv_cb(msg),
-            QOS_DEPTH,
-            callback_group=ReentrantCallbackGroup()
-        )
-        
-        self._vw_sub = self.create_subscription(
-            PoseStamped,
-            'tactical/virtual_waypoint',
-            lambda msg: self._vw_rcv_cb(msg),
-            qos_profile=qos_profile,
+            world_state_qos,
             callback_group=ReentrantCallbackGroup()
         )
 
@@ -358,14 +279,14 @@ class StrategyNode(Node):
         self._plan_pub = self.create_publisher(
             Path,
             'planner/plan',
-            qos_profile=qos_profile,
+            qos_profile=world_state_qos,
             callback_group=ReentrantCallbackGroup()
         )
         
         self._goal_pose_pub = self.create_publisher(
             PoseStamped,
             'planner/goal_pose',
-            qos_profile=qos_profile,
+            qos_profile=world_state_qos,
             callback_group=ReentrantCallbackGroup()
         )
 
@@ -389,7 +310,7 @@ class StrategyNode(Node):
         # self.__replan_timer = self.create_timer(
         #     1.0 / self.get_replan_frequency(),
         #     self._replan_callback,
-        #     autostart=(self.get_state() == StrategyState.ACTIVE),
+        #     autostart=(self.get_state() == NodeState.ACTIVE),
         #     callback_group=ReentrantCallbackGroup()
         # )
 
@@ -446,7 +367,7 @@ class StrategyNode(Node):
         """
         return str(self.get_parameter('description').value)
     
-    def get_state(self) -> StrategyState: 
+    def get_state(self) -> NodeState: 
         """
         Getter for the current state of the planner."""
         return self.__state
@@ -532,7 +453,7 @@ class StrategyNode(Node):
     #     self.planner_timer = self.create_timer(
     #         1.0 / new_replan_frequency,
     #         self._replan_callback,
-    #         autostart=(self.state == StrategyState.ACTIVE),
+    #         autostart=(self.state == NodeState.ACTIVE),
     #         callback_group=ReentrantCallbackGroup()
     #     )
     #     self.get_logger().info(f'Replan frequency set to {new_replan_frequency} Hz')   
@@ -541,10 +462,10 @@ class StrategyNode(Node):
     # def set_max_planning_time(self, new_max_planning_time: float, reset_replan_timer): 
     #     ...
     
-    def set_state(self, state: StrategyState):
+    def set_state(self, state: NodeState):
         """Set the current state of the planner."""
-        if not isinstance(state, StrategyState):
-            raise Exception("State must be an instance of StrategyState Enum")
+        if not isinstance(state, NodeState):
+            raise Exception("State must be an instance of NodeState Enum")
         
         # should prob validate that if setting state to false 
         # timer is not running and vice versa
@@ -554,7 +475,7 @@ class StrategyNode(Node):
     # NOTE: DONE: NEEDS TESTED
     def is_active(self) -> bool:
         """Check if planner is in active state."""
-        return bool(self.__state == StrategyState.ACTIVE)
+        return bool(self.__state == NodeState.ACTIVE)
 
 
     """ === Callback Functions === """
@@ -758,36 +679,24 @@ class StrategyNode(Node):
             return
         
         # If valid, update the current cost map
-        self.current_cost_map = msg
+        self._map:PlannerGrid = PlannerGrid.from_ros_msg(msg)
         
     def _agent_state_rcv_cb(self, msg: AgentState):
         """Callback for agent state updates."""
         if not isinstance(msg, AgentState): 
             self.get_logger().error("Received agent state is not of type AgentState")
             return
-        if not isinstance(msg.pose, Pose):
-            self.get_logger().error("AgentState.pose is not of type Pose")
-            return
+        
         # Optionally: Validate frame_id matches cost map frame
-        if hasattr(self, 'current_cost_map') and self.current_cost_map:
-            if msg.header.frame_id != self.current_cost_map.header.frame_id:
+        if hasattr(self, '_map') and self._map:
+            if msg.header.frame_id != self._map.header.frame_id:
                 self.get_logger().warning(
-                    f"Agent pose frame_id ({msg.header.frame_id}) does not match cost map frame_id ({self.current_cost_map.header.frame_id})"
+                    f"Agent pose frame_id ({msg.header.frame_id}) does not match cost map frame_id ({self._map.header.frame_id})"
                 )
-        self.current_agent_pose = PoseStamped(header=msg.header, pose=msg.pose)
-        # Optionally: Log agent pose for debugging
-        self.get_logger().debug(
-            f"Updated agent pose: x={msg.pose.position.x}, y={msg.pose.position.y}, frame_id={msg.header.frame_id}"
-        )
-    
-    def _vw_rcv_cb(self, msg: PoseStamped):
-        if not isinstance(msg, PoseStamped):
-            self.get_logger().error("Received virtual waypoint state.")
-            return
-        self.current_virtual_waypoint = PoseStamped(header=msg.header, pose=msg.pose)
-        self.get_logger().debug(
-            f"Updated virtual waypoint: x={msg.pose.position.x}, y={msg.pose.position.y}, frame_id={msg.header.frame_id}"
-        )
+                
+        current_agent_pose = PoseStamped(header=msg.header, pose=msg.pose)
+        self._start_point:PlannerPoint = PlannerPoint.from_ros_msg(current_agent_pose)
+
 
     """ === dynamic configuration callback functions === """
     # NOTE: Done needs tested.
@@ -807,14 +716,17 @@ class StrategyNode(Node):
             -  
             -   
         """
-        for param in params:
-            # if param.name == 'planner_frequency':
-            #     self.set_replan_frequency(param.value)
-            if param.name == 'planner':
-                self.set_planner(param.value)
-            # elif param.name == 'max_planning_time':
-            #     self.set_max_planning_time(param.value)
-
+        try: 
+            for param in params:
+                # if param.name == 'planner_frequency':
+                #     self.set_replan_frequency(param.value)
+                if param.name == 'planner':
+                    self.set_planner(param.value)
+                # elif param.name == 'max_planning_time':
+                #     self.set_max_planning_time(param.value)
+        except Exception as e: 
+            return SetParametersResult(successful=False, reason=str(e))
+        
         return SetParametersResult(successful=True)
 
     """ === planner functions === """
@@ -827,7 +739,7 @@ class StrategyNode(Node):
     #     """Toggler the replan timer state"""
     #     if self.is_active():
     #         self._deactivate_replan_timer() 
-    #         self.__state = StrategyState.INACTIVE
+    #         self.__state = NodeState.INACTIVE
     #     else:
     #         self._activate_replan_timer()
     #         self.set_state

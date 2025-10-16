@@ -1,7 +1,8 @@
+# controller_node.py
+# **- coding: utf-8 -*-
 # !/usr/bin/env python3
-
 """ 
-This Node is Layer 3 of the HybrautNav Navigation Stack
+This file contains implementation of Layer 3 of the HybrautNav Navigation Stack
 This layer produces the low-level actuator commands for the controller or execution 
 layer.
 
@@ -11,88 +12,56 @@ layer.
 - and allows Layer 2 to stay physics agnostic
 """
 
+import math
+from typing import Optional, Union
+
 import rclpy
 from rclpy.node import Node
-from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
-from enum import Enum
-from hybraut_nav_controller.controller import Controller, FiniteTimeController
-from colav_interfaces.msg import AgentState
-from typing import Optional
+from rclpy.qos import qos_profile_system_default
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.subscription import Subscription
 from rclpy.publisher import Publisher
-
-from rclpy.qos import QoSProfile, qos_profile_system_default
-from rclpy.callback_groups import ReentrantCallbackGroup
-from geometry_msgs.msg import Twist
 from rclpy.service import Service
+from rclpy.timer import Timer
 
-from typing import Union
+from rcl_interfaces.msg import ParameterDescriptor
+
+from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+from std_srvs.srv import Trigger
+
+from hybraut_nav_controller.controller import Controller
+from hybraut_nav.qos import world_state_qos
 from hybraut_interfaces.msg import ContinousDynamics
 
-from std_srvs.srv import Trigger
-from rclpy.timer import Timer
-import math
+from hybraut_nav_controller.controller import Controller, ControllerType
+from hybraut_nav.state import NodeState
 
 
-class ControllerState(Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-
-class ControllerType(Enum): 
-    FINITE_TIME_CONTROLLER = "finite_time_controller"
-    
-    @staticmethod
-    def from_string(controller_type_str: str) -> 'ControllerType':
-        """
-        Convert string to PlannerType enum.
-        
-        Args:
-            controller_type_str: String representation of ControllerType type
-            
-        Returns:
-            Corresponding PlannerType enum member
-            
-        Raises:
-            ValueError: If planner type string is not recognized
-        """
-        for pt in ControllerType:
-            if pt.value == controller_type_str:
-                return pt
-        raise ValueError(f'Unknown planner type string: {controller_type_str}')
-
-    @staticmethod
-    def initialize_planner(controller_type: 'ControllerType') -> Controller:
-        """
-        Factory method to create planner instance.
-        
-        Args:
-            planner_type: Type of planner to create
-            
-        Returns:
-            Initialized planner instance
-            
-        Raises:
-            ValueError: If planner type is not recognized
-        """
-        planner_map = {
-            ControllerType.FINITE_TIME_CONTROLLER: FiniteTimeController,
-        }
-        
-        planner_class = planner_map.get(controller_type)
-        if planner_class is None:
-            raise ValueError(f'Unknown controller type: {controller_type}')
-        
-        return planner_class()
-    
 class ControllerNode(Node):
+    """ 
+    ControllerNode forms apart of the HybrautNav Navigation Stack.
+    
+    It is responsible for generating Low-Level Actuator Commands based 
+    on both the continous dynamics received from the L2 Tactical Layer
+    Hybrid Autmoaton and the current state of the agent vehicle, It utilizes
+    a controller to compute the necessary commands for Twist messages to 
+    follow the desired trajectory as defined within the continous dynamics. 
+    
+    This Node Does not implement the actual controller but instaed provides the 
+    interfaces to plug into the HybrautNav Navigation Stack and manages dynamic
+    reconfiguration of controller parameters like what controller we should
+    be using in the controller Loop in real time via manual changes of parameters
+    by human in the loop or updates from continous dynamic messages which request for 
+    controller to be changes based on control mode we are in.
+    """    
     
     # Controller Type
     DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
-    DEFAULT_CONTROLLER_FREQUENCY: float = 10.0  # Hz   
-    
+    DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz   
     
     # internal state
-    state: ControllerState = ControllerState.INACTIVE
+    state: NodeState = NodeState.INACTIVE
     controller: Optional[Controller] = None
     desired_heading: float = 0.0
     desired_velocity: float = 0.0
@@ -101,7 +70,7 @@ class ControllerNode(Node):
     velocity_tolerance: float = 0.1
     
     # State variables
-    agent_state: Optional[AgentState] = None
+    agent_state: Optional[Odometry] = None
     
     # Subscriptions
     agent_state_sub: Subscription = None
@@ -114,8 +83,6 @@ class ControllerNode(Node):
     # Timer
     control_timer: Timer = None 
     
-    
-    
     def __init__(self):
         super().__init__('controller_node', namespace='hybraut_nav')
         
@@ -123,6 +90,7 @@ class ControllerNode(Node):
         self.__init_subscriptions__()
         self.__init_publishers__()
         self.__init_timers__()
+        self.add_on_set_parameters_callback(self.on_parameter_change)
         self.__init_services__()
         self.__init_default_controller__()
 
@@ -147,10 +115,17 @@ class ControllerNode(Node):
         
     def __init_subscriptions__(self): 
         self.agent_state_sub = self.create_subscription(
-            msg_type=AgentState, 
-            topic='/agent_state',
+            msg_type=Odometry, 
+            topic='/odom',
             callback=lambda msg: self.agent_state_cb(msg),
             qos_profile=qos_profile_system_default,
+            callback_group=ReentrantCallbackGroup()
+        )
+        self.continous_dynamics_sub = self.create_subscription(
+            msg_type=ContinousDynamics,
+            topic='tactical/continuous_dynamics',
+            callback=lambda msg: self.continous_dynamics_cb(msg),
+            qos_profile=world_state_qos, # need to decide on a qos for continous dynamics for tactical layer
             callback_group=ReentrantCallbackGroup()
         )
         
@@ -163,41 +138,79 @@ class ControllerNode(Node):
         )
     
     def __init_services__(self):
+        """ initializes services"""
         self.toggle_controller_srv = self.create_service(
             Trigger,
-            '/toggle_controller',
-            self.toggle_controller_cb
+            'controller_node/toggle',
+            self.toggle_controller_cb,
+            callback_group=ReentrantCallbackGroup()
         )
 
     def __init_timers__(self):
         self.control_timer = self.create_timer(
-            timer_period_sec=0.1,  # 10 Hz control loop
+            timer_period_sec=1 / self.get_controller_frequency(),  # 10 Hz control loop
             callback=self.control_loop,
-            callback_group=ReentrantCallbackGroup()
+            callback_group=ReentrantCallbackGroup(),
+            autostart=False
         ) 
 
     def __init_default_controller__(self):
-        ...
+        self.controller = ControllerType.initialize_controller(self.get_controller_type())
 
     """ === getters === """
     
     def get_controller_type(self) -> ControllerType: 
-        return None
+        return self.get_parameter('controller_type').value
     
     def get_controller_frequency(self) -> float:
-        ... 
+        return self.get_parameter('controller_frequency').value
         
     """ === setters === """
     def set_controller_type(self, new_controller_type: Union[ControllerType, str]):
-        ...
+        if isinstance(new_controller_type, str):
+            new_controller_type = ControllerType.from_string(new_controller_type)
+        
+        if not isinstance(new_controller_type, ControllerType):
+            raise TypeError("new_controller_type must be a ControllerType or string.")
+        
+        # Update parameter
+        self.set_parameters([rclpy.parameter.Parameter('controller_type', rclpy.Parameter.Type.STRING, new_controller_type.value)])
+        self.get_logger().info(f"Controller type set to {new_controller_type.value}")
         
     def set_controller_frequency(self, new_frequency: float):
         ... 
         
     """ === callbacks === """
     
+    def on_parameter_change(self, params): 
+        for param in params: 
+            ... 
+    
     def control_loop(self):
-        ... 
+        """ 
+        Main control loop to compute and publish actuator commands.
+        
+        Runs at the frequency defined by 'controller_frequency' parameter.
+        
+        Example: 
+            >>> TODO
+        
+        Tests: 
+        ...
+        """
+        from geometry_msgs.msg import Twist
+        if self.state == NodeState.ACTIVE and self.agent_state is not None:
+            try:  
+                yaw_rate = self.controller.step()
+            except Exception as e: 
+                self.get_logger().error(f"Controller step failed: {e}")
+                return
+                
+            twist = Twist()
+            twist.angular.z = yaw_rate
+            twist.linear.x = 5.0 # placeholder for x velocity
+            
+            self.cmd_vel_pub.publish(twist)
     
     def continous_dynamics_cb(self, msg: ContinousDynamics):
         """ 
@@ -212,49 +225,34 @@ class ControllerNode(Node):
             # Update controller type parameter
             self.set_parameters([rclpy.parameter.Parameter('controller_type', rclpy.Parameter.Type.STRING, msg.controller_name)])
 
-        
+        desired_heading_rate = 0.2 # placeholder for now
         # 2. Check for any setpoint metadata changes, update internal state if changed
-        if (
-            self.desired_heading != msg.desired_heading or
-            self.desired_velocity != msg.desired_velocity or
-            self.target_waypoint != msg.target_waypoint or
-            self.heading_tolerance != msg.heading_tolerance or
-            self.velocity_tolerance != msg.velocity_tolerance
-        ):
-            # Setpoints changed
-            self.desired_heading = msg.desired_heading  # The current desired heading we want to be in
-            self.desired_velocity = msg.desired_velocity # The current desired velocity we want to be in
-            self.target_waypoint = msg.target_waypoint # This is mainly for controller metadata to see which waypoint, virtual waypoint/real waypoint
-            # we are tracking for logging purposes
-            self.heading_tolerance = msg.heading_tolerance # This is an important piece of metadata used for controller, it can help loss control
-            # by stopping oscillation for heading tolerance when far from the waypoint
-            self.velocity_tolerance = msg.velocity_tolerance # This is an import piece of metadata used for controller, it can help loss control
-            # by stopping oscillation for velocity tolerance when far from the waypoint
-            
-    def agent_state_cb(self, msg: AgentState):
+        self.controller.update_continous_dynamics(desired_heading=msg.desired_heading , desired_heading_rate=desired_heading_rate)
+
+    def agent_state_cb(self, msg: Odometry):
         # Convert quaternion to yaw (heading)
         q = msg.pose.orientation
         # Quaternion to Euler (yaw)
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         current_heading = math.atan2(siny_cosp, cosy_cosp)
-        # desired_heading = msg.
-        
-        self.controller.update_state(current_heading=msg.orientation.yaw, desired_heading=msg.desired_heading, desired_heading_rate=msg.desired_heading_rate)
-        
+                
+        self.controller.update_state(current_heading=current_heading, desired_heading=self.desired_heading, desired_heading_rate=self.desired_heading_rate)
         
     def toggle_controller_cb(self, request: Trigger.Request, response: Trigger.Response):
         # Toggle controller state
-        if self.state == ControllerState.ACTIVE:
-            self.state = ControllerState.INACTIVE
+        if self.state == NodeState.ACTIVE:
+            self.state = NodeState.INACTIVE
             response.success = True
             response.message = "Controller deactivated."
+            self.control_timer.cancel()
         else:
-            self.state = ControllerState.ACTIVE
+            self.state = NodeState.ACTIVE
             response.success = True
             response.message = "Controller activated."
+            self.control_timer.reset()
+            
         return response
-        
         
         
     """ === helper functions === """

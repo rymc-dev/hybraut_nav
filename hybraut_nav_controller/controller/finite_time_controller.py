@@ -35,9 +35,12 @@ class FiniteTimeController(Controller):
         self.desired_heading = 0.0
         self.time_derivative_of_desired_heading = 0.0
 
-    def update_state(self, current_heading: float, desired_heading: float, desired_heading_rate: float = 0.0):
-        """Update the current and desired headings."""
+    def update_state(self, current_heading: float):
+        """Update the current heading."""
         self.current_heading = current_heading
+        
+    def update_continous_dynamics(self, desired_heading: float, desired_heading_rate: float = 0.0):
+        """Update the continous dynamics as defined in the tactical layer."""
         self.desired_heading = desired_heading
         self.time_derivative_of_desired_heading = desired_heading_rate
 
