@@ -38,6 +38,10 @@ from hybraut_nav_controller.controller import Controller, ControllerType
 from hybraut_nav.state import NodeState
 
 
+DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
+DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz   
+    
+
 class ControllerNode(Node):
     """ 
     ControllerNode forms apart of the HybrautNav Navigation Stack.
@@ -57,9 +61,7 @@ class ControllerNode(Node):
     """    
     
     # Controller Type
-    DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
-    DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz   
-    
+
     # internal state
     state: NodeState = NodeState.INACTIVE
     controller: Optional[Controller] = None
@@ -97,19 +99,19 @@ class ControllerNode(Node):
     def __init_parameters__(self):
         self.declare_parameter(
             'controller_type', 
-            self.DEFAULT_CONTROLLER_TYPE.value,
+            DEFAULT_CONTROLLER_TYPE,
             ParameterDescriptor(
                 description='Type of controller to use. '
                            'Options: Finite Time Controller .'
-                           f'(default: {self.DEFAULT_CONTROLLER_TYPE.value})'
+                           f'(default: {DEFAULT_CONTROLLER_TYPE})'
             )
         )
         self.declare_parameter(
             'controller_frequency',
-            self.DEFAULT_CONTROLLER_FREQUENCY,
+            DEFAULT_CONTROLLER_FREQUENCY,
             ParameterDescriptor(
                 description='Frequency (Hz) at which to run the controller loop. '
-                            f'(default: {self.DEFAULT_CONTROLLER_FREQUENCY} Hz)'
+                            f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)'
             )
         )
         
