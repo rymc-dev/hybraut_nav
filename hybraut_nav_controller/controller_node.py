@@ -199,7 +199,7 @@ class ControllerNode(Node):
         ...
         """
         from geometry_msgs.msg import Twist
-        if self.state == NodeState.ACTIVE and self.agent_state is not None:
+        if self.state == NodeState.ACTIVE:
             try:  
                 yaw_rate = self.controller.step()
             except Exception as e: 
@@ -231,13 +231,13 @@ class ControllerNode(Node):
 
     def agent_state_cb(self, msg: Odometry):
         # Convert quaternion to yaw (heading)
-        q = msg.pose.orientation
+        q = msg.pose.pose.orientation
         # Quaternion to Euler (yaw)
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         current_heading = math.atan2(siny_cosp, cosy_cosp)
                 
-        self.controller.update_state(current_heading=current_heading, desired_heading=self.desired_heading, desired_heading_rate=self.desired_heading_rate)
+        self.controller.update_state(current_heading=current_heading)
         
     def toggle_controller_cb(self, request: Trigger.Request, response: Trigger.Response):
         # Toggle controller state
@@ -258,8 +258,45 @@ class ControllerNode(Node):
     """ === helper functions === """
     
 def main(args = None):
+    from rclpy.executors import MultiThreadedExecutor
+    from threading import Thread
+    
     rclpy.init(args=args)
+    
+    executor = MultiThreadedExecutor()
     node = ControllerNode()
+    cli_node = Node('controller_cli_node')
+    executor.add_node(node)
+    executor.add_node(cli_node)
+    
+    thread = Thread(target=executor.spin, daemon=True)
+    try: 
+        thread.start()
+        
+        odom_pub = cli_node.create_publisher(
+            Odometry,
+            '/odom',
+            qos_profile_system_default
+        )
+        odom_msg = Odometry()
+        odom_pub.publish(odom_msg)
+        toggle_cli = cli_node.create_client(
+            Trigger,
+            'hybraut_nav/controller_node/toggle'
+        )
+        req = Trigger.Request()
+        toggle_cli.wait_for_service(timeout_sec=10.0)
+        future = toggle_cli.call_async(req)
+        rclpy.spin_until_future_complete(cli_node, future, timeout_sec=5.0)
+        if future.result() is not None:
+            print(f"Service call succeeded: {future.result().message}")
+            
+        import time 
+        time.sleep(20)
+        
+    except Exception as e: 
+        print (e)
+    
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
