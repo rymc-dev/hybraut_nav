@@ -10,6 +10,10 @@ layer.
 - enforces safety limits
 - interfaces with hardware (rudder, thrusters)
 - and allows Layer 2 to stay physics agnostic
+
+NOTE: This version of controller only considers velocity and continous
+      dynamics of the hybraut_tactical_layer will only generate desired 
+      headings for the moment for the moment
 """
 
 import math
@@ -26,7 +30,7 @@ from rclpy.timer import Timer
 
 from rcl_interfaces.msg import ParameterDescriptor
 
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger
 
@@ -39,7 +43,8 @@ from hybraut_nav.state import NodeState
 
 
 DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
-DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz   
+DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
+DEFAULT_CRUISE_SPEED: float = 10.0 # m/s   
     
 
 class ControllerNode(Node):
@@ -114,6 +119,16 @@ class ControllerNode(Node):
                             f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)'
             )
         )
+        self.declare_parameter(
+            'cruise_speed',
+            DEFAULT_CRUISE_SPEED, 
+            ParameterDescriptor(
+                description='Velocity (m/s) in which the controller will' \
+                    f'operate a cruise speed, this version of hybraut_nav_controller' \
+                    f'outputs a constant cruise speed for `cmd_vel` based on this' \
+                    f'(default: {DEFAULT_CRUISE_SPEED})'
+            )
+        )
         
     def __init_subscriptions__(self): 
         self.agent_state_sub = self.create_subscription(
@@ -133,7 +148,7 @@ class ControllerNode(Node):
         
     def __init_publishers__(self):
         self.cmd_vel_pub = self.create_publisher(
-            Twist,  # msg_type
+            TwistStamped,  # msg_type
             '/cmd_vel',
             qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
@@ -166,6 +181,9 @@ class ControllerNode(Node):
     
     def get_controller_frequency(self) -> float:
         return self.get_parameter('controller_frequency').value
+    
+    def get_cruise_speed(self) -> float:
+        return self.get_parameter('cruise_speed').value
         
     """ === setters === """
     def set_controller_type(self, new_controller_type: Union[ControllerType, str]):
@@ -208,9 +226,10 @@ class ControllerNode(Node):
                 self.get_logger().error(f"Controller step failed: {e}")
                 return
                 
-            twist = Twist()
-            twist.angular.z = yaw_rate
-            twist.linear.x = 5.0 # placeholder for x velocity
+            twist = TwistStamped()
+
+            twist.twist.angular.z = yaw_rate
+            twist.twist.linear.x = self.get_cruise_speed()
             
             self.cmd_vel_pub.publish(twist)
     
