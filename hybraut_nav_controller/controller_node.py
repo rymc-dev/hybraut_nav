@@ -10,10 +10,18 @@ layer.
 - enforces safety limits
 - interfaces with hardware (rudder, thrusters)
 - and allows Layer 2 to stay physics agnostic
+
+NOTE: This version of controller only considers velocity and continous
+      dynamics of the hybraut_tactical_layer will only generate desired 
+      headings for the moment for the moment
 """
 
 import math
 from typing import Optional, Union
+
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
+import os
 
 import rclpy
 from rclpy.node import Node
@@ -26,7 +34,7 @@ from rclpy.timer import Timer
 
 from rcl_interfaces.msg import ParameterDescriptor
 
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger
 
@@ -39,7 +47,8 @@ from hybraut_nav.state import NodeState
 
 
 DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
-DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz   
+DEFAULT_CONTROLLER_FREQUENCY: float = 10.0  # Hz
+DEFAULT_CRUISE_SPEED: float = 0.2 # m/s   
     
 
 class ControllerNode(Node):
@@ -99,11 +108,11 @@ class ControllerNode(Node):
     def __init_parameters__(self):
         self.declare_parameter(
             'controller_type', 
-            DEFAULT_CONTROLLER_TYPE,
+            DEFAULT_CONTROLLER_TYPE.value,
             ParameterDescriptor(
                 description='Type of controller to use. '
                            'Options: Finite Time Controller .'
-                           f'(default: {DEFAULT_CONTROLLER_TYPE})'
+                           f'(default: {DEFAULT_CONTROLLER_TYPE.value})'
             )
         )
         self.declare_parameter(
@@ -112,6 +121,16 @@ class ControllerNode(Node):
             ParameterDescriptor(
                 description='Frequency (Hz) at which to run the controller loop. '
                             f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)'
+            )
+        )
+        self.declare_parameter(
+            'cruise_speed',
+            DEFAULT_CRUISE_SPEED, 
+            ParameterDescriptor(
+                description='Velocity (m/s) in which the controller will' \
+                    f'operate a cruise speed, this version of hybraut_nav_controller' \
+                    f'outputs a constant cruise speed for `cmd_vel` based on this' \
+                    f'(default: {DEFAULT_CRUISE_SPEED})'
             )
         )
         
@@ -125,7 +144,7 @@ class ControllerNode(Node):
         )
         self.continous_dynamics_sub = self.create_subscription(
             msg_type=ContinousDynamics,
-            topic='tactical/continuous_dynamics',
+            topic='tactical_node/continuous_dynamics',
             callback=lambda msg: self.continous_dynamics_cb(msg),
             qos_profile=world_state_qos, # need to decide on a qos for continous dynamics for tactical layer
             callback_group=ReentrantCallbackGroup()
@@ -133,7 +152,7 @@ class ControllerNode(Node):
         
     def __init_publishers__(self):
         self.cmd_vel_pub = self.create_publisher(
-            Twist,  # msg_type
+            TwistStamped,  # msg_type
             '/cmd_vel',
             qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
@@ -166,6 +185,9 @@ class ControllerNode(Node):
     
     def get_controller_frequency(self) -> float:
         return self.get_parameter('controller_frequency').value
+    
+    def get_cruise_speed(self) -> float:
+        return self.get_parameter('cruise_speed').value
         
     """ === setters === """
     def set_controller_type(self, new_controller_type: Union[ControllerType, str]):
@@ -208,9 +230,10 @@ class ControllerNode(Node):
                 self.get_logger().error(f"Controller step failed: {e}")
                 return
                 
-            twist = Twist()
-            twist.angular.z = yaw_rate
-            twist.linear.x = 5.0 # placeholder for x velocity
+            twist = TwistStamped()
+
+            twist.twist.angular.z = yaw_rate
+            twist.twist.linear.x = self.get_cruise_speed()
             
             self.cmd_vel_pub.publish(twist)
     
@@ -227,9 +250,10 @@ class ControllerNode(Node):
             # Update controller type parameter
             self.set_parameters([rclpy.parameter.Parameter('controller_type', rclpy.Parameter.Type.STRING, msg.controller_name)])
 
-        desired_heading_rate = 0.2 # placeholder for now
+        desired_heading = msg.desired_heading # placeholder for now
+        desired_heading_rate = 0.2 # This is static for now, a constant turning rate
         # 2. Check for any setpoint metadata changes, update internal state if changed
-        self.controller.update_continous_dynamics(desired_heading=msg.desired_heading , desired_heading_rate=desired_heading_rate)
+        self.controller.update_continous_dynamics(desired_heading=desired_heading , desired_heading_rate=0.2)
 
     def agent_state_cb(self, msg: Odometry):
         # Convert quaternion to yaw (heading)
@@ -256,52 +280,21 @@ class ControllerNode(Node):
             
         return response
         
-        
-    """ === helper functions === """
-    
-def main(args = None):
-    from rclpy.executors import MultiThreadedExecutor
-    from threading import Thread
-    
-    rclpy.init(args=args)
-    
-    executor = MultiThreadedExecutor()
-    node = ControllerNode()
-    cli_node = Node('controller_cli_node')
-    executor.add_node(node)
-    executor.add_node(cli_node)
-    
-    thread = Thread(target=executor.spin, daemon=True)
-    try: 
-        thread.start()
-        
-        odom_pub = cli_node.create_publisher(
-            Odometry,
-            '/odom',
-            qos_profile_system_default
-        )
-        odom_msg = Odometry()
-        odom_pub.publish(odom_msg)
-        toggle_cli = cli_node.create_client(
-            Trigger,
-            'hybraut_nav/controller_node/toggle'
-        )
-        req = Trigger.Request()
-        toggle_cli.wait_for_service(timeout_sec=10.0)
-        future = toggle_cli.call_async(req)
-        rclpy.spin_until_future_complete(cli_node, future, timeout_sec=5.0)
-        if future.result() is not None:
-            print(f"Service call succeeded: {future.result().message}")
-            
-        import time 
-        time.sleep(20)
-        
+
+def main():
+    rclpy.init()
+    executor = MultiThreadedExecutor(num_threads=os.cpu_count())
+    executor.add_node(node=ControllerNode)
+
+    try:
+        executor.spin()
     except Exception as e: 
-        print (e)
-    
-    rclpy.spin(node)
-    node.destroy_node()
+        print (f'Exception occured during execution: {e}')
+    except KeyboardInterrupt:
+        print (f'Keyboard interrupt occured')
+
+    executor.shutdown()
     rclpy.shutdown()
-    
+
 if __name__ == '__main__':
     main()
