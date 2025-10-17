@@ -47,13 +47,8 @@ from hybraut_nav.state import NodeState
 
 
 DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
-<<<<<<< HEAD
 DEFAULT_CONTROLLER_FREQUENCY: float = 10.0  # Hz
 DEFAULT_CRUISE_SPEED: float = 0.2 # m/s   
-=======
-DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
-DEFAULT_CRUISE_SPEED: float = 10.0 # m/s   
->>>>>>> a35f24fc7537a09a9579a85937b3643444d9175d
     
 
 class ControllerNode(Node):
