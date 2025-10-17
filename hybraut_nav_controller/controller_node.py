@@ -99,11 +99,11 @@ class ControllerNode(Node):
     def __init_parameters__(self):
         self.declare_parameter(
             'controller_type', 
-            DEFAULT_CONTROLLER_TYPE,
+            DEFAULT_CONTROLLER_TYPE.value,
             ParameterDescriptor(
                 description='Type of controller to use. '
                            'Options: Finite Time Controller .'
-                           f'(default: {DEFAULT_CONTROLLER_TYPE})'
+                           f'(default: {DEFAULT_CONTROLLER_TYPE.value})'
             )
         )
         self.declare_parameter(
