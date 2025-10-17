@@ -279,22 +279,3 @@ class ControllerNode(Node):
             self.control_timer.reset()
             
         return response
-        
-
-def main():
-    rclpy.init()
-    executor = MultiThreadedExecutor(num_threads=os.cpu_count())
-    executor.add_node(node=ControllerNode)
-
-    try:
-        executor.spin()
-    except Exception as e: 
-        print (f'Exception occured during execution: {e}')
-    except KeyboardInterrupt:
-        print (f'Keyboard interrupt occured')
-
-    executor.shutdown()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
