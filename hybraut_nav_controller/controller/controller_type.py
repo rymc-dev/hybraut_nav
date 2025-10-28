@@ -5,6 +5,7 @@ from .finite_time_controller import FiniteTimeController
 
 class ControllerType(Enum): 
     FINITE_TIME_CONTROLLER = "finite_time_controller"
+    PID_CONTROLLER = "pid_controller"
     
     @staticmethod
     def from_string(controller_type_str: str) -> 'ControllerType':

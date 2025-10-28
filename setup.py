@@ -12,6 +12,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
+        ('share/' + package_name + '/amdl', glob('share/' + package_name + '/amdl/*.yml')),  # <- fixed
     ],
     install_requires=['setuptools', 'launch_testing'],
     zip_safe=True,
