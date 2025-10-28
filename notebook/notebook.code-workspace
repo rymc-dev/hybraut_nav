@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "notebook",
+			"path": "."
+		},
+		{
+			"name": "bags",
+			"path": "../../hybraut_nav_bringup/notebooks/bags"
+		}
+	],
+	"settings": {}
+}
