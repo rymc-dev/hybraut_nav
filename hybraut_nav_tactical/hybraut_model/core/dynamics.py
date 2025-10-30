@@ -13,13 +13,13 @@ from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from hybraut_aci import DynamicsInterface
 from hybraut_aci.core.dynamics_interface import DynamicsInterface
 
-from hybraut_models.ctx.evaluation_context import EvaluationContext
-from hybraut_models.core.component_interfaces.wrapper_interface import WrapperInterface
-from hybraut_models.core.component_interfaces.registry_interface import (
+from ctx.evaluation_context import EvaluationContext
+from core.component_interfaces.wrapper_interface import WrapperInterface
+from core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
-from hybraut_models.ldr.component_path import ComponentPath
-from hybraut_models.ldr.msg_type import MsgType
+from ldr.component_path import ComponentPath
+from ldr.msg_type import MsgType
 import json
 from typing import List
 
@@ -207,9 +207,9 @@ class DynamicsRegistry(ComponentRegistry["DynamicsInterface"]):
 def main():
 
     import threading
-    from hybraut_models.ctx.evaluation_context import EvaluationContext
+    from ctx.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
-    from hybraut_models.core.states import StateRegistry
+    from core.states import StateRegistry
 
     dynamics_name = "pid_controller"
 

@@ -17,6 +17,7 @@ import os
 from hybraut_nav_tactical.tactical_models.models import HybridAutomaton
 from hybraut_nav.state import NodeState
 
+
 class TacticalNode(Node):
     
     state = NodeState.INACTIVE

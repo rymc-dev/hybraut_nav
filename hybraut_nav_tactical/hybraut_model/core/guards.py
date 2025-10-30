@@ -10,13 +10,13 @@ from typing import Any, Dict, List, Type
 
 from hybraut_interfaces.msg import GuardEvaluationMSG
 from hybraut_aci import GuardInterface
-from hybraut_models.ldr.component_path import ComponentPath
-from hybraut_models.core.component_interfaces import WrapperInterface
-from hybraut_models.core.component_interfaces.registry_interface import (
+from hybraut_nav_tactical.tactical_models.ldr.component_path import ComponentPath
+from hybraut_nav_tactical.tactical_models.core.component_interfaces import WrapperInterface
+from hybraut_nav_tactical.tactical_models.core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
-from hybraut_models.ctx.evaluation_context import EvaluationContext
-from hybraut_models.exc import EvaluationException
+from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
+from hybraut_nav_tactical.tactical_models.exc import EvaluationException
 
 logger = logging.getLogger(__name__)
 
@@ -186,11 +186,11 @@ def main():
             "type": {"pkg": "std_msgs.msg", "msg": "Bool"},
         }
     }
-    from hybraut_models.core.states import StateRegistry
+    from hybraut_nav_tactical.tactical_models.core.states import StateRegistry
 
     state_registry = StateRegistry.load_state_registry_from_amdl(states_dict=states)
 
-    from hybraut_models.ctx.evaluation_context import EvaluationContext
+    from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
     from builtin_interfaces.msg import Time
 
     evaluation_context = EvaluationContext(

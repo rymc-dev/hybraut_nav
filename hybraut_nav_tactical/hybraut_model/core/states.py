@@ -10,7 +10,7 @@ It also provides a StateRegistry for managing multiple states.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Type
 
-from hybraut_models.core.component_interfaces.registry_interface import (
+from hybraut_nav_tactical.tactical_models.core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
 import time

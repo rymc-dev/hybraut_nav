@@ -8,12 +8,12 @@ files.
 
 from typing import Any, Dict, List, Type, Optional
 
-from hybraut_models.core.component_interfaces.registry_interface import (
+from hybraut_nav_tactical.tactical_models.core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
-from hybraut_models.const.urgency import UrgencyEnums
-from hybraut_models.ctx.evaluation_context import EvaluationContext
-from hybraut_models.core.guards import GuardWrapper
+from hybraut_nav_tactical.tactical_models.const.urgency import UrgencyEnums
+from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
+from hybraut_nav_tactical.tactical_models.core.guards import GuardWrapper
 
 from hybraut_interfaces.msg import (
     GuardEvaluationMSG,

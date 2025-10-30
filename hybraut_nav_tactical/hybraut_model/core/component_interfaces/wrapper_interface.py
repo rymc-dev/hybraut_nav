@@ -8,7 +8,7 @@ from typing import Any, Type, Optional, Dict, List
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from builtin_interfaces.msg import Time
-from hybraut_models.ctx.evaluation_context import EvaluationContext
+from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
 from hybraut_aci.core.core_interface.hybrid_automaton_component_interface import (
     HybridComponentInterface,
 )

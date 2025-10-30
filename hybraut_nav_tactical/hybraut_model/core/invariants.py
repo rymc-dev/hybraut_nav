@@ -16,13 +16,13 @@ from typing import List, Type
 from hybraut_interfaces.msg import InvariantEvaluationMSG, InvariantEvaluationsMSG
 
 from hybraut_aci import InvariantInterface
-from hybraut_models.core.component_interfaces import WrapperInterface
-from hybraut_models.core.component_interfaces.registry_interface import (
+from hybraut_nav_tactical.tactical_models.core.component_interfaces import WrapperInterface
+from hybraut_nav_tactical.tactical_models.core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
-from hybraut_models.ctx.evaluation_context import EvaluationContext
+from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
 
-from hybraut_models.exc import EvaluationException
+from hybraut_nav_tactical.tactical_models.exc import EvaluationException
 
 
 logger = logging.getLogger(__name__)

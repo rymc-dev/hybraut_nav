@@ -19,26 +19,26 @@ from typing import List
 
 from hybraut_utils import now_to_ros_time_msg
 
-from hybraut_models.core.guards import GuardRegistry
-from hybraut_models.core.invariants import InvariantRegistry
-from hybraut_models.core.modes import ModeRegistry, Mode
-from hybraut_models.core.resets import ResetRegistry
-from hybraut_models.core.dynamics import DynamicsRegistry
-from hybraut_models.core.states import StateRegistry
-from hybraut_models.core.transitions import TransitionRegistry
+from .core.guards import GuardRegistry
+from .core.invariants import InvariantRegistry
+from .core.modes import ModeRegistry, Mode
+from .core.resets import ResetRegistry
+from .core.dynamics import DynamicsRegistry
+from .core.states import StateRegistry
+from .core.transitions import TransitionRegistry
 
-from hybraut_models.ctx.evaluation_context import EvaluationContext
+from .ctx.evaluation_context import EvaluationContext
 
 from hybraut_interfaces.msg import TransitionEvaluationsMSG
 from hybraut_interfaces.msg import InvariantEvaluationsMSG
 from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
 from hybraut_interfaces.msg import AutomatonResets
-from hybraut_models.const import ModeConnectivity
+from hybraut_nav_tactical.tactical_models.const import ModeConnectivity
 
 from typing import Tuple, Any
 
 
-from hybraut_models.exc import EvaluationException
+from .exc import EvaluationException
 
 
 class HybridAutomaton:

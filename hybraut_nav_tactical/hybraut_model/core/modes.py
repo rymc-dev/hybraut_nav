@@ -9,8 +9,8 @@ entering and exiting modes, and retrieving enabled transitions.
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from hybraut_models.ctx.evaluation_context import EvaluationContext
-from hybraut_models.core.transitions import Transition
+from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
+from hybraut_nav_tactical.tactical_models.core.transitions import Transition
 
 from typing import Optional, Callable
 
