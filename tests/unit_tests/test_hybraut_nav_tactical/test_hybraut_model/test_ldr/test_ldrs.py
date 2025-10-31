@@ -1,7 +1,7 @@
 # test_component_and_msg.py
 import pytest
 from hybraut_models.ldr import ComponentPath, MsgType
-from hybraut_utils import import_class
+from hybraut_nav_utils import import_class
 
 
 # --- Tests for ComponentPath ---

@@ -21,7 +21,7 @@ from hybraut_interfaces.msg import (
     TransitionEvaluationsMSG,
 )
 
-from hybraut_utils import now_to_ros_time_msg
+from hybraut_nav_utils import now_to_ros_time_msg
 
 
 class Transition:

@@ -21,7 +21,7 @@ from hybraut_nav_tactical.tactical_models.core.component_interfaces.registry_int
 from hybraut_nav_tactical.tactical_models.core.component_interfaces.wrapper_interface import WrapperInterface
 
 from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
-from hybraut_utils import now_to_ros_time_msg
+from hybraut_nav_utils import now_to_ros_time_msg
 
 # Set up module-level logger
 logger = logging.getLogger(__name__)

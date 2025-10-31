@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Type
-from hybraut_utils import import_class
+from hybraut_nav_utils import import_class
 
 @dataclass
 class MsgType:
