@@ -1,4 +1,4 @@
-from hybraut_execution_engine.evaluators.transitions import TransitionEvaluator
+from tactical_execution_engine.evaluators.transitions import TransitionEvaluator
 
 import rclpy
 from rclpy.node import Node
@@ -9,7 +9,7 @@ from hybraut_model_factory.amdl import HybridAutomatonFactory
 from rclpy.publisher import Publisher
 from hybraut_interfaces.msg import TransitionEvent
 
-from hybraut_execution_engine.internal_state import EngineAutomatonStateTracker
+from tactical_execution_engine.internal_state import EngineAutomatonStateTracker
 
 
 QOS = rclpy.qos.qos_profile_system_default

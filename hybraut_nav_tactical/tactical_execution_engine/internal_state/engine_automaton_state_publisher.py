@@ -9,7 +9,7 @@ from hybraut_interfaces.msg import AutomatonRuntimeState
 from builtin_interfaces.msg import Duration
 from rclpy.publisher import Publisher
 from rclpy.timer import Timer
-from hybraut_execution_engine.internal_state.engine_automaton_state_tracker import EngineAutomatonStateTracker
+from tactical_execution_engine.internal_state.engine_automaton_state_tracker import EngineAutomatonStateTracker
 from rclpy.qos import qos_profile_system_default
 from rclpy.callback_groups import ReentrantCallbackGroup
 

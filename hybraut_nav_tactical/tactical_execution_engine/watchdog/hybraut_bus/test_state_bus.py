@@ -13,7 +13,7 @@ import os
 from rclpy.node import Node
 import threading
 from hybraut_interfaces.msg import State
-from hybraut_execution_engine.watchdog.hybraut_bus.state_bus import StateBus, StateEnum
+from tactical_execution_engine.watchdog.hybraut_bus.state_bus import StateBus, StateEnum
 
 from rclpy.qos import QoSProfile, qos_profile_system_default
 

@@ -29,23 +29,23 @@ from rclpy.guard_condition import GuardCondition
 
 from automaton_interfaces.msg import AutomatonModeState 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from hybraut_lifecycle._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
+from tactical_lifecycle._internal.callbacks.dynamic_callbacks import dynamics_evaluation_callback
 from automaton_interfaces.msg import AutomatonDynamicsEvaluation, AutomatonStatus, AutomatonTransitionEvaluations
 from automaton_interfaces.msg import AutomatonInvariantsEvaluation
-from hybraut_lifecycle._internal.callbacks.invariant_callback import invariants_evaluation_callback
+from tactical_lifecycle._internal.callbacks.invariant_callback import invariants_evaluation_callback
 from automaton_interfaces.action import ExecuteMission
 from hybraut_lifecycle._internal.status_manager.status_fsm import StatusFSM
 
 
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from hybraut_lifecycle._internal.constants import QOS_PROFILE
+from tactical_lifecycle._internal.constants import QOS_PROFILE
 import sys  
 
-from hybraut_lifecycle._internal.callbacks import (
+from tactical_lifecycle._internal.callbacks import (
     transition_evaluation_callback,
     on_mode_callback,
 )
-from hybraut_lifecycle._internal.factory import (
+from tactical_lifecycle._internal.factory import (
     HybridAutomatonFactory
 )
 

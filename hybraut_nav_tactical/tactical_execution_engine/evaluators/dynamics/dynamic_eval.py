@@ -25,9 +25,9 @@ from typing import Tuple, Any
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
-from hybraut_execution_engine.evaluators.dynamics.dynamic_bus import DynamicsHub
+from tactical_execution_engine.evaluators.dynamics.dynamic_bus import DynamicsHub
 
-from hybraut_execution_engine.internal_state import EngineStateTracker
+from tactical_execution_engine.internal_state import EngineStateTracker
 from hybraut_interfaces.msg import AutomatonEvents
 
 

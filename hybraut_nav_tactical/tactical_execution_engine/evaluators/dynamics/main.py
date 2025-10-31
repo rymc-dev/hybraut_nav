@@ -1,4 +1,4 @@
-from hybraut_execution_engine.evaluators.invariants import InvariantEvaluator
+from tactical_execution_engine.evaluators.dynamics import DynamicEvaluator
 
 import rclpy
 from rclpy.node import Node
@@ -9,7 +9,7 @@ from hybraut_model_factory.amdl import HybridAutomatonFactory
 from rclpy.publisher import Publisher
 from hybraut_interfaces.msg import TransitionEvent
 
-from hybraut_execution_engine.internal_state import EngineAutomatonStateTracker
+from tactical_execution_engine.internal_state import EngineAutomatonStateTracker
 
 
 QOS = rclpy.qos.qos_profile_system_default
@@ -42,7 +42,7 @@ def main(**kwargs):
         node=node, initial_mode=0, q_goals=[1]
     )
 
-    invariant_evaluator: InvariantEvaluator = InvariantEvaluator(
+    dynamic_evaluator: DynamicEvaluator = DynamicEvaluator(
         node=node,
         state_tracker=engine_state_tracker,
         automaton=hybraut_model,
@@ -55,9 +55,8 @@ def main(**kwargs):
 
         while True:
             time.sleep(0.2)
-            invariant_evaluator()
+            dynamic_evaluator()
 
-    # TODO: Need to look into why invariant statuses is not showing all the invariants invformation.
     thread1 = threading.Thread(target=evaluation_callback)
     thread1.start()
 

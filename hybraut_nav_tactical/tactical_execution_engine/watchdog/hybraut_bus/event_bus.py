@@ -7,7 +7,7 @@ simplify event publishing and subscription
 for the base FSM class.
 """
 
-from hybraut_execution_engine.watchdog.hybraut_consts import TransitionEventEnum
+from tactical_execution_engine.watchdog.hybraut_consts import TransitionEventEnum
 from hybraut_interfaces.msg import TransitionEvent
 from dataclasses import dataclass
 from typing import Callable
@@ -16,8 +16,8 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, qos_profile_system_default
 from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 
-from hybraut_execution_engine.watchdog.hybraut_bus.ros_bus import BaseBus
-from hybraut_execution_engine.watchdog.hybraut_consts import TransitionEventEnum
+from tactical_execution_engine.watchdog.hybraut_bus.ros_bus import BaseBus
+from tactical_execution_engine.watchdog.hybraut_consts import TransitionEventEnum
 from typing import Type, Union, Any
 from enum import Enum
 

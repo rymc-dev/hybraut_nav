@@ -15,8 +15,8 @@ from typing import Type, Callable, Any
 from hybraut_interfaces.msg import State
 from enum import Enum
 
-from hybraut_execution_engine.watchdog.hybraut_consts import StateEnum
-from hybraut_execution_engine.watchdog.hybraut_bus.ros_bus import BaseBus
+from tactical_execution_engine.watchdog.hybraut_consts import StateEnum
+from tactical_execution_engine.watchdog.hybraut_bus.ros_bus import BaseBus
 from typing import Union
 
 @dataclass

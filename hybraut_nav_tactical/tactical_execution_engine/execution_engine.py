@@ -27,23 +27,23 @@ from rclpy.callback_groups import CallbackGroup, ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, qos_profile_system_default
 
 from hybraut_interfaces.msg import TransitionEvent
-from hybraut_execution_engine.watchdog.fsm import FSM
+from tactical_execution_engine.watchdog.fsm import FSM
 
 from hybraut_models import HybridAutomaton
 
-from hybraut_execution_engine.event_handlers.world_state_update_handler import (
+from tactical_execution_engine.event_handlers.world_state_update_handler import (
     WorldStateHandler,
     WorldStateHandlerHub,
 )
 
-from hybraut_execution_engine.evaluators import (
+from tactical_execution_engine.evaluators import (
     DynamicEvaluator,
     InvariantEvaluator,
     TransitionEvaluator,
 )
 from rclpy.publisher import Publisher
 
-from hybraut_execution_engine.internal_state import EngineAutomatonStateTracker
+from tactical_execution_engine.internal_state import EngineAutomatonStateTracker
 from rclpy.clock import Clock
 
 QOS = qos_profile_system_default

@@ -16,7 +16,7 @@ from enum import Enum
 import logging
 import subprocess
 from pathlib import Path
-from hybraut_lifecycle._internal.factory.famd_validator import FAMDValidator
+from tactical_lifecycle._internal.factory.famd_validator import FAMDValidator
 from hybraut_lifecycle._internal.automaton import HybridAutomaton
 from hybraut_lifecycle._internal.automaton.hybrid_automaton_model_diagram_generator import HybridAutomatonModelDiagramGenerator
 

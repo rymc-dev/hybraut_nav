@@ -69,7 +69,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile
 import os
 import time
-from hybraut_lifecycle._internal.factory import HybridAutomatonFactory
+from tactical_lifecycle._internal.factory import HybridAutomatonFactory
 
 # automaton_model_file_path = os.path.join(os.path.dirname(__file__), 'test_data/test_hybrid_automaton.famd.yaml')
 automaton_model_file_path = "/home/3507145@eeecs.qub.ac.uk/ros2_ws/src/colav-hybrid-automaton/colav_hybrid_automaton/tests/unit_tests/test_automaton/test__internal/test_callbacks/test_data/test_hybrid_automaton.famd.yaml"

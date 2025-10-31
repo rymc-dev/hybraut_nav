@@ -24,6 +24,10 @@ pkg_share_dir = get_package_share_directory(package_name)
 default_config_path = os.path.join(pkg_share_dir, 'automaton', 'config', 'colav-famd.yml')
 
 def generate_launch_description():
+    # should have a launch configuration xml for all three layers, 
+    # strategy: XML name of the global planner, as well as configurations surrounding other params like event horizon
+    # , tactical: AMDL: defines the tactical model and links to guard, reset, invariant ... behaviour implementations, control: XML this will contain name of the initial controller along with it's parameters
+
 
     # Declare launch arguments
     configuration_path_arg = DeclareLaunchArgument(
