@@ -4,15 +4,15 @@ factory class for generating a hybrid automaton model fomr
 an AMDL file.
 """
 
-from hybraut_models import HybridAutomaton
+from hybraut_nav_tactical.hybraut_model import HybridAutomaton
 
-from hybraut_factory.amdl.core.state_factory import StateFactory
-from hybraut_factory.amdl.core.guard_factory import GuardFactory
-from hybraut_factory.amdl.core.reset_factory import ResetFactory
-from hybraut_factory.amdl.core.dynamics_factory import DynamicsFactory
-from hybraut_factory.amdl.core.invariant_factory import InvariantFactory
-from hybraut_factory.amdl.core.transition_factory import TransitionFactory
-from hybraut_factory.amdl.core.mode_factory import ModeFactory
+from hybraut_model_factory.amdl.core.state_factory import StateFactory
+from hybraut_model_factory.amdl.core.guard_factory import GuardFactory
+from hybraut_model_factory.amdl.core.reset_factory import ResetFactory
+from hybraut_model_factory.amdl.core.dynamics_factory import DynamicsFactory
+from hybraut_model_factory.amdl.core.invariant_factory import InvariantFactory
+from hybraut_model_factory.amdl.core.transition_factory import TransitionFactory
+from hybraut_model_factory.amdl.core.mode_factory import ModeFactory
 
 
 class HybridAutomatonFactory:

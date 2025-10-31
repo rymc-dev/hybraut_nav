@@ -6,10 +6,11 @@ It includes functionality for loading reset components dynamically and validatin
 It is designed to be used within the Hybraut ROS2 framework.
 """
 
-from hybraut_models.core.resets import ResetRegistry, ResetWrapper
 from typing import Dict, Any
-from hybraut_models.ldr import ComponentPath
 import logging
+
+from hybraut_nav_tactical.hybraut_model.core.resets import ResetRegistry, ResetWrapper
+from hybraut_nav_tactical.hybraut_model.ldr import ComponentPath
 
 
 class ResetFactory:

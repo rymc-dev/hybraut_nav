@@ -7,8 +7,8 @@ Transition Factory Module for Hybraut Model
 import logging
 from typing import Dict, Any
 
-from hybraut_models.core.transitions import TransitionRegistry, Transition
-from hybraut_models.const.urgency import UrgencyEnums
+from hybraut_nav_tactical.hybraut_model.core.transitions import TransitionRegistry, Transition
+from hybraut_nav_tactical.hybraut_model.const.urgency import UrgencyEnums
 
 logger = logging.getLogger(__name__)
 

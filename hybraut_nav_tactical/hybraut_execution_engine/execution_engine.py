@@ -270,7 +270,7 @@ def main():
         path = "/home/ryan/ros2_ws/src/hybraut_ros2/example_amdls/hybraut_tb3.amdl.yml"
         with open(path, "r") as f:
             data = yaml.safe_load(f)
-        from hybraut_factory.amdl import HybridAutomatonFactory
+        from hybraut_model_factory.amdl import HybridAutomatonFactory
         
         automaton: HybridAutomaton = HybridAutomatonFactory.register_automaton(
             amdl_dict=data

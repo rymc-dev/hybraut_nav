@@ -101,7 +101,7 @@ import threading
 from rclpy.executors import MultiThreadedExecutor
 import os
 import yaml
-from hybraut_factory.amdl import HybridAutomatonFactory
+from hybraut_model_factory.amdl import HybridAutomatonFactory
 
 
 def main() -> None:

@@ -5,7 +5,7 @@ from rclpy.node import Node
 import threading
 from rclpy.executors import MultiThreadedExecutor
 import yaml
-from hybraut_factory.amdl import HybridAutomatonFactory
+from hybraut_model_factory.amdl import HybridAutomatonFactory
 from rclpy.publisher import Publisher
 from hybraut_interfaces.msg import TransitionEvent
 

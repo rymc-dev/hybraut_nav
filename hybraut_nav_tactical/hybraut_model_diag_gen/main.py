@@ -5,13 +5,13 @@ Mainly for testing and showing how the diagram generator works, not for use in p
 """
 
 import yaml
-from hybraut_diag_gen import HybrautDiag
+from hybraut_model_diag_gen import HybrautDiag
 
 """=== Code below here is for testing not for production use. ==="""
 
 
 def main():
-    from hybraut_factory.amdl.models import HybridAutomatonFactory
+    from hybraut_model_factory.amdl.models import HybridAutomatonFactory
 
     amdl_path = "/home/ryan/ros2_ws/src/hybraut_ros2/example_amdls/hybraut_tb3.amdl.yml"
     with open(amdl_path, "r") as f:

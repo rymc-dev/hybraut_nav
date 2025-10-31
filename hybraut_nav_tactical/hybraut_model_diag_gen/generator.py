@@ -9,9 +9,9 @@ from hybraut_models.core import ModeRegistry, Mode
 from hybraut_models.core.transitions import TransitionRegistry, Transition
 import yaml
 
-from hybraut_diag_gen.config import Theme, Background, OutputFormat, DiagramConfig
-from hybraut_diag_gen.exceptions import MermaidDiagramGeneratorError
-from hybraut_diag_gen.mermaid_utils import (
+from hybraut_model_diag_gen.config import Theme, Background, OutputFormat, DiagramConfig
+from hybraut_model_diag_gen.exceptions import MermaidDiagramGeneratorError
+from hybraut_model_diag_gen.mermaid_utils import (
     add_goal_states,
     add_initial_state,
     add_modes,

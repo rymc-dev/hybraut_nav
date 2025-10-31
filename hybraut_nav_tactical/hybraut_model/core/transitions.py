@@ -8,12 +8,12 @@ files.
 
 from typing import Any, Dict, List, Type, Optional
 
-from hybraut_nav_tactical.tactical_models.core.component_interfaces.registry_interface import (
+from core.component_interfaces.registry_interface import (
     ComponentRegistry,
 )
-from hybraut_nav_tactical.tactical_models.const.urgency import UrgencyEnums
-from hybraut_nav_tactical.tactical_models.ctx.evaluation_context import EvaluationContext
-from hybraut_nav_tactical.tactical_models.core.guards import GuardWrapper
+from const.urgency import UrgencyEnums
+from ctx.evaluation_context import EvaluationContext
+from core.guards import GuardWrapper
 
 from hybraut_interfaces.msg import (
     GuardEvaluationMSG,
@@ -222,36 +222,3 @@ class TransitionRegistry(ComponentRegistry):
     def __str__(self):
         transitions_str = "\n".join(str(t) for t in self._components.values())
         return f"TransitionRegistry with {len(self._components)} transitions:\n{transitions_str}"
-
-
-""" === Main function for testing or running the module, not for production use === """
-
-
-def main():
-    # Example usage of Transition and TransitionrRegistry
-
-    transition_data = {
-        "transition_1": {
-            "target_mode": 2,
-            "guard": ["guard_1", "guard_2"],
-            "reset": ["reset_1"],
-            "urgency": 1,  # EAGER urgency,
-        },
-        "transition_2": {
-            "target_mode": 3,
-            "guard": ["guard_3"],
-            "reset": ["reset_2", "reset_3"],
-            "urgency": 2,  # LAZY urgency
-        },
-    }
-
-    transition_registry = TransitionRegistry.load_transition_registry_from_amdl(
-        transition_data
-    )
-
-    print(f"string transition_registry representation: {transition_registry}\n")
-    print(f"__repr__ transition_registry representation: {repr(transition_registry)}")
-
-
-if __name__ == "__main__":
-    main()

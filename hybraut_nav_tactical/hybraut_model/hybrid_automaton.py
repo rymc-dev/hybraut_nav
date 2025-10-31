@@ -1,5 +1,5 @@
+# <---utf-8--->
 # !/usr/bin/python3
-#
 """
 Hybrid Automaton Implementation
 
@@ -15,29 +15,27 @@ This module is intended to be used as part of a larger Hybraut framework, which 
 evaluation.
 """
 
-from typing import List
+from typing import List, Tuple, Any
 
 from hybraut_utils import now_to_ros_time_msg
-
-from .core.guards import GuardRegistry
-from .core.invariants import InvariantRegistry
-from .core.modes import ModeRegistry, Mode
-from .core.resets import ResetRegistry
-from .core.dynamics import DynamicsRegistry
-from .core.states import StateRegistry
-from .core.transitions import TransitionRegistry
-
+from .core import (
+    GuardRegistry,
+    InvariantRegistry,
+    ModeRegistry,
+    Mode,
+    ResetRegistry,
+    DynamicsRegistry,
+    StateRegistry,
+    TransitionRegistry,
+)
+from hybraut_interfaces.msg import (
+    TransitionEvaluationsMSG,
+    InvariantEvaluationsMSG,
+    AutomatonDynamicsEvaluation,
+    AutomatonResets
+)
 from .ctx.evaluation_context import EvaluationContext
-
-from hybraut_interfaces.msg import TransitionEvaluationsMSG
-from hybraut_interfaces.msg import InvariantEvaluationsMSG
-from hybraut_interfaces.msg import AutomatonDynamicsEvaluation
-from hybraut_interfaces.msg import AutomatonResets
-from hybraut_nav_tactical.tactical_models.const import ModeConnectivity
-
-from typing import Tuple, Any
-
-
+from .const import ModeConnectivity
 from .exc import EvaluationException
 
 

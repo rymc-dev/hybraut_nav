@@ -6,10 +6,12 @@ This factory is used to create instances of DynamicsWrapper and DynamicsRegistry
 the provided AMDL configuration.
 """
 
-from hybraut_models.core.guards import GuardWrapper, GuardRegistry
 from typing import Dict, Any
 import logging
-from hybraut_models.ldr import ComponentPath
+
+from hybraut_nav_tactical.hybraut_model.core.guards import GuardWrapper, GuardRegistry
+from hybraut_nav_tactical.hybraut_model.ldr import ComponentPath
+
 
 logger = logging.getLogger(__name__)
 

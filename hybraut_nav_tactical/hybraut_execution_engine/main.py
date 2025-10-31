@@ -8,8 +8,8 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 
 from hybraut_execution_engine.execution_engine import ExecutionEngine
-from hybraut_factory.amdl import HybridAutomatonFactory
-from hybraut_diag_gen.generator import HybrautDiag
+from hybraut_model_factory.amdl import HybridAutomatonFactory
+from hybraut_model_diag_gen.generator import HybrautDiag
 
 import yaml
 

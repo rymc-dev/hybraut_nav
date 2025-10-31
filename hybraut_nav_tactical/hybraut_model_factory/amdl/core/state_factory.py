@@ -6,13 +6,14 @@ This module provides a factory for creating State instances from AMDL (Automaton
 configuration, enabling dynamic loading of state definitions.
 """
 
-from hybraut_models.core.states import State, StateRegistry
-from hybraut_models.ldr import MsgType
 from typing import Dict, Any
 import logging
 
-logger = logging.getLogger(__name__)
+from hybraut_nav_tactical.hybraut_model.core.states import State, StateRegistry
+from hybraut_nav_tactical.hybraut_model.ldr import MsgType
 
+
+logger = logging.getLogger(__name__)
 
 class StateFactory:
     component_cls = State
