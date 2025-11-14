@@ -1,6 +1,11 @@
 """ 
-
-
+Hybrid Automaton is a model which models real-time and simulated 
+tactical decision for navigating complex scenarios, This package implements
+several classes, HybridTransition defines components of a transition 
+for a hybrid automaton which is composed of guards and resets, 
+Hybrid State contains transitions invariants and flow functions for 
+calculation of continous dynamics which can be utilized by real world 
+controllers or internally for simulating next states.
 """
 
 import os
@@ -12,11 +17,12 @@ from statemachine import State
 from typing import Optional, Callable, List, Any, Tuple
 import asyncio
 
-
 from typing import Optional, Callable, Any, Tuple, Dict
 
-
-
+class IntegrationMethods: 
+    def default_integration(self, x, xdot, dt):
+        return x + xdot * dt
+    
 class HybridTransition:
     """ 
     Defines the transition logic for a hybrid automaton model.
@@ -345,6 +351,12 @@ class HybridAutomaton:
             these are the Hybrid STates of the automaton, these represent the discrete modes
             of the automaton 
 
+        real_time_mode: bool
+            determines whether continous state should have simulated integration,
+            (automation to compute xdot (continous dynamics) and integrate it with continous state
+            on each internal loop), if true loop just uses whatever is provided for continous state via
+            manual set_continous_state function which will be hooked up to sensors.
+
         on_entry: Optional[Callable]
             on entry callback function for when evaluation_loop_worker starts
 
@@ -374,7 +386,15 @@ class HybridAutomaton:
     _elapsed_time_active = None
     _elapsed_time_since_transition = None
     
-    def __init__(self, name: str, value: int, states: List[HybridTransition], on_entry: Optional[Callable] = None, on_exit: Optional[Callable] = None):
+    def __init__(
+        self, 
+        name: str, 
+        value: int, 
+        states: List[HybridTransition], 
+        on_entry: Optional[Callable] = None, 
+        on_exit: Optional[Callable] = None,
+        real_time_mode: bool = False
+    ):
         """ """
         
         self.NAME = name
@@ -388,6 +408,8 @@ class HybridAutomaton:
         if cnt_init > 1: 
             raise ValueError(f"invalid HybridAutomaton initialization, need 1 initial state, got {cnt_init}")
         
+        self._real_time_mode = real_time_mode
+
         self._Q_T0 = self.Q[init_idx[0]]
         self._ON_ENTRY = on_entry
         self._ON_EXIT = on_exit
@@ -461,11 +483,20 @@ class HybridAutomaton:
         while self.active:
 
             # -------------------------------------------------------------
-            # 1️⃣ Continuous dynamics (ALWAYS evaluated first)
+            # 1️⃣ Continuous dynamics
             # -------------------------------------------------------------
-            self._xdot = await self._q.continuous_dynamics(
-                self._x, self._u, self._ctx, self._dt
-            )
+            
+            if not self._real_time_mode: # simulated
+                self._xdot = await self._q.continuous_dynamics(
+                    self._x, self._u, self._ctx, self._dt
+                )
+                if self._xdot is not None: 
+                    self._x = self._x + self._xdot * self._dt # TODO: need to update this to use injectable Integrator function
+
+            else: # real time 
+                self._xdot = await self._q.continous_dynamics(
+                    self._x, self._u, self._ctx, self._dt
+                )
 
             # TODO: check here if there is integration/ real_time param is set to true or false
             # for now assuming closed loop control with simulation, If it's not real time
@@ -505,7 +536,7 @@ class HybridAutomaton:
                     d = resolve_transition_priority(D_active)
 
                 # ---------------------------------------------------------
-                # 2b️⃣ Execute transition (apply reset, change state)
+                # Execute transition (apply reset, change state)
                 # ---------------------------------------------------------
                 new_q, new_x, new_ctx = d.execute(
                     self._x, self._u, self._ctx, self._dt
