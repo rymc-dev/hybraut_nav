@@ -15,6 +15,8 @@ import asyncio
 
 from typing import Optional, Callable, Any, Tuple, Dict
 
+
+
 class HybridTransition:
     """ 
     Defines the transition logic for a hybrid automaton model.
@@ -41,19 +43,19 @@ class HybridTransition:
         self,
         name: str,
         value: int,
-        to: str,
-        guards: Optional[List[Callable[[Any], bool]]] = None,
-        resets: Optional[List[Callable[[Any], Any]]] = None,
-        priority: int = 1
+        to_state: "HybridState",
+        guards: Optional[List[Callable]] = None,
+        reset: Optional[Callable] = None,
+        priority: int = 0
     ):
         self.name = name
         self.value = value
-        self.to = to
-        self.guards = guards
-        self.resets = resets
+        self.to_q = to_state
+        self.G = guards
+        self.R = reset
         self.priority = priority
 
-    def is_enabled(self, x: Any, ctx: Optional[Any] = None) -> bool:
+    def is_enabled(self, x: Any, u: Optional[Any], ctx: Optional[Any] = None, dt: Optional[float] = 0.1) -> bool:
         """
         apply guard to continous state and/or auxielary context 
         to see if transition is enabled or not
@@ -61,16 +63,20 @@ class HybridTransition:
         Args: 
             x: Any
                 continous state information representation
+            u: Optional[Any]
+                control input
             ctx: Optional[Any]
                 auxilary information for the hybrid automaton model
+            dt: Optional[float]
+                the delta time for calculating future states
 
         Outputs: 
             boolean: represents if transition is enabled
         """
-        if self.guards is None:
+        if self.G is None:
             return True # pass through guard, always true if guard not given
         
-        return all(guard(x, ctx) for guard in self.guards)
+        return all(g(x, u, ctx, dt) for g in self.G)
     
     def apply_reset(self, x: Any, u: Optional[Any], ctx: Optional[Any] = None, dt: Optional[float] = 0.1) ->  Tuple[Any, Any]: 
         """
@@ -80,15 +86,19 @@ class HybridTransition:
         Args: 
             x: Any
                 continous state information repesentation
+            u: Optional[Any]
+                control input
             ctx: Optional[Any]
                 auxielary context information represenation the for hybrid automaton
+            dt: Optional[float]
+                delta time
 
         Outputs:
             Tuple[x, ctx]: represents new continous states and auxielary states
         """
-        if self.resets is None: 
+        if self.R is None: 
             return x, ctx # pass through, reset just returns the x and ctx
-        return self.resets(x, u, ctx, dt)
+        return self.R(x, u, ctx, dt)
     
     def execute(self, x: Any, u: Optional[Any] = None, ctx: Optional[Any] = None, dt: Optional[float] = 0.1) -> Tuple[Any, Any, Any]:
         """ 
@@ -106,13 +116,32 @@ class HybridTransition:
                 the delta time in seconds
         """
         new_x, new_ctx = self.apply_reset(x, u, ctx, dt)
-        return self.to, new_x, new_ctx
+        return self.to_q, new_x, new_ctx
     
     def __repr__(self): 
-        ... 
-
+        """Developer representation: unambiguous string useful for debugging."""
+        to_name = getattr(self.to_q, "name", repr(self.to_q))
+        guards_repr = None if self.G is None else [getattr(g, "__name__", repr(g)) for g in self.G]
+        reset_repr = None if self.R is None else getattr(self.R, "__name__", repr(self.R))
+        return (
+            f"HybridTransition(name={self.name!r}, value={self.value!r}, "
+            f"to={to_name!r}, guards={guards_repr!r}, reset={reset_repr!r}, "
+            f"priority={self.priority!r})"
+        )
+    
     def __str__(self): 
-        ...
+        """User-friendly string: shows target, guard names and reset name."""
+        to_name = getattr(self.to_q, "name", repr(self.to_q))
+        if self.G:
+            guards_list = [getattr(g, "__name__", repr(g)) for g in self.G]
+            guards_str = ", ".join(guards_list)
+        else:
+            guards_str = "None"
+        reset_str = getattr(self.R, "__name__", repr(self.R)) if self.R is not None else "None"
+        return (
+            f"Transition '{self.name}' -> {to_name} (value={self.value}, priority={self.priority}, "
+            f"guards=[{guards_str}], reset={reset_str})"
+        )
 
 class HybridState:
     """ 
@@ -173,21 +202,17 @@ class HybridState:
         self.name = name
         self.value = value
         self.flow = flow
-        self.invariants = invariants
-        self.transitions = [] if transitions == None else transitions
+        self._Inv = invariants
+        self._D = [] if transitions == None else transitions
         self.integration_method = integartion_method
-        self.initial = initial
-        self.final = final
+        self._is_init = initial
+        self._is_final = final
         self.on_enter = on_enter
         self.on_exit = on_exit
 
-
-
-
-
-
     def add_transition(self, transition: HybridTransition): 
-        self.transitions.append(transition)
+        """function for adding transition post HybridState obj creation"""
+        self._D.append(transition)
 
     async def evaluate_transitions(self, x: Any, u: Optional[Any] = None, ctx: Optional[Any] = None, dt: float = 0.1) -> List[Tuple[HybridTransition, bool, Optional[Exception]]]:
         """
@@ -201,17 +226,17 @@ class HybridState:
             x: continous state
             ctx: auxielary context for this Hybrid Automaton to run
         """
-        if not self.transitions:
+        if not self._D:
             return []
 
-        async def _eval(t: HybridTransition):
+        async def _eval(d: HybridTransition):
             try:
-                enabled = bool(t.is_enabled(x, ctx))
-                return (t, enabled, None)
+                enabled = bool(d.is_enabled(x, ctx))
+                return (d, enabled, None)
             except Exception as e:
-                return (t, False, e)
+                return (d, False, e)
 
-        coros = [_eval(t) for t in self.transitions]
+        coros = [_eval(d) for d in self._D]
         results = await asyncio.gather(*coros, return_exceptions=False)
         return results
 
@@ -249,7 +274,7 @@ class HybridState:
         bool: True if invariant holds, else False
         """
     
-        if not self.invariants:
+        if not self._Inv:
             return []
 
         async def _eval(i: Callable):
@@ -259,10 +284,53 @@ class HybridState:
             except Exception as e:
                 return (i, False, e)
 
-        coros = [_eval(i) for i in self.invariants]
+        coros = [_eval(i) for i in self._Inv]
         results = await asyncio.gather(*coros, return_exceptions=False)
         return results
     
+    def __repr__(self):
+        """Developer representation: unambiguous string useful for debugging."""
+        transitions_repr = None if not self._D else [
+            getattr(d, "name", repr(d)) for d in self._D
+        ]
+        flow_repr = None if self.flow is None else getattr(self.flow, "__name__", repr(self.flow))
+        invariants_repr = None if not self._Inv else [
+            getattr(i, "__name__", repr(i)) for i in self._Inv
+        ]
+        return (
+            f"HybridState(name={self.name!r}, value={self.value!r}, "
+            f"initial={self._is_init!r}, final={self._is_final!r}, "
+            f"flow={flow_repr!r}, invariants={invariants_repr!r}, "
+            f"transitions={transitions_repr!r})"
+        )
+
+    def __str__(self):
+        """User-facing string: shows state, flags, flow, invariants and transitions (with guards/resets)."""
+        flags = []
+        if self._is_init:
+            flags.append("initial")
+        if self._is_final:
+            flags.append("final")
+        flags_str = ", ".join(flags) if flags else "normal"
+
+        flow_str = getattr(self.flow, "__name__", repr(self.flow)) if self.flow is not None else "None"
+        Inv_str = "None" if not self._Inv else ", ".join(
+            getattr(i, "__name__", repr(i)) for i in self._Inv  
+        )
+
+        if not self._D:
+            D_str = "None"
+        else:
+            # Use each transition's __str__ (which includes guard and reset names)
+            D_str = "; ".join(str(d) for d in self._D)
+
+        return (
+            f"State '{self.name}' (value={self.value}, {flags_str})\n"
+            f"  flow: {flow_str}\n"
+            f"  invariants: [{Inv_str}]\n"
+            f"  transitions: [{D_str}]"
+        )
+
 class HybridAutomaton: 
     """ 
     model of the hybrid automaton 
@@ -313,7 +381,7 @@ class HybridAutomaton:
         self.VALUE = value
         self.Q = states
 
-        init_idx = [i for i, s in enumerate(self.Q) if getattr(s, "initial", False)]
+        init_idx = [i for i, s in enumerate(self.Q) if getattr(s, "_is_init", False)]
         cnt_init = len(init_idx)
         if cnt_init == 0: 
             raise ValueError("invalid HybridAutomaton initialization, need 1 initial state, got 0.")
@@ -360,15 +428,6 @@ class HybridAutomaton:
     def set_dt(self, new_dt: float):
         """explicit setter for internal dt, used for timing of evalution loop and calculations"""
         self._dt = new_dt
-
-
-    async def trigger_transition(self): ... 
-
-    async def trigger_reset(self): 
-        ... 
-
-    async def step_evalution(self): 
-        ... 
 
     async def evluation_loop_worker(
         self,
@@ -474,7 +533,7 @@ class HybridAutomaton:
 
             if not invariants_ok:
                 # Invariant violated → forced exit or error
-                if self._q.final:
+                if self._q._is_final:
                     # Proper termination
                     print(f"{self.NAME} reached final state {self._q.name}")
                     self.active = False
@@ -519,7 +578,7 @@ def main():
         HybridTransition(
             name="transition_1",
             value=1,
-            to=state_2,
+            to_state=state_2,
             guards=[guard],
         )
     )
@@ -527,7 +586,7 @@ def main():
         HybridTransition(
                 name="transition_1",
                 value=2,
-                to=state_2,
+                to_state=state_2,
                 guards=[guard],
                 priority=2
             )
