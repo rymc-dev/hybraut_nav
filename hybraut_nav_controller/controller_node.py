@@ -1,25 +1,32 @@
 # controller_node.py
-# **- coding: utf-8 -*-
-# !/usr/bin/env python3
-""" 
-This file contains implementation of Layer 3 of the HybrautNav Navigation Stack
-This layer produces the low-level actuator commands for the controller or execution 
-layer.
+# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+"""
+Implementation of the Guidance and Control Layer (Layer 3) of the HybrautNav 
+Navigation Stack.
 
-- It closes the HybrautNav navigation stack for fast control loops
-- enforces safety limits
-- interfaces with hardware (rudder, thrusters)
-- and allows Layer 2 to stay physics agnostic
+This layer integrates the finite-time high-level guidance controller and 
+produces reference commands—desired yaw rate and desired velocity—that will 
+be tracked by downstream low-level controllers (e.g., PID, differential-drive, 
+MPC). It acts as the closure of the HybrautNav stack for fast control loops, 
+bridging the tactical continuous dynamics and the physical control execution.
 
-NOTE: This version of controller only considers velocity and continous
-      dynamics of the hybraut_tactical_layer will only generate desired 
-      headings for the moment for the moment
+Responsibilities:
+- Integrates the high-level guidance controller into real-time control loops
+- Enforces safety limits and parameter constraints
+- Provides hardware interfacing pathways (rudder, thrusters, actuators)
+- Allows the L2 Tactical Layer to remain physics-agnostic by handling 
+  vessel-specific control considerations here
+
+NOTE:
+This version of the controller assumes a constant forward velocity and relies 
+on the continuous dynamics from the hybraut_tactical_layer to supply only a 
+desired heading. Future versions may support richer dynamic references.
 """
 
 import math
-from typing import Optional, Union
+from typing import Optional
 
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 import os
 
@@ -30,8 +37,6 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.subscription import Subscription
 from rclpy.publisher import Publisher
 from rclpy.service import Service
-from rclpy.timer import Timer
-
 from rcl_interfaces.msg import ParameterDescriptor
 
 from geometry_msgs.msg import TwistStamped
@@ -42,44 +47,53 @@ from hybraut_nav_controller.controller import Controller
 from hybraut_nav.qos import world_state_qos
 from hybraut_interfaces.msg import ContinousDynamics
 
-from hybraut_nav_controller.controller import Controller, ControllerType
 from hybraut_nav.state import NodeState
 
+from finite_time_control import HeadingFTC
 
-DEFAULT_CONTROLLER_TYPE: ControllerType = ControllerType.FINITE_TIME_CONTROLLER
-DEFAULT_CONTROLLER_FREQUENCY: float = 10.0  # Hz
-DEFAULT_CRUISE_SPEED: float = 0.2 # m/s   
-    
+from rcl_interfaces.msg import ParameterType
+
+DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
+DEFAULT_CRUISE_SPEED: float = 0.2 # m/s       
+DEFAULT_YAW_RATE_LIMIT: float = 0.2
+DEFAULT_DESIRED_HEADING: float = 0.0
+
+import numpy as np
+
 
 class ControllerNode(Node):
-    """ 
-    ControllerNode forms apart of the HybrautNav Navigation Stack.
-    
-    It is responsible for generating Low-Level Actuator Commands based 
-    on both the continous dynamics received from the L2 Tactical Layer
-    Hybrid Autmoaton and the current state of the agent vehicle, It utilizes
-    a controller to compute the necessary commands for Twist messages to 
-    follow the desired trajectory as defined within the continous dynamics. 
-    
-    This Node Does not implement the actual controller but instaed provides the 
-    interfaces to plug into the HybrautNav Navigation Stack and manages dynamic
-    reconfiguration of controller parameters like what controller we should
-    be using in the controller Loop in real time via manual changes of parameters
-    by human in the loop or updates from continous dynamic messages which request for 
-    controller to be changes based on control mode we are in.
-    """    
-    
-    # Controller Type
+    """
+    ControllerNode is a core component of the HybrautNav Navigation Stack,
+    integrating a finite-time guidance controller and its manager into the 
+    Planning–Behaviour–Guidance architecture.
+
+    This node computes high-level guidance commands—specifically desired 
+    yaw rate and desired velocity—based on the continuous dynamics provided 
+    by the L2 Tactical Layer’s Hybrid Automaton and the current state of the 
+    agent vehicle. In this version, the controller assumes a constant forward 
+    velocity and uses the desired heading from the tactical layer as its 
+    primary reference.
+
+    The ControllerNode does not implement any low-level control (e.g., PID, 
+    differential drive control, MPC). Instead, it produces reference commands 
+    that downstream low-level controllers can track, incorporating the vessel’s 
+    physical parameters as needed.
+
+    This node also manages dynamic reconfiguration of controller parameters 
+    and supports runtime switching of control modes—whether triggered manually 
+    by a human operator or automatically via updates from continuous-dynamics 
+    messages generated by the tactical layer.
+    """
 
     # internal state
     state: NodeState = NodeState.INACTIVE
-    controller: Optional[Controller] = None
+    controller: Controller = HeadingFTC
+
     desired_heading: float = 0.0
-    desired_velocity: float = 0.0
-    target_waypoint = None
-    heading_tolerance: float = 0.1
-    velocity_tolerance: float = 0.1
-    
+
+    desired_velocity: float = 10.0
+    desired_yaw_rate: float = 0.0
+
     # State variables
     agent_state: Optional[Odometry] = None
     
@@ -90,9 +104,7 @@ class ControllerNode(Node):
     
     # services 
     toggle_controller_srv: Service = None
-    
-    # Timer
-    control_timer: Timer = None 
+
     
     def __init__(self):
         super().__init__('controller_node', namespace='hybraut_nav')
@@ -101,44 +113,55 @@ class ControllerNode(Node):
         self.__init_subscriptions__()
         self.__init_publishers__()
         self.__init_timers__()
-        self.add_on_set_parameters_callback(self.on_parameter_change)
         self.__init_services__()
-        self.__init_default_controller__()
+        self.__init_controller__()
 
     def __init_parameters__(self):
-        self.declare_parameter(
-            'controller_type', 
-            DEFAULT_CONTROLLER_TYPE.value,
-            ParameterDescriptor(
-                description='Type of controller to use. '
-                           'Options: Finite Time Controller .'
-                           f'(default: {DEFAULT_CONTROLLER_TYPE.value})'
-            )
-        )
         self.declare_parameter(
             'controller_frequency',
             DEFAULT_CONTROLLER_FREQUENCY,
             ParameterDescriptor(
                 description='Frequency (Hz) at which to run the controller loop. '
-                            f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)'
+                            f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)',
+                type=ParameterType.PARAMETER_INTEGER
             )
         )
         self.declare_parameter(
-            'cruise_speed',
+            'desired_velocity',
             DEFAULT_CRUISE_SPEED, 
             ParameterDescriptor(
                 description='Velocity (m/s) in which the controller will' \
                     f'operate a cruise speed, this version of hybraut_nav_controller' \
                     f'outputs a constant cruise speed for `cmd_vel` based on this' \
-                    f'(default: {DEFAULT_CRUISE_SPEED})'
+                    f'(default: {DEFAULT_CRUISE_SPEED})',
+                type=ParameterType.PARAMETER_DOUBLE
+            ),
+        )
+        self.declare_parameter(
+            'desired_heading', 
+            DEFAULT_DESIRED_HEADING, 
+            ParameterDescriptor( 
+                descriptor='Desired Heading for the finite time controller currently',
+                type=ParameterType.PARAMETER_DOUBLE
             )
         )
-        
+        self.declare_parameter(
+            'yaw_rate_limit',
+            DEFAULT_YAW_RATE_LIMIT,
+            ParameterDescriptor(
+                description=(
+                    'Yaw rate limit defines the constraints of yaw rate for the '
+                    f'finite time controller (default: {DEFAULT_YAW_RATE_LIMIT})'
+                ),
+                type=ParameterType.PARAMETER_DOUBLE
+            )
+        )
+
     def __init_subscriptions__(self): 
         self.agent_state_sub = self.create_subscription(
             msg_type=Odometry, 
             topic='/odom',
-            callback=lambda msg: self.agent_state_cb(msg),
+            callback=lambda msg: self.odom_cb(msg),
             qos_profile=qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
@@ -153,7 +176,7 @@ class ControllerNode(Node):
     def __init_publishers__(self):
         self.cmd_vel_pub = self.create_publisher(
             TwistStamped,  # msg_type
-            '/cmd_vel',
+            '/cmd_vel',   # This is the output topic for turtlebot3's differential drive for giving target linear velocity and yaw rate
             qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
@@ -175,41 +198,33 @@ class ControllerNode(Node):
             autostart=False
         ) 
 
-    def __init_default_controller__(self):
-        self.controller = ControllerType.initialize_controller(self.get_controller_type())
+    def __init_controller__(self):
+        self.ctrl = HeadingFTC(
+            # control_gain=0.4,
+            # present_convergence=0.6,
+            # smoothing_eps=1e-2,
+            max_yaw_rate=DEFAULT_YAW_RATE_LIMIT,  # 10°/s
+            dt=float(1.0 / DEFAULT_CONTROLLER_FREQUENCY)
+        )
+
 
     """ === getters === """
-    
-    def get_controller_type(self) -> ControllerType: 
-        return self.get_parameter('controller_type').value
-    
+
     def get_controller_frequency(self) -> float:
         return self.get_parameter('controller_frequency').value
     
-    def get_cruise_speed(self) -> float:
-        return self.get_parameter('cruise_speed').value
-        
+    def get_desired_velocity(self) -> float:
+        return self.get_parameter('desired_velocity').value
+    
+    def get_desired_heading(self) -> float: 
+        return self.get_parameter('desired_heading').value
+
     """ === setters === """
-    def set_controller_type(self, new_controller_type: Union[ControllerType, str]):
-        if isinstance(new_controller_type, str):
-            new_controller_type = ControllerType.from_string(new_controller_type)
-        
-        if not isinstance(new_controller_type, ControllerType):
-            raise TypeError("new_controller_type must be a ControllerType or string.")
-        
-        # Update parameter
-        self.set_parameters([rclpy.parameter.Parameter('controller_type', rclpy.Parameter.Type.STRING, new_controller_type.value)])
-        self.get_logger().info(f"Controller type set to {new_controller_type.value}")
-        
     def set_controller_frequency(self, new_frequency: float):
         ... 
-        
+
     """ === callbacks === """
-    
-    def on_parameter_change(self, params): 
-        for param in params: 
-            ... 
-    
+
     def control_loop(self):
         """ 
         Main control loop to compute and publish actuator commands.
@@ -222,18 +237,20 @@ class ControllerNode(Node):
         Tests: 
         ...
         """
-        from geometry_msgs.msg import Twist
+
         if self.state == NodeState.ACTIVE:
             try:  
-                yaw_rate = self.controller.step()
+                self.ctrl.update_desired_state(self.get_desired_heading())
+                self.desired_yaw_rate = self.ctrl.update()
             except Exception as e: 
                 self.get_logger().error(f"Controller step failed: {e}")
                 return
                 
             twist = TwistStamped()
-
-            twist.twist.angular.z = yaw_rate
-            twist.twist.linear.x = self.get_cruise_speed()
+            twist.header.stamp = self.get_clock().now().to_msg()
+            twist.header.frame_id = '/map'
+            twist.twist.angular.z = self.desired_yaw_rate
+            twist.twist.linear.x = self.get_desired_velocity()
             
             self.cmd_vel_pub.publish(twist)
     
@@ -244,26 +261,20 @@ class ControllerNode(Node):
         # 1. Validate message type
         if not isinstance(msg, ContinousDynamics):
             raise TypeError("Expected ContinousDynamics message.")
-        
-        # 1. Check for controller type change 
-        if self.get_parameter('controller_type').value != msg.controller_name:
-            # Update controller type parameter
-            self.set_parameters([rclpy.parameter.Parameter('controller_type', rclpy.Parameter.Type.STRING, msg.controller_name)])
 
-        desired_heading = msg.desired_heading # placeholder for now
-        desired_heading_rate = 0.2 # This is static for now, a constant turning rate
+        desired_heading = msg.desired_heading # desired heading should be in degrees
+
         # 2. Check for any setpoint metadata changes, update internal state if changed
-        self.controller.update_continous_dynamics(desired_heading=desired_heading , desired_heading_rate=0.2)
+        self.ctrl.update_desired_state(desired_heading)
 
-    def agent_state_cb(self, msg: Odometry):
+    def odom_cb(self, msg: Odometry):
         # Convert quaternion to yaw (heading)
         q = msg.pose.pose.orientation
         # Quaternion to Euler (yaw)
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        current_heading = math.atan2(siny_cosp, cosy_cosp)
-                
-        self.controller.update_state(current_heading=current_heading)
+        current_heading = float(np.rad2deg(np.arctan2(siny_cosp, cosy_cosp)))
+        self.ctrl.update_x_state(current_x_state=float(current_heading))
         
     def toggle_controller_cb(self, request: Trigger.Request, response: Trigger.Response):
         # Toggle controller state
@@ -279,3 +290,23 @@ class ControllerNode(Node):
             self.control_timer.reset()
             
         return response
+    
+
+if __name__ == '__main__': 
+    import rclpy
+    from rclpy.executors import MultiThreadedExecutor
+    import os
+
+    rclpy.init()
+    node = ControllerNode()
+    executor = MultiThreadedExecutor(num_threads=os.cpu_count())
+    executor.add_node(node)
+    import threading
+    thread = threading.Thread(target=executor.spin, daemon=True)
+    thread.start()
+
+    import time
+
+    time.sleep(9999999)
+
+    rclpy.shutdown()
