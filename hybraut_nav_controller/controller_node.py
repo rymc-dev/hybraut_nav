@@ -25,9 +25,8 @@ desired heading. Future versions may support richer dynamic references.
 """
 
 import math
-from typing import Optional, Union
+from typing import Optional
 
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 import os
 
@@ -38,8 +37,6 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.subscription import Subscription
 from rclpy.publisher import Publisher
 from rclpy.service import Service
-from rclpy.timer import Timer
-
 from rcl_interfaces.msg import ParameterDescriptor
 
 from geometry_msgs.msg import TwistStamped
@@ -53,15 +50,15 @@ from hybraut_interfaces.msg import ContinousDynamics
 from hybraut_nav.state import NodeState
 
 from finite_time_control import HeadingFTC
-from finite_time_control.manager import FTCManager
+
+from rcl_interfaces.msg import ParameterType
 
 DEFAULT_CONTROLLER_FREQUENCY: float = 10.0  # Hz
 DEFAULT_CRUISE_SPEED: float = 0.2 # m/s       
 DEFAULT_YAW_RATE_LIMIT: float = 0.30
+DEFAULT_DESIRED_HEADING: float = 0.0
 
 import numpy as np
-
-
 
 
 class ControllerNode(Node):
@@ -94,9 +91,8 @@ class ControllerNode(Node):
 
     desired_heading: float = 0.0
 
-    desired_velocity: float = 0.0
+    desired_velocity: float = 10.0
     desired_yaw_rate: float = 0.0
-    
 
     # State variables
     agent_state: Optional[Odometry] = None
@@ -117,7 +113,6 @@ class ControllerNode(Node):
         self.__init_subscriptions__()
         self.__init_publishers__()
         self.__init_timers__()
-        self.add_on_set_parameters_callback(self.on_parameter_change)
         self.__init_services__()
         self.__init_controller__()
 
@@ -127,32 +122,46 @@ class ControllerNode(Node):
             DEFAULT_CONTROLLER_FREQUENCY,
             ParameterDescriptor(
                 description='Frequency (Hz) at which to run the controller loop. '
-                            f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)'
+                            f'(default: {DEFAULT_CONTROLLER_FREQUENCY} Hz)',
+                type=ParameterType.PARAMETER_INTEGER
             )
         )
         self.declare_parameter(
-            'desired_cruise_speed',
+            'desired_velocity',
             DEFAULT_CRUISE_SPEED, 
             ParameterDescriptor(
                 description='Velocity (m/s) in which the controller will' \
                     f'operate a cruise speed, this version of hybraut_nav_controller' \
                     f'outputs a constant cruise speed for `cmd_vel` based on this' \
-                    f'(default: {DEFAULT_CRUISE_SPEED})'
+                    f'(default: {DEFAULT_CRUISE_SPEED})',
+                type=ParameterType.PARAMETER_DOUBLE
+            ),
+        )
+        self.declare_parameter(
+            'desired_heading', 
+            DEFAULT_DESIRED_HEADING, 
+            ParameterDescriptor( 
+                descriptor='Desired Heading for the finite time controller currently',
+                type=ParameterType.PARAMETER_DOUBLE
             )
         )
         self.declare_parameter(
             'yaw_rate_limit',
-            DEFAULT_YAW_RATE_LIMIT, 
-            ParameterDescriptor='yaw rate limit defines the' \
-            f'constraints of yaw rate for the finite time controller' \
-            f'(default: {DEFAULT_YAW_RATE_LIMIT})'
+            DEFAULT_YAW_RATE_LIMIT,
+            ParameterDescriptor(
+                description=(
+                    'Yaw rate limit defines the constraints of yaw rate for the '
+                    f'finite time controller (default: {DEFAULT_YAW_RATE_LIMIT})'
+                ),
+                type=ParameterType.PARAMETER_DOUBLE
+            )
         )
-        
+
     def __init_subscriptions__(self): 
         self.agent_state_sub = self.create_subscription(
             msg_type=Odometry, 
             topic='/odom',
-            callback=lambda msg: self.agent_state_cb(msg),
+            callback=lambda msg: self.odom_cb(msg),
             qos_profile=qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
@@ -191,7 +200,7 @@ class ControllerNode(Node):
 
     def __init_controller__(self):
         self.ctrl = HeadingFTC(
-            max_yaw_rate=self.get_parameter('max_yaw_rate').value
+            max_yaw_rate=self.get_parameter('yaw_rate_limit').value
         )
 
 
@@ -200,20 +209,18 @@ class ControllerNode(Node):
     def get_controller_frequency(self) -> float:
         return self.get_parameter('controller_frequency').value
     
-    def get_cruise_speed(self) -> float:
-        return self.get_parameter('desired_cruise_speed').value
+    def get_desired_velocity(self) -> float:
+        return self.get_parameter('desired_velocity').value
     
+    def get_desired_heading(self) -> float: 
+        return self.get_parameter('desired_heading').value
 
     """ === setters === """
     def set_controller_frequency(self, new_frequency: float):
         ... 
 
     """ === callbacks === """
-    
-    def on_parameter_change(self, params): 
-        for param in params: 
-            ... 
-    
+
     def control_loop(self):
         """ 
         Main control loop to compute and publish actuator commands.
@@ -226,18 +233,20 @@ class ControllerNode(Node):
         Tests: 
         ...
         """
-        from geometry_msgs.msg import Twist
+
         if self.state == NodeState.ACTIVE:
             try:  
-                yaw_rate = self.ctrl.update()
+                self.ctrl.update_desired_state(self.get_desired_heading())
+                self.desired_heading = self.ctrl.update()
             except Exception as e: 
                 self.get_logger().error(f"Controller step failed: {e}")
                 return
                 
             twist = TwistStamped()
-
-            twist.twist.angular.z = yaw_rate
-            twist.twist.linear.x = self.get_cruise_speed()
+            twist.header.stamp = self.get_clock().now().to_msg()
+            twist.header.frame_id = '/map'
+            twist.twist.angular.z = float(np.deg2rad(self.desired_heading))
+            twist.twist.linear.x = self.get_desired_velocity()
             
             self.cmd_vel_pub.publish(twist)
     
@@ -254,14 +263,13 @@ class ControllerNode(Node):
         # 2. Check for any setpoint metadata changes, update internal state if changed
         self.ctrl.update_desired_state(desired_heading)
 
-    def agent_state_cb(self, msg: Odometry):
+    def odom_cb(self, msg: Odometry):
         # Convert quaternion to yaw (heading)
         q = msg.pose.pose.orientation
         # Quaternion to Euler (yaw)
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        current_heading = np.rad2deg(np.arctan2(siny_cosp, cosy_cosp))
-                
+        current_heading = float(np.rad2deg(np.arctan2(siny_cosp, cosy_cosp)))
         self.ctrl.update_x_state(current_x_state=float(current_heading))
         
     def toggle_controller_cb(self, request: Trigger.Request, response: Trigger.Response):
