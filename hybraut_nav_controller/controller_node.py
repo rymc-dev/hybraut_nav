@@ -53,9 +53,9 @@ from finite_time_control import HeadingFTC
 
 from rcl_interfaces.msg import ParameterType
 
-DEFAULT_CONTROLLER_FREQUENCY: float = 10.0  # Hz
+DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
 DEFAULT_CRUISE_SPEED: float = 0.2 # m/s       
-DEFAULT_YAW_RATE_LIMIT: float = 0.30
+DEFAULT_YAW_RATE_LIMIT: float = 0.2
 DEFAULT_DESIRED_HEADING: float = 0.0
 
 import numpy as np
@@ -200,7 +200,11 @@ class ControllerNode(Node):
 
     def __init_controller__(self):
         self.ctrl = HeadingFTC(
-            max_yaw_rate=self.get_parameter('yaw_rate_limit').value
+            # control_gain=0.4,
+            # present_convergence=0.6,
+            # smoothing_eps=1e-2,
+            max_yaw_rate=DEFAULT_YAW_RATE_LIMIT,  # 10°/s
+            dt=float(1.0 / DEFAULT_CONTROLLER_FREQUENCY)
         )
 
 
@@ -237,7 +241,7 @@ class ControllerNode(Node):
         if self.state == NodeState.ACTIVE:
             try:  
                 self.ctrl.update_desired_state(self.get_desired_heading())
-                self.desired_heading = self.ctrl.update()
+                self.desired_yaw_rate = self.ctrl.update()
             except Exception as e: 
                 self.get_logger().error(f"Controller step failed: {e}")
                 return
@@ -245,7 +249,7 @@ class ControllerNode(Node):
             twist = TwistStamped()
             twist.header.stamp = self.get_clock().now().to_msg()
             twist.header.frame_id = '/map'
-            twist.twist.angular.z = float(np.deg2rad(self.desired_heading))
+            twist.twist.angular.z = self.desired_yaw_rate
             twist.twist.linear.x = self.get_desired_velocity()
             
             self.cmd_vel_pub.publish(twist)
@@ -286,3 +290,23 @@ class ControllerNode(Node):
             self.control_timer.reset()
             
         return response
+    
+
+if __name__ == '__main__': 
+    import rclpy
+    from rclpy.executors import MultiThreadedExecutor
+    import os
+
+    rclpy.init()
+    node = ControllerNode()
+    executor = MultiThreadedExecutor(num_threads=os.cpu_count())
+    executor.add_node(node)
+    import threading
+    thread = threading.Thread(target=executor.spin, daemon=True)
+    thread.start()
+
+    import time
+
+    time.sleep(9999999)
+
+    rclpy.shutdown()
