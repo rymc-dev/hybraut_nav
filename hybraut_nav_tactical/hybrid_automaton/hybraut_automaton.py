@@ -13,11 +13,9 @@ import sys
 
 sys.path.append(os.path.dirname(__file__))
 
-from statemachine import State
-from typing import Optional, Callable, List, Any, Tuple
+from typing import Optional, Callable, List, Any, Tuple, Dict
 import asyncio
 
-from typing import Optional, Callable, Any, Tuple, Dict
 
 class IntegrationMethods: 
     def default_integration(self, x, xdot, dt):
@@ -494,7 +492,7 @@ class HybridAutomaton:
                     self._x = self._x + self._xdot * self._dt # TODO: need to update this to use injectable Integrator function
 
             else: # real time 
-                self._xdot = await self._q.continous_dynamics(
+                self._xdot = await self._q.continuous_dynamics(
                     self._x, self._u, self._ctx, self._dt
                 )
 
@@ -627,6 +625,7 @@ def main():
     ha = HybridAutomaton(
         name="tb3 automaton",
         value=0,
+        real_time_mode=True,
         states=[state_1, state_2],
     )
     import numpy as np
