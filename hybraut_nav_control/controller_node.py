@@ -39,7 +39,7 @@ from rclpy.publisher import Publisher
 from rclpy.service import Service
 from rcl_interfaces.msg import ParameterDescriptor
 
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import TwistStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger
 
@@ -98,7 +98,7 @@ class ControllerNode(Node):
     agent_state: Optional[Odometry] = None
     
     # Subscriptions
-    agent_state_sub: Subscription = None
+    odom_sub: Subscription = None
     # Publishers
     cmd_vel_pub: Publisher = None
     
@@ -158,13 +158,25 @@ class ControllerNode(Node):
         )
 
     def __init_subscriptions__(self): 
-        self.agent_state_sub = self.create_subscription(
+        self.odom_sub = self.create_subscription(
             msg_type=Odometry, 
             topic='/odom',
             callback=lambda msg: self.odom_cb(msg),
             qos_profile=qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
+        self.base_link_sub=self.create_subscription(
+            msg_type=TransformStamped,
+            topic='/base_link',
+            callback=lambda msg: self.base_link_cb(msg), 
+            qos_profile=None,
+            callback_group=ReentrantCallbackGroup()
+        )
+
+        # TODO: continous_x state needs to be below
+        # tf2_ros.Buffer().lookup_transform("odom", "base_link") # APPLYS ROTATION THEN TRANSLATION
+
+
         self.continous_dynamics_sub = self.create_subscription(
             msg_type=ContinousDynamics,
             topic='tactical_node/continuous_dynamics',
@@ -275,6 +287,9 @@ class ControllerNode(Node):
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         current_heading = float(np.rad2deg(np.arctan2(siny_cosp, cosy_cosp)))
         self.ctrl.update_x_state(current_x_state=float(current_heading))
+
+    def base_link_cb(self, msg: TwistStamped):
+        self.base_link_state = msg
         
     def toggle_controller_cb(self, request: Trigger.Request, response: Trigger.Response):
         # Toggle controller state

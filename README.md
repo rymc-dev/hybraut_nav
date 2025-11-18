@@ -29,6 +29,11 @@ mkdir -p ~/ros2_ws/src && git clone {} && git clone {} && cd hybraut_ros2 && pip
 
 assuming everything worked as expected this bash script should setup the hybraut_ros2 system in a ros2 environment and make it ready to use.
 
+# NOTE: the strategy layer runs a global planner for generating global waypoints, however the local planner is kind of like a combination
+#       of both the tactical and controller layer, where tactical is hybrid automaton and controller is a high level ideal velcotiy/yaw rate
+#       computation unit which output the low level controller can generate a small trajectory using the sample desired yaw rate a velocity,
+#       combination of both these layers is what deals with dynamic obstacles 
+
 ## Structure
 
 The structure of the `hybraut_ros2` project is as follows: 
