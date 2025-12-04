@@ -13,7 +13,9 @@ PyYAML
 transitions
 jsonschema
 hybraut-executor-watchdog
-finite-time-control
+
+finite-time-control=="0.0.1"
+colav-automaton=="0.0.1"
 
 # External system dependencies (install seperately)
 # cd ~/ros2_ws/src && git clone git+https://github.com/Artemis-QUB-COLAV/colav-interfaces && cd .. && colcon build --package-select colav-interfaces
