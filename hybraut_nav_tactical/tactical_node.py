@@ -20,7 +20,6 @@ import numpy as np
 
 class TacticalNode(Node):
     
-    
     def __init__(self, node_name:str='tactical_node', namespace:str='hybraut_nav',**kwargs) -> None:
         super().__init__(node_name, namespace=namespace, **kwargs)
         # parameters
@@ -35,8 +34,13 @@ class TacticalNode(Node):
         
         self._x = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
         self._aux_x = {
-            'waypoints': [np.array([100.0, 100.0])],
-            'unsafe_region': []
+            'waypoints': [np.array([400.0, 400.0])],
+            'unsafe_region': [
+                np.array([180, 180]),
+                np.array([220, 180]),
+                np.array([220, 220]),
+                np.array([180, 220]),
+            ]
         }
         
         
@@ -112,9 +116,21 @@ class TacticalNode(Node):
                     continuous_states_over_time_fig, 
                     automaton_states_over_time
                 )
+                from colav_automaton_evaluation.figure_generator import plot_xy_position_over_time
                 fig1 = continuous_states_over_time_fig(results['continuous_states'])
                 fig2 = automaton_states_over_time(results['automaton_states'])
+                fig3 = plot_xy_position_over_time(results['continuous_states'],  [
+                    np.array([180, 180]),
+                    np.array([220, 180]),
+                    np.array([220, 220]),
+                    np.array([180, 220]),
+                ], [np.array([400.0, 400.0])])
                 plt.show()
+                
+                self._runner = None
+                self._runner_thread = None
+                
+                self._toggle_inactive_params_state()
 
         except Exception as e:
             self.get_logger().error(f"Error during deactivation: {str(e)}")
@@ -128,6 +144,17 @@ class TacticalNode(Node):
 
         return TransitionCallbackReturn.SUCCESS
 
+    def on_cleanup(self, state):
+        self.get_logger().info(f"Node '{self.get_name()}' is in state '{state.label}'. Transitioning to 'activate'")
+        
+        try: 
+            self._toggle_inactive_params_state()
+            self._toggle_unconfigured_params_state()
+        except Exception as e: 
+            raise SystemError(f"{str(e)}")
+        
+        return TransitionCallbackReturn.SUCCESS 
+    
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"Node '{self.get_name()}' is in state '{state.label}'. Transitioning to 'shutdown'")
         
@@ -159,7 +186,6 @@ class TacticalNode(Node):
         finally:
             self._loop.close()
 
-    
     """ === parameters toggles === """
     
     def _toggle_unconfigured_params_state(self):
@@ -319,9 +345,6 @@ class TacticalNode(Node):
         ... 
         
     
-        
-    
-        
 if __name__ == '__main__':
     rclpy.init()
     
