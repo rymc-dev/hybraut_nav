@@ -1,0 +1,2 @@
+timestamp_wall,timestamp_mono,state_x,desired_x,output_cmd,error,converged_flag,distance_to_converge,estimated_time_to_converge,fsm_mode
+2025-12-04T19:41:44.532537,4688.200016792,0.0,0.0,0.0,0.0,False,0.0,0.0,INIT

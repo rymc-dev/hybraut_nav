@@ -45,7 +45,11 @@ from std_srvs.srv import Trigger
 
 from hybraut_nav_controller.controller import Controller
 from hybraut_nav.qos import world_state_qos
-from hybraut_interfaces.msg import ContinousDynamics
+
+from finite_time_control import YawRateFTC
+from finite_time_control import VelocityFTC
+
+from std_msgs.msg import Float64MultiArray
 
 from hybraut_nav.state import NodeState
 
@@ -165,21 +169,21 @@ class ControllerNode(Node):
             qos_profile=qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
-        self.base_link_sub=self.create_subscription(
-            msg_type=TransformStamped,
-            topic='/base_link',
-            callback=lambda msg: self.base_link_cb(msg), 
-            qos_profile=None,
-            callback_group=ReentrantCallbackGroup()
-        )
+        # self.base_link_sub=self.create_subscription(
+        #     msg_type=TransformStamped,
+        #     topic='/base_link',
+        #     callback=lambda msg: self.base_link_cb(msg), 
+        #     qos_profile=None,
+        #     callback_group=ReentrantCallbackGroup()
+        # )
 
         # TODO: continous_x state needs to be below
         # tf2_ros.Buffer().lookup_transform("odom", "base_link") # APPLYS ROTATION THEN TRANSLATION
 
 
         self.continous_dynamics_sub = self.create_subscription(
-            msg_type=ContinousDynamics,
-            topic='tactical_node/continuous_dynamics',
+            msg_type=Float64MultiArray,
+            topic='/hybraut_nav/continous_dynamics',
             callback=lambda msg: self.continous_dynamics_cb(msg),
             qos_profile=world_state_qos, # need to decide on a qos for continous dynamics for tactical layer
             callback_group=ReentrantCallbackGroup()
@@ -211,11 +215,12 @@ class ControllerNode(Node):
         ) 
 
     def __init_controller__(self):
-        self.ctrl = HeadingFTC(
-            # control_gain=0.4,
-            # present_convergence=0.6,
-            # smoothing_eps=1e-2,
-            max_yaw_rate=DEFAULT_YAW_RATE_LIMIT,  # 10°/s
+        self.ctrl: HeadingFTC = HeadingFTC(  # Changed from HeadingFTC
+            control_gain=1.0,
+            present_convergence=0.7,
+            smoothing_eps=1e-2,
+            max_yaw_rate=DEFAULT_YAW_RATE_LIMIT,
+            # max_yaw_acceleration=float(np.deg2rad(30)),  # 30 deg/s² acceleration limit
             dt=float(1.0 / DEFAULT_CONTROLLER_FREQUENCY)
         )
 
@@ -236,57 +241,49 @@ class ControllerNode(Node):
         ... 
 
     """ === callbacks === """
-
     def control_loop(self):
-        """ 
-        Main control loop to compute and publish actuator commands.
-        
-        Runs at the frequency defined by 'controller_frequency' parameter.
-        
-        Example: 
-            >>> TODO
-        
-        Tests: 
-        ...
-        """
-
+        """Main control loop to compute and publish actuator commands."""
         if self.state == NodeState.ACTIVE:
-            try:  
-                self.ctrl.update_desired_state(self.get_desired_heading())
-                self.desired_yaw_rate = self.ctrl.update()
-            except Exception as e: 
+            try:
+                # Controller now returns both yaw rate and velocity
+                commanded_yaw_rate, commanded_velocity = self.ctrl.update()
+            except Exception as e:
                 self.get_logger().error(f"Controller step failed: {e}")
                 return
-                
+            
             twist = TwistStamped()
             twist.header.stamp = self.get_clock().now().to_msg()
             twist.header.frame_id = '/map'
-            twist.twist.angular.z = self.desired_yaw_rate
-            twist.twist.linear.x = self.get_desired_velocity()
+            twist.twist.angular.z = commanded_yaw_rate
+            twist.twist.linear.x = 0.2
             
             self.cmd_vel_pub.publish(twist)
+
     
-    def continous_dynamics_cb(self, msg: ContinousDynamics):
-        """ 
-        Handle updates to controller metadata and setpoints from ContinousDynamics message.
-        """
-        # 1. Validate message type
-        if not isinstance(msg, ContinousDynamics):
+    def continous_dynamics_cb(self, msg: Float64MultiArray):
+        """Handle updates from tactical layer."""
+        if not isinstance(msg, Float64MultiArray):
             raise TypeError("Expected ContinousDynamics message.")
-
-        desired_heading = msg.desired_heading # desired heading should be in degrees
-
-        # 2. Check for any setpoint metadata changes, update internal state if changed
+        
+        desired_heading = msg.data[2]  # rad/s from tactical layer
+        desired_velocity = msg.data[0]  # m/s from tactical layer
+        
+        # Update controller setpoints
         self.ctrl.update_desired_state(desired_heading)
+        self.desired_yaw_rate = self.ctrl.update()
+        
+        twist= TwistStamped()
+        twist.header.stamp = self.get_clock().now().to_msg()
+        twist.header.frame_id = '/map'
+        twist.twist.angular.z = self.desired_yaw_rate
+        twist.twist.linear.x = 0.2
+        
+        self.cmd_vel_pub.publish(twist)
 
     def odom_cb(self, msg: Odometry):
-        # Convert quaternion to yaw (heading)
-        q = msg.pose.pose.orientation
-        # Quaternion to Euler (yaw)
-        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        current_heading = float(np.rad2deg(np.arctan2(siny_cosp, cosy_cosp)))
-        self.ctrl.update_x_state(current_x_state=float(current_heading))
+        """Update current yaw rate from odometry."""
+        current_yaw_rate = msg.twist.twist.angular.z  # rad/s
+        self.ctrl.update_x_state(current_yaw_rate)
 
     def base_link_cb(self, msg: TwistStamped):
         self.base_link_state = msg

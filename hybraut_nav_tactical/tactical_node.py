@@ -15,6 +15,12 @@ from hybrid_automaton_runner import AutomatonRunner
 import asyncio
 from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult, ParameterType
 import threading
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import TransformStamped
+from rclpy.callback_groups import ReentrantCallbackGroup  
+from rclpy.qos import qos_profile_system_default
+from scipy.spatial.transform import Rotation as R
+from std_msgs.msg import Float64MultiArray
 
 import numpy as np
 
@@ -22,11 +28,6 @@ class TacticalNode(Node):
     
     def __init__(self, node_name:str='tactical_node', namespace:str='hybraut_nav',**kwargs) -> None:
         super().__init__(node_name, namespace=namespace, **kwargs)
-        # parameters
-        
-
-        
-        # initialize the subscriber/publishers
         
         self._automaton: Automaton = None
         self._runner: AutomatonRunner = None
@@ -34,14 +35,23 @@ class TacticalNode(Node):
         
         self._x = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
         self._aux_x = {
-            'waypoints': [np.array([400.0, 400.0])],
+            # 'waypoints': [np.array([400.0, 400.0])],
+            'waypoints': [np.array([100.0, 100.0]), np.array([-200.0, -200.0])],
             'unsafe_region': [
-                np.array([180, 180]),
-                np.array([220, 180]),
-                np.array([220, 220]),
-                np.array([180, 220]),
+                # np.array([180, 180]),
+                # np.array([220, 180]),
+                # np.array([220, 220]),
+                # np.array([180, 220]),
             ]
         }
+        
+        self.__init_subscriptions__()
+        self._continuous_dynamics_pub = self.create_publisher(
+            Float64MultiArray,
+            '/hybraut_nav/continous_dynamics',
+            qos_profile_system_default,
+            callback_group=ReentrantCallbackGroup()
+        )
         
         
         self._unconfigured_params_state = False
@@ -75,16 +85,19 @@ class TacticalNode(Node):
         self.get_logger().info(f"Node '{self.get_name()}' is in state '{state.label}'. Transitioning to 'activate'")
         
         try: 
-            self._runner: AutomatonRunner = AutomatonRunner(
-                hybrid_automaton=self._automaton,
-                sampling_rate=0.01
-            )
             dt = self.get_parameter('dt').value
+            self._runner = TacticalNode.PublishingAutomatonRunner(
+                hybrid_automaton=self._automaton,
+                sampling_rate=0.01,
+                publish_callback=self._publish_continuous_state  # Pass the callback
+            )
+            
             injector_update_rate = self.get_parameter('sensor_update_rate').value
             self._runner_thread = threading.Thread(
                 target=lambda: self._runner_thread_fn(dt, injector_update_rate),
                 daemon=True
             )
+            
             self._runner_thread.start()
             self._toggle_inactive_params_state()
         except Exception as e:
@@ -166,6 +179,36 @@ class TacticalNode(Node):
         return TransitionCallbackReturn.SUCCESS
     
     
+    """ subscriptions """
+    
+    def __init_subscriptions__(self): 
+        self.odom_sub = self.create_subscription(
+            msg_type=Odometry, 
+            topic='/odom',
+            callback=lambda msg: self._odom_rcv(msg),
+            qos_profile=qos_profile_system_default,
+            callback_group=ReentrantCallbackGroup()
+        )
+        self.base_link_sub=self.create_subscription(
+            msg_type=TransformStamped,
+            topic='/base_link',
+            callback=lambda msg: print (msg), 
+            qos_profile=qos_profile_system_default,
+            callback_group=ReentrantCallbackGroup()
+        )
+
+        # TODO: continous_x state needs to be below
+        # tf2_ros.Buffer().lookup_transform("odom", "base_link") # APPLYS ROTATION THEN TRANSLATION
+
+
+        # self.continous_dynamics_sub = self.create_subscription(
+        #     msg_type=ContinousDynamics,
+        #     topic='tactical_node/continuous_dynamics',
+        #     callback=lambda msg: self.continous_dynamics_cb(msg),
+        #     qos_profile=world_state_qos, # need to decide on a qos for continous dynamics for tactical layer
+        #     callback_group=ReentrantCallbackGroup()
+        # )
+    
     """ asyncio runner"""
     def _runner_thread_fn(self, dt: float, injector_update_rate: float):
         self._loop = asyncio.new_event_loop()
@@ -181,11 +224,27 @@ class TacticalNode(Node):
                 collect_automaton=True,
                 collect_control=False,
                 collect_transitions=True,
+                inject_continuous=True,
+                continuous_state_fn=self.get_continuous_state,
                 injector_update_rate=injector_update_rate
             ))
         finally:
             self._loop.close()
 
+    """ === odometry callback ==="""
+    def _odom_rcv(self, msg: Odometry):
+        quat = np.array([msg.pose.pose.orientation.__getattribute__(attr) for attr in ['x', 'y', 'z', 'w']])
+        eul = R.from_quat(quat).as_euler('xyz')  # radians
+        yaw = eul[2]
+        self._x = np.array([
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            yaw,
+            msg.twist.twist.linear.x,
+            msg.twist.twist.angular.z
+        ])
+        
+    
     """ === parameters toggles === """
     
     def _toggle_unconfigured_params_state(self):
@@ -328,18 +387,53 @@ class TacticalNode(Node):
         
         self._inactive_params_state = not(self._inactive_params_state)
     
+
+    class PublishingAutomatonRunner(AutomatonRunner):
+        """Extended runner that can publish continuous states"""
+        
+        def __init__(self, hybrid_automaton, sampling_rate, publish_callback=None):
+            super().__init__(hybrid_automaton, sampling_rate)
+            self.publish_callback = publish_callback
+            
+        async def run(self, *args, **kwargs):
+            # Add publishing collector task if callback provided
+            if self.publish_callback is not None:
+                self._tasks.append(
+                    asyncio.create_task(self._publish_continuous_states())
+                )
+            return await super().run(*args, **kwargs)
+        
+        async def _publish_continuous_states(self):
+            """Continuously publish the automaton's continuous state"""
+            while True:
+                await asyncio.sleep(self.sampling_rate)
+                x = self.ha.get_continous_dynamics()
+                if self.publish_callback:
+                    self.publish_callback(x)
+    
     """ === injection functions === """
     
     def _control_fu_publisher():
         """injection function for controller updates"""
         ...
         
+    def _publish_continuous_state(self, x: np.ndarray):
+        """Callback to publish continuous state"""
+        from std_msgs.msg import Float64MultiArray
+        
+        msg = Float64MultiArray()
+        msg.data = x.tolist()
+        self._continuous_dynamics_pub.publish(msg)
+        
     def _aux_x_injection():
         ...
         
-    def x_cb():
-        """"""
-        ...
+    def get_continuous_state(self) -> np.ndarray:
+        """
+        Return the current continuous state for injection into the AutomatonRunner.
+        This will be called repeatedly by the runner.
+        """
+        return self._x.copy()  # return a copy to avoid race conditions
         
     def x_aux_unsafe_set_cb():
         ... 
