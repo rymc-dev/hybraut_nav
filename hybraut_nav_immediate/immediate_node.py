@@ -43,7 +43,6 @@ from geometry_msgs.msg import TwistStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger
 
-from hybraut_nav_controller.controller import Controller
 from hybraut_nav.qos import world_state_qos
 
 from finite_time_control import YawRateFTC
@@ -65,7 +64,7 @@ DEFAULT_DESIRED_HEADING: float = 0.0
 import numpy as np
 
 
-class ControllerNode(Node):
+class ImmediateNode(Node):
     """
     ControllerNode is a core component of the HybrautNav Navigation Stack,
     integrating a finite-time guidance controller and its manager into the 
@@ -91,7 +90,7 @@ class ControllerNode(Node):
 
     # internal state
     state: NodeState = NodeState.INACTIVE
-    controller: Controller = HeadingFTC
+    controller = HeadingFTC
 
     desired_heading: float = 0.0
 
@@ -310,7 +309,7 @@ if __name__ == '__main__':
     import os
 
     rclpy.init()
-    node = ControllerNode()
+    node = ImmediateNode()
     executor = MultiThreadedExecutor(num_threads=os.cpu_count())
     executor.add_node(node)
     import threading

@@ -1,4 +1,5 @@
 from .tactical_node import TacticalNode
 
-class TacticalNode:
-    pass
+__all__ = [
+    'TacticalNode'
+]

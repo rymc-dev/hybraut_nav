@@ -36,7 +36,7 @@ class TacticalNode(Node):
         self._x = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
         self._aux_x = {
             # 'waypoints': [np.array([400.0, 400.0])],
-            'waypoints': [np.array([100.0, 100.0]), np.array([-200.0, -200.0])],
+            'waypoints': [np.array([5.0, 5.0]), np.array([0.0, 0.0])],
             'unsafe_region': [
                 # np.array([180, 180]),
                 # np.array([220, 180]),
@@ -133,11 +133,11 @@ class TacticalNode(Node):
                 fig1 = continuous_states_over_time_fig(results['continuous_states'])
                 fig2 = automaton_states_over_time(results['automaton_states'])
                 fig3 = plot_xy_position_over_time(results['continuous_states'],  [
-                    np.array([180, 180]),
-                    np.array([220, 180]),
-                    np.array([220, 220]),
-                    np.array([180, 220]),
-                ], [np.array([400.0, 400.0])])
+                    # np.array([180, ]),
+                    # np.array([220, 180]),
+                    # np.array([220, 220]),
+                    # np.array([180, 220]),
+                ], [np.array([5.0, 5.0]), np.array([0.0, 0.0])])
                 plt.show()
                 
                 self._runner = None

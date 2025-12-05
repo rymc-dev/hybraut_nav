@@ -1,3 +1,3 @@
-from .controller_node import ControllerNode
+from .immediate_node import ImmediateNode
 
-__all__ = ["ControllerNode"]
+__all__ = ["ImmediateNode"]

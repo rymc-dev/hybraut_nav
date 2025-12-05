@@ -3,13 +3,13 @@ import os
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
-from hybraut_nav_controller import ControllerNode
+from hybraut_nav_immediate import ImmediateNode
 
 def main():
     rclpy.init()
     executor = MultiThreadedExecutor(num_threads=os.cpu_count())
-    controller_node = ControllerNode()
-    executor.add_node(node=controller_node)
+    immediate_node = ImmediateNode()
+    executor.add_node(node=immediate_node)
 
     try:
         executor.spin()

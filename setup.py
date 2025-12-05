@@ -24,7 +24,8 @@ setup(
     license='MIT',
     entry_points={
         'console_scripts': [
-            'controller_node = hybraut_nav.launch.launch_controller_node:main'
+            'immediate_node = hybraut_nav.launch.launch_immediate_node:main',
+            'tactical_node = hybraut_nav.launch.launch_tactical_node:main'
         ],
     },
 )
