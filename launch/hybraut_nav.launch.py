@@ -11,6 +11,22 @@ package_name = 'hybraut_nav'
 
 def generate_launch_description():
 
+    risk_envelope_node= Node(
+        package=package_name,
+        executable='risk_envelope_node',
+        output='screen',
+        parameters=[{
+            
+        }]
+    )
+    strategy_node = Node(
+        package=package_name,
+        executable='strategy_node',
+        output='screen',
+        parameters=[{
+            
+        }]
+    )
     immediate_node = Node(
         package=package_name,
         executable='immediate_node',
@@ -27,6 +43,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        risk_envelope_node,
+        strategy_node,
         immediate_node,
         tactical_node
     ])

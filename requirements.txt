@@ -14,8 +14,13 @@ transitions
 jsonschema
 hybraut-executor-watchdog
 
-finite-time-control=="0.0.1"
-colav-automaton=="0.0.1"
+colav-automaton==1.0.0
+hybrid-automaton==1.0.0
+riskenv==1.0.0
+
+# finite-time-control: not yet published on PyPI. hybraut_nav_immediate defaults to
+# ControllerType.PID_CONTROLLER for now; once finite-time-control ships, pin it here
+# and switch the 'controller_type' ROS param to 'finite_time_controller'.
 
 # External system dependencies (install seperately)
 # cd ~/ros2_ws/src && git clone git+https://github.com/Artemis-QUB-COLAV/colav-interfaces && cd .. && colcon build --package-select colav-interfaces

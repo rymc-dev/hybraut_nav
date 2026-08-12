@@ -2,6 +2,7 @@ from typing import Union
 from enum import Enum
 from .controller import Controller
 from .finite_time_controller import FiniteTimeController
+from .pid_controller import PIDController
 
 class ControllerType(Enum): 
     FINITE_TIME_CONTROLLER = "finite_time_controller"
@@ -53,6 +54,7 @@ class ControllerType(Enum):
 
         planner_map = {
             ControllerType.FINITE_TIME_CONTROLLER: FiniteTimeController,
+            ControllerType.PID_CONTROLLER: PIDController,
         }
         
         planner_class = planner_map.get(controller_type_enum)

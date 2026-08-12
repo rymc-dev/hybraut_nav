@@ -838,6 +838,28 @@ class StrategyNode(Node):
     #     except Exception as e:
     #         self.get_logger().error(f"Planning failed: {str(e)}")
 
+
+def main(args=None):
+    from rclpy.executors import MultiThreadedExecutor
+
+    rclpy.init(args=args)
+    node = StrategyNode()
+    executor = MultiThreadedExecutor(num_threads=os.cpu_count())
+    executor.add_node(node)
+
+    try:
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+
 # ============================================================================
 # Independent Testing Code
 # ============================================================================
