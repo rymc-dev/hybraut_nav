@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!--
+  Template SDF for a lightweight dynamic-obstacle "mover" - a plain box body
+  with gz-sim's VelocityControl (direct linear/angular velocity actuation,
+  no wheel joints needed) and OdometryPublisher systems.
+
+  This is a *template*, not a directly-spawnable model: {name} must be
+  substituted (model name + all topic/frame names must match, and must be
+  unique per instance - see hybraut_nav/scripts/demo/dynamic_obstacles.py,
+  which renders this and spawns it via `ros_gz_sim create -string`).
+
+  NOTE: relative <topic>/<odom_topic> values do NOT auto-namespace by model
+  name in gz-sim (verified empirically) - every mover would collide on one
+  global /cmd_vel and /odometry if left relative. Topics here are therefore
+  absolute (/model/{name}/...) and unique per rendered instance.
+-->
+<sdf version="1.9">
+  <model name="{name}">
+    <pose>{x} {y} 0.1 0 0 0</pose>
+    <link name="base_link">
+      <inertial>
+        <mass>1.0</mass>
+        <inertia>
+          <ixx>0.05</ixx><iyy>0.05</iyy><izz>0.05</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><box><size>0.3 0.3 0.3</size></box></geometry>
+        <material>
+          <ambient>{r} {g} {b} 1</ambient>
+          <diffuse>{r} {g} {b} 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry><box><size>0.3 0.3 0.3</size></box></geometry>
+      </collision>
+    </link>
+
+    <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
+      <topic>/model/{name}/cmd_vel</topic>
+    </plugin>
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_topic>/model/{name}/odometry</odom_topic>
+      <odom_frame>{name}/odom</odom_frame>
+      <robot_base_frame>{name}/base_link</robot_base_frame>
+    </plugin>
+  </model>
+</sdf>

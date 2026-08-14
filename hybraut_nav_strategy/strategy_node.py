@@ -1,149 +1,181 @@
 #!/usr/bin/env python3
 
-""" 
+"""
 Layer one of the hybraut navigation stack: the global planner.
 
-This node subscribes to global cost map updates, goal poses, and agent states.
-It operates on a timer, planning a global path when a new goal is received,
-which can be passed to layer two (the local planner hybrid automaton), 
-then to a controller.
+This node subscribes to global cost map updates and agent states. On a
+`navigate_to_goal` action goal it plans a global path (A*, Dijkstra, RRT,
+RRT*) from the agent's current position to the requested overall target,
+downsamples it into a bounded list of intermediate waypoints, and
+dispatches them to layer two (the local planner hybrid automaton) **one at
+a time**, via `tactical_node`'s own `execute_mission` action
+(`hybraut_interfaces/action/ExecuteMission`) - sending one leg, awaiting its
+result, then sending the next, until the route is exhausted.
+
+While a mission is active, this node also checks the agent's position
+against the stored global plan at a slow frequency. If it has drifted past
+a tolerance, it cancels whatever leg is currently in flight and replans
+from the agent's current position to the same overall goal, discarding
+whatever was left of the old route.
+
+This node's own `navigate_to_goal` action streams feedback covering both
+the live state of whichever leg is currently executing (relayed straight
+from tactical_node's own feedback) and mission-level progress across the
+whole route - the planned waypoint list, elapsed time since the mission
+started, an estimated time remaining, and overall distance-based progress.
 
 UML Reference:
     See state machine diagram: ./diagrams/strategy_node_state_machine.puml
     See class diagram: .diagrams/strategy_node_class_class_diagram.uml
 """
 
-# TODO: Need to integrate this functions with there UML diagrams and documentation
+import os
+import sys
+import math
+from enum import Enum
+from typing import List, Optional, Tuple, Union
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
+from rclpy.action import ActionServer, ActionClient, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.duration import Duration
 from rclpy.timer import Timer
-from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
-from std_msgs.msg import Header
-from typing import Tuple
-from typing import List
 from rclpy.parameter import Parameter
-from rcl_interfaces.msg import SetParametersResult
+from rclpy.publisher import Publisher
+from rclpy.subscription import Subscription
+from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 
 from nav_msgs.msg import OccupancyGrid, Path
-from geometry_msgs.msg import PoseStamped, Pose
-from colav_interfaces.msg import AgentState
-from hybraut_interfaces.srv import SendPose
-from std_srvs.srv import Trigger
-
-from enum import Enum
-import sys
-from typing import Union
-import os
+from geometry_msgs.msg import PoseStamped
+from colav_interfaces.msg import AgentState, Waypoint
+from hybraut_interfaces.action import ExecuteMission, NavigateToGoal
 
 # Import path planning modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from hybraut_nav_strategy.path_planning import (
     RRTStar, RRT, Dijkstra, AStar, Planner,
-    Grid as PlannerGrid, Point as PlannerPoint
+    Grid as PlannerGrid, Point as PlannerPoint,
+    PlannerType, downsample_path, distance_to_path,
 )
 
-from rclpy.qos import HistoryPolicy, ReliabilityPolicy, DurabilityPolicy
 from hybraut_nav.qos import map_qos, world_state_qos
-
-
-from rclpy.subscription import Subscription
-from rclpy.publisher import Publisher
-
-from typing import Optional
-from geometry_msgs.msg import Point
-from rclpy.service import Service
-import threading
-from hybraut_nav_strategy.path_planning import PlannerType
 from hybraut_nav.state import NodeState
+
+
+class _LegOutcome(Enum):
+    """Internal only - how one dispatched tactical leg (_run_leg) resolved,
+    for the mission drive loop (_execute_mission_cb) to act on."""
+    REACHED = "reached"
+    CANCELED_FOR_REPLAN = "canceled_for_replan"
+    CANCELED_BY_USER = "canceled_by_user"
+    FAILED = "failed"
 
 
 class StrategyNode(Node):
     """
     Global planner for the Hybraut_nav navigation stack.
-    
-    Plans a global path relative to the agent's current state to a goal pose 
-    using a specified planning algorithm (A*, Dijkstra, RRT, RRT*).
-    
-    This is Layer one of the HybrautNav navigation stack generating optimal 
-    trajectories in the static cost map layer, cost map being a continous representation 
-    of a 2d environemnt where each cell represents traversability cost. 
-    
-    ROS Standard Cost Map use cell state convention: 
+
+    Plans a global path relative to the agent's current state to a goal
+    waypoint using a specified planning algorithm (A*, Dijkstra, RRT,
+    RRT*), then dispatches it to the Tactical Layer (layer two) one
+    waypoint at a time via that layer's own `execute_mission` action,
+    replanning from scratch if the agent drifts too far off the stored
+    route.
+
+    This is Layer one of the HybrautNav navigation stack, generating optimal
+    trajectories over the static cost map layer - a continuous representation
+    of a 2D environment where each cell represents traversability cost.
+
+    ROS Standard Cost Map cell state convention:
     - -1: Unknown
     - 0: Free
     - 1-99: Increasing cost of traversal
     - 100: Insurmountable obstacle
-    
-    The paths generated from this are utilized by the Tactical Layer layer 2,
-    This layer is a hybrid automaton defined utilzind 'AMDL' (Automaton Modeling Description Language)
-    to generate local paths within an event horizon of the agent which optimally will follow the global path
-    but if needed can generate virtual waypoints considering the second layer of the cost map (dynamic obstacles). 
-    The local paths are then passed to a controller (layer 3) to generate control commands for the agent.
+
+    Each waypoint handed to the Tactical Layer (layer 2, a hybrid automaton
+    defined using 'AMDL' - Automaton Modeling Description Language) is run to
+    completion as its own leg via `ExecuteMission` - tactical_node reports
+    back (that action's result) once it actually reaches that target, at
+    which point this node sends the next one. COLAV's own local-avoidance
+    virtual waypoints are handled entirely inside the tactical layer and
+    never surface here. The tactical layer's resulting continuous dynamics
+    are tracked by a controller (layer 3).
     """
 
     # Parameter Defaults
-    DEFAULT_REPLAN_FREQUENCY: float = 0.1               # default replan hz is 0.1 every 10 seconds
-    DEFAULT_MAX_PLANNING_TIME: float = 5.0              # DEFAULT max planning type is 5 seconds
-    DEFAULT_PLANNER_TYPE: str = PlannerType.ASTAR.value # DEFAULT planner type is A* 
+    DEFAULT_PLANNER_TYPE: str = PlannerType.ASTAR.value  # DEFAULT planner type is A*
+    DEFAULT_MAX_TACTICAL_WAYPOINTS: int = 8              # cap on legs dispatched per plan
+    DEFAULT_PLAN_CHECK_FREQUENCY: float = 0.2            # Hz - deviation check every 5s
+    DEFAULT_PATH_DEVIATION_TOLERANCE: float = 0.5        # metres off the global plan before replanning
 
     # World State Variables
-    _map: Optional[PlannerGrid] = None          # stores the latest version of the cost map
-    _start_point: Optional[PlannerPoint] = None # stores the agent states point position for planning
-    _goal_point: Optional[PlannerPoint] = None  # stores latest valid goal point received on send_goal_srv if goal point mission is active
-    _vw_point: Optional[PlannerPoint] = None    # Stores latest virtual waypoint value received on vw topic
-    
+    _map: Optional[PlannerGrid] = None            # latest cost map, converted for planning
+    _start_point: Optional[PlannerPoint] = None    # latest agent position, converted for planning
+
+    # Mission State Variables - all reset together in _clear_mission_state()
+    _goal_waypoint: Optional[Waypoint] = None      # overall target of the active mission, if any
+    _global_path: Optional[Path] = None            # full-resolution planned path, for deviation checks
+    _route_waypoints: List[Waypoint] = None        # current downsampled route, dispatched one at a time
+    _segment_lengths: List[float] = None           # per-leg length of _route_waypoints, for progress/ETA
+    _current_waypoint_index: int = 0               # index into _route_waypoints of the leg now executing
+    _mission_start_time = None                     # rclpy.time.Time - when the active mission's goal was accepted
+    _active_mission_goal_handle = None              # ServerGoalHandle for the in-flight navigate_to_goal goal
+    _tactical_goal_handle = None                    # ClientGoalHandle for the in-flight tactical leg, if any
+    _replan_requested: bool = False                 # set by _plan_check_cb, consumed by _run_leg/_execute_mission_cb
+    _cancel_sent_for_active_leg: bool = False       # guards against re-sending cancel_goal_async every feedback tick
+
     # Node State Variables
-    _state: NodeState = NodeState.INACTIVE # State of StrategyNode by default always INACTIVE
-    _planner: Optional[Planner] = None           # planner class instance utilized for making path planning  
-    
+    _state: NodeState = NodeState.INACTIVE  # State of StrategyNode by default always INACTIVE
+    _planner: Optional[Planner] = None      # planner class instance utilized for making path planning
+
     # publishers
-    _plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>>
-    _goal_point_pub: Optional[Publisher] = None  # <<geometry_msgs/msg/Point>> 
-    
-    # subscription
-    _map_sub: Optional[Subscription] = None      # <<nav_msgs/msg/OccupancyGrid>>
-    _agent_sub: Optional[Subscription] = None    # <<nav_msgs/msg/AgentState>> 
-    _vw_sub: Optional[Subscription] = None       # <<geometry_msgs/msg/Point>>
-    
-    # Services 
-    _activate_srv: Optional[Service] = None     # <<hybraut_interfaces/srv/SendGoal>> :: callback = goal_received_callback
-    _deactivate_srv: Optional[Service] = None   # <<std_srvs/srv/Trigger>> :: callback = cancel_goal_callback
-    
-    #  Timers
-    _replan_timer: Optional[Timer] = None         # operates at value of 1.0 / replan_frequency node param value, every time calling                                      # replan_callback
-    _replan_lock: threading.Lock                               
-    
+    _plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>> - downsampled dispatch route, for observability
+    _goal_pose_pub: Optional[Publisher] = None   # <<geometry_msgs/msg/PoseStamped>>
+
+    # subscriptions
+    _map_sub: Optional[Subscription] = None    # <<nav_msgs/msg/OccupancyGrid>>
+    _agent_sub: Optional[Subscription] = None  # <<colav_interfaces/msg/AgentState>>
+
+    # Action server (this node's own interface) / client (into the tactical layer)
+    _mission_action_server: Optional[ActionServer] = None   # <<hybraut_interfaces/action/NavigateToGoal>>
+    _tactical_action_client: Optional[ActionClient] = None  # <<hybraut_interfaces/action/ExecuteMission>>
+
+    # Timers
+    _plan_check_timer: Optional[Timer] = None  # slow-frequency deviation check; not running until a mission starts
+
     """ === Node Initialization === """
 
     def __init__(self, *args, **kwargs):
-        """ 
-        Initializes the planner node, setting parameters for dynamic 
-        reconfiguration, setting up services for API interactition with planner,
-        subscriptions for world state updates required for planning, 
-        and publishers for planned paths and goal poses.
-        Also sets up a timer for periodic replanning without starting it immediately.
-        
-        Args: 
+        """
+        Initializes the planner node, setting parameters for dynamic
+        reconfiguration, the action server/client pair for driving a
+        mission and the tactical layer respectively, subscriptions for
+        world state updates required for planning, and publishers for
+        planned paths and goal poses. Also sets up a timer for periodic
+        deviation checking without starting it immediately.
+
+        Args:
             *args: Variable length argument list for Node
             **kwargs: Arbitrary keyword arguments for Node
-        Returns: 
+        Returns:
             None
         Raises:
             Exception: if any initialization step fails
         """
         super().__init__('strategy_node', namespace='hybraut_nav', *args, **kwargs)
-        
+
+        self._route_waypoints = []
+        self._segment_lengths = []
+
         # Declare and initialize parameters
         self.__init_parameters__()
-        
+
         # Initialize planner
         self.set_planner(self.get_parameter('planner').value)
 
-        # Setup services
-        self.__init_services__()
+        # Client into the tactical layer's execute_mission action
+        self.__init_tactical_client__()
 
         # Setup parameter change callback
         self.add_on_set_parameters_callback(self._parameter_update_cb)
@@ -153,36 +185,31 @@ class StrategyNode(Node):
 
         # Setup publishers
         self.__init_publishers__()
-        
+
         # Setup timer
         self.__init_timer__()
 
-        # NOTE: DONE, needs testing
-    
+        # This node's own action server - last, since a goal could in
+        # principle arrive the moment it's created and everything above
+        # needs to already be ready.
+        self.__init_action_server__()
+
     def __init_parameters__(self):
-        """ 
-        Declares node parameters for dynamic reconfiguration 
+        """
+        Declares node parameters for dynamic reconfiguration
         of this planner node.
-        
-        Args: 
+
+        Args:
             None
-            
-        Returns: 
+
+        Returns:
             None
-        
+
         Raises:
             Exception: if parameters cannot be declared
         """
-        # self.declare_parameter(
-        #     'replan_frequency', 
-        #     self.DEFAULT_REPLAN_FREQUENCY, 
-        #     ParameterDescriptor(
-        #         description='Frequency to replan the global path in Hz '
-        #                    f'(default: {self.DEFAULT_REPLAN_FREQUENCY} Hz)'
-        #     )
-        # )
         self.declare_parameter(
-            'planner', 
+            'planner',
             self.DEFAULT_PLANNER_TYPE,
             ParameterDescriptor(
                 description='Type of global planner to use. '
@@ -190,14 +217,37 @@ class StrategyNode(Node):
                            f'(default: {self.DEFAULT_PLANNER_TYPE})'
             )
         )
-        # self.declare_parameter(
-        #     'max_planning_time', 
-        #     self.DEFAULT_MAX_PLANNING_TIME,
-        #     ParameterDescriptor(
-        #         description='Maximum time allowed for planning in seconds '
-        #                    f'(default: {self.DEFAULT_MAX_PLANNING_TIME}s)'
-        #     )
-        # )
+        self.declare_parameter(
+            'max_tactical_waypoints',
+            self.DEFAULT_MAX_TACTICAL_WAYPOINTS,
+            ParameterDescriptor(
+                description='Maximum number of intermediate waypoints (legs) '
+                           'dispatched to the tactical layer per plan. Must '
+                           'stay comfortably below the tactical layer\'s '
+                           'waypoint_buffer_len. '
+                           f'(default: {self.DEFAULT_MAX_TACTICAL_WAYPOINTS})'
+            )
+        )
+        self.declare_parameter(
+            'plan_check_frequency',
+            self.DEFAULT_PLAN_CHECK_FREQUENCY,
+            ParameterDescriptor(
+                description='Frequency (Hz) at which the agent\'s position is '
+                           'checked against the stored global plan while a '
+                           'mission is active. '
+                           f'(default: {self.DEFAULT_PLAN_CHECK_FREQUENCY} Hz)'
+            )
+        )
+        self.declare_parameter(
+            'path_deviation_tolerance',
+            self.DEFAULT_PATH_DEVIATION_TOLERANCE,
+            ParameterDescriptor(
+                description='Maximum distance (m) the agent may drift from '
+                           'the stored global plan before a replan is '
+                           'triggered. '
+                           f'(default: {self.DEFAULT_PATH_DEVIATION_TOLERANCE} m)'
+            )
+        )
         self.declare_parameter(
             'description',
             self.__doc__ or "Global Planner Node for Hybraut Navigation Stack",
@@ -206,47 +256,36 @@ class StrategyNode(Node):
             )
         )
 
-    # NOTE: DONE, needs testing
-    def __init_services__(self):
-        """ 
-        Create services for planner activation and goal setting 
-        and deactivation. 
-        
-        Args:
-            None
-        Returns: 
-            None
-        Raises: 
-            Exception: if services cannot be created
+    def __init_tactical_client__(self):
         """
-        self._activate_srv = self.create_service(
-            SendPose,
-            'planner/activate',
-            self._goal_rcv_cb,
-            callback_group=MutuallyExclusiveCallbackGroup()
-        )
-        
-        self._deactivate_srv = self.create_service(
-            Trigger,
-            'planner/deactivate',
-            self._cancel_goal_cb,
-            callback_group=MutuallyExclusiveCallbackGroup()
-        )
+        Create the action client used to drive the tactical layer: handing
+        it one waypoint at a time via `execute_mission`, one leg at a time,
+        awaiting each leg's result before dispatching the next.
 
-    # NOTE: DONE, needs testing
-    def __init_subscriptions__(self):
-        """ 
-        initializes topic subscriptions for world state updates required
-        for path planning. These being the occupancy grid cost map, /map,
-        and the agent state, /agent_state.
-        
         Args:
             None
-        
         Returns:
             None
-        
-        Raises: 
+        """
+        self._tactical_action_client = ActionClient(
+            self,
+            ExecuteMission,
+            '/hybraut_nav/tactical_node/execute_mission',
+            callback_group=ReentrantCallbackGroup()
+        )
+
+    def __init_subscriptions__(self):
+        """
+        initializes topic subscriptions for world state updates required
+        for path planning.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
             None
         """
         self._map_sub = self.create_subscription(
@@ -256,7 +295,7 @@ class StrategyNode(Node):
             map_qos,
             callback_group=ReentrantCallbackGroup()
         )
-        
+
         self._agent_sub = self.create_subscription(
             AgentState,
             '/agent_state',
@@ -265,16 +304,19 @@ class StrategyNode(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
-    # NOTE: DONE, needs testing
     def __init_publishers__(self):
         """
-        Create topic publishers for planned paths and goal poses. 
-        Args: 
+        Create topic publishers for the downsampled dispatch route (purely
+        for observability - the tactical layer is fed one waypoint at a
+        time via the execute_mission action, not via this topic) and goal
+        poses.
+
+        Args:
             None
         Returns:
             None
         Raises:
-            Exception: if publishers cannot be created        
+            Exception: if publishers cannot be created
         """
         self._plan_pub = self.create_publisher(
             Path,
@@ -282,7 +324,7 @@ class StrategyNode(Node):
             qos_profile=world_state_qos,
             callback_group=ReentrantCallbackGroup()
         )
-        
+
         self._goal_pose_pub = self.create_publisher(
             PoseStamped,
             'planner/goal_pose',
@@ -290,74 +332,63 @@ class StrategyNode(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
-    # NOTE: DONE, needs testing
     def __init_timer__(self):
-        """ 
-        Initialize a timer for periodic replanning
-        without starting it immediately.The timer will call the _replan_callback method
-        at the frequency defined by the replan_frequency parameter.
-        
-        Args: 
-            None
-            
-        Returns: 
-            None
-    
-        Raises: 
-            Exception: if timer cannot be created  
         """
-        pass
-        # self.__replan_timer = self.create_timer(
-        #     1.0 / self.get_replan_frequency(),
-        #     self._replan_callback,
-        #     autostart=(self.get_state() == NodeState.ACTIVE),
-        #     callback_group=ReentrantCallbackGroup()
-        # )
+        Initialize the slow-frequency plan-deviation-check timer without
+        starting it immediately - it only runs while a mission is active
+        (started/stopped from _execute_mission_cb's drive loop).
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            Exception: if timer cannot be created
+        """
+        self._plan_check_timer = self.create_timer(
+            1.0 / float(self.get_parameter('plan_check_frequency').value),
+            self._plan_check_cb,
+            autostart=False,
+            callback_group=ReentrantCallbackGroup()
+        )
+
+    def __init_action_server__(self):
+        """
+        Create this node's own action server - one goal = one whole
+        mission. Only one mission runs at a time (see _goal_cb).
+
+        Args:
+            None
+        Returns:
+            None
+        """
+        self._mission_action_server = ActionServer(
+            self, NavigateToGoal, '/hybraut_nav/strategy_node/navigate_to_goal',
+            execute_callback=self._execute_mission_cb,
+            goal_callback=self._goal_cb,
+            cancel_callback=self._cancel_cb,
+            callback_group=ReentrantCallbackGroup()
+        )
 
     """ === getters === """
-    
-    # def get_replan_frequency(self) -> float:
-    #     """ 
-    #     Getter for the replanning frequency in Hz. 
-    #     Returns: 
-    #         float: Replanning frequency in Hz
 
-    #     Example: 
-    #         >> freq = planner_node.get_replan_frequency()
-    #         >> print(f"Replan Frequency: {freq} Hz")
-            
-    #     Test: tests/hybraut_nav_strategy/unit_tests/test_strategy_node:TestStrategy_node::test_get_replan_frequency 
-    #     """
-    #     return float(self.get_parameter('replan_frequency').value)
-    
-    def get_planner_type(self) -> str: 
-        """ 
+    def get_planner_type(self) -> str:
+        """
         getter for planner type as a string.
-        
-        Returns: 
+
+        Returns:
             str: Planner type as string
-            
-        Example: 
+
+        Example:
             >> ptype = planner_node.get_planner_type()
-            >> print(f"Current Planner Type: {ptype}") 
-            
+            >> print(f"Current Planner Type: {ptype}")
+
         Test: tests/hybraut_nav_strategy/unit_tests/test_strategy_node:TestStrategy_node::test_get_planner_type
         """
         return str(self.get_parameter('planner').value)
 
-    # def get_max_planning_time(self) -> float:
-    #     """
-    #     getter for the maximum allowed planning time in seconds.
-
-    #     Returns:
-    #         float: Maximum planning time in seconds
-            
-    #     Example: 
-    #         >> max_time = planner_node.get_max_planning_time()
-    #         >> print(f"Max Planning Time: {max_time} seconds")
-    #     """ 
-    #     return float(self.get_parameter('max_planning_time').value)
-    
     def get_description(self) -> str:
         """
         Getter for the description of the planner node.
@@ -366,37 +397,29 @@ class StrategyNode(Node):
             str: Description of the planner node
         """
         return str(self.get_parameter('description').value)
-    
-    def get_state(self) -> NodeState: 
+
+    def get_state(self) -> NodeState:
         """
         Getter for the current state of the planner."""
-        return self.__state
-    
+        return self._state
+
     """ === setters === """
-    # TODO: Complete
-    def set_planner(self, new_planner_type: Union[PlannerType, str], reset_replan_timer:Optional[bool]=False):
+
+    def set_planner(self, new_planner_type: Union[PlannerType, str], reset_replan_timer: Optional[bool] = False):
         """
         Setter for the planning algorithm type.
-        
-        Args: 
-            planner_type: PlannerType: Type of planner to set
-            reset_replan_timer: bool: This is an attribute that determines if you want to 
-                                      restart the timer with the new planner type active,
-                                      it will lock planner replan which changing attribute
-            
+
+        Args:
+            new_planner_type: PlannerType or str: Type of planner to set
+            reset_replan_timer: bool: unused - kept for interface compatibility.
+
         example:
             >>> set_planner(PlannerType.ASTAR)
             >>> set_planner(PlannerType.RRTSTAR)
         Raises:
             ValueError: if planner type is not recognized
-            
-        Tests: 
-            -   
         """
-        # initialize the planner from either PlannerType or string repr arg
-        # passed into this function
         try:
-            # Convert string to PlannerType if needed
             planner_type = (
                 new_planner_type if isinstance(new_planner_type, PlannerType)
                 else PlannerType.from_string(new_planner_type)
@@ -406,268 +429,69 @@ class StrategyNode(Node):
             self.get_logger().error(f"Failed to set planner: {e}")
             raise
 
-        # update ros2 param for parameter planner type with new planner type
-        # self.set_parameters([rclpy.parameter.Parameter('planner_type', rclpy.Parameter.Type.STRING, planner_type.value)])
-        
-        # Acquire the replan lock to prevent race conditions while changing planner
-        if hasattr(self, '__replan_lock'):
-            self.__replan_lock.acquire()
-        try:
-            self._planner = new_planner
-        finally:
-            # Release the lock after updating planner
-            if hasattr(self, '__replan_lock'):
-                self.__replan_lock.release()
-        
-        
-        
-        
-        # if not isinstance(planner_type, PlannerType) and not isinstance(planner_type, str):
-        #     self.get_logger().error("invalid planner_type, can either be the string representation or the PlannerType enum")
-            
-        # # TODO: Do more logic for both str and PlannerType
-        
-        # try:
-        #     self.planner = PlannerType.initialize_planner(planner_type)
-        # except ValueError as e:
-        #     self.get_logger().error(str(e))
-     
-    # # TODO: Add logic for if reste_replan_timer is set
-    # def set_replan_frequency(self, new_replan_frequency: float, reset_replan_timer:Optional[bool] = False):
-    #     """
-    #     Update the replanning frequency.
+        self._planner = new_planner
 
-    #     Args:
-    #         new_frequency: New frequency in Hz
-    #     """
-    #     if not isinstance(new_replan_frequency, (float, int)):
-    #         raise ValueError("Replan frequency must be a number")
-        
-    #     if not (0.01 <= new_replan_frequency <= 10.0):
-    #         self.get_logger().warning("Replan frequency out of bounds (0.01 - 10.0 Hz). Clamping to valid range.")
-    #         return
-        
-    #     self.set_parameters([rclpy.parameter.Parameter('replan_frequency', rclpy.Parameter.Type.DOUBLE, new_replan_frequency)])
-    #     if hasattr(self, 'planner_timer') and self.planner_timer is not None:
-    #         self.planner_timer.cancel()
-    #     self.planner_timer = self.create_timer(
-    #         1.0 / new_replan_frequency,
-    #         self._replan_callback,
-    #         autostart=(self.state == NodeState.ACTIVE),
-    #         callback_group=ReentrantCallbackGroup()
-    #     )
-    #     self.get_logger().info(f'Replan frequency set to {new_replan_frequency} Hz')   
-
-    # TODO: NEEDS COMPLETED
-    # def set_max_planning_time(self, new_max_planning_time: float, reset_replan_timer): 
-    #     ...
-    
     def set_state(self, state: NodeState):
         """Set the current state of the planner."""
         if not isinstance(state, NodeState):
             raise Exception("State must be an instance of NodeState Enum")
-        
-        # should prob validate that if setting state to false 
-        # timer is not running and vice versa
-        self.__state = state
-        
+        self._state = state
+
     """ === helper functions === """
-    # NOTE: DONE: NEEDS TESTED
+
     def is_active(self) -> bool:
         """Check if planner is in active state."""
-        return bool(self.__state == NodeState.ACTIVE)
+        return bool(self._state == NodeState.ACTIVE)
 
-
-    """ === Callback Functions === """
-    """ === planner callback functions === """
-    
-    # def _replan_event(self): 
-    #     """ 
-    #     Event handler triggered by replan events such as deviation from course
-    #     """
-    #     ...
-    
-    # NOTE: DONE: NEEDS TESTED
-    def _goal_rcv_cb(self, request: SendPose.Request, 
-                          response: SendPose.Response) -> SendPose.Response:
+    def _validate_goal(self, goal_pose: PoseStamped) -> Tuple[bool, str]:
         """
-        Service callback to set a new goal pose and activate the planner.
-        
-        @flowchart: .diagrams/goal_received_callback_flowchart.puml
-        
+        Validates an incoming goal pose against currently available world
+        state (agent position, cost map bounds).
 
-        Args:
-            request: Service request containing goal pose
-            response: Service response to populate
-            
+        Note: frame_id cross-checking against the cost map isn't possible
+        here - self._map/self._start_point are already converted into
+        planner-local types (PlannerGrid/PlannerPoint) by _map_rcv_cb /
+        _agent_state_rcv_cb, which don't retain the original frame_id.
+        """
+        if self._start_point is None or self._map is None:
+            return False, "Cannot set goal: missing world state data (agent pose or cost map)"
+        if not isinstance(goal_pose, PoseStamped):
+            return False, "Cannot set goal: invalid goal pose"
+
+        origin_x, origin_y, _ = self._map.origin
+        width_m = self._map.width * self._map.resolution
+        height_m = self._map.height * self._map.resolution
+        x, y = goal_pose.pose.position.x, goal_pose.pose.position.y
+        if not (origin_x <= x <= origin_x + width_m) or not (origin_y <= y <= origin_y + height_m):
+            return False, "Goal pose is out of cost map bounds"
+
+        return True, ""
+
+    def _plan(self, goal_pose: PoseStamped) -> Optional[Path]:
+        """
+        Plans a global path from the agent's current position to
+        `goal_pose` using the currently configured planner.
+
         Returns:
-            Response with success status
+            The dense nav_msgs/Path from the planner, or None if no path
+            was found.
         """
-        # Step 1. Validate request, 
-        #   - 1.0. validate that the request pose is a PoseStamped
-        #   - 1.1. check if pose is valid
-        #   - 1.2. check if pose frame_id matches agent state frame_id, both should be in 'map' frame
-        #   - 1.3. check if the pose is within the bounds of the current cost map
-        #   - 1.4. check that the pose is not too close to the agent's current position
-        # 
-        # if any of these checks fail, return response.success = False, response.message = 'reason', log an error message and return
-        # Validate world state data availability for planning
-        def _validate_goal(request_pose: PoseStamped) -> tuple[bool, str]:
-            # Validate world state data
-            if not (isinstance(self.__start_point, PoseStamped) and isinstance(self.__map, OccupancyGrid)):
-                return False, "Cannot set goal: Missing World State Data (agent pose or cost map)"
-            # Validate request pose type
-            if not isinstance(request_pose, PoseStamped):
-                return False, "Cannot set goal: Invalid goal pose"
-            # Validate frame_id matches cost map
-            cost_map_frame_id = self.__map.header.frame_id
-            if request_pose.header.frame_id != cost_map_frame_id or self.__start_point.header.frame_id != cost_map_frame_id:
-                return False, "Goal pose and agent state frame_id must match cost map frame_id"
-            # Validate pose within cost map bounds
-            map_origin_x = self.__map.info.origin.position.x
-            map_origin_y = self.__map.info.origin.position.y
-            map_width = self.__map.info.width * self.__map.info.resolution
-            map_height = self.__map.info.height * self.__map.info.resolution
-            pose_x = request_pose.pose.position.x
-            pose_y = request_pose.pose.position.y
-            if not (map_origin_x <= pose_x <= map_origin_x + map_width) or \
-               not (map_origin_y <= pose_y <= map_origin_y + map_height):
-                return False, "Goal pose is out of cost map bounds"
-            return True, ""
-
-        valid, message = _validate_goal(request.pose)
-        if not valid:
-            response.success = False
-            response.message = message
-            self.get_logger().warning(f"Received goal but validation failed: {message}")
-            return response
-        
-        # Step 2: Attempt to generate initial plan between agent pose and goal pose
-        #     2.1. if fails return response.success = False, return reason and return from function
-        #     2.2. if succeeds, proceed to step 3
-        try: 
-            def _convert_msg_to_planner_args(
-                grid: OccupancyGrid,                      
-                start: PoseStamped, 
-                goal: PoseStamped
-            ) -> Tuple[PlannerGrid, PlannerPoint, PlannerPoint]:
-                """ 
-                A utiltiy function to convert ROS messages to planner-specific data structures.
-                
-                Args: 
-                    - grid: nav_msgs/OccupancyGrid message representing the cost map
-                    - start: geometry_msgs/PoseStamped message representing the start pose
-                    - goal: geometry_msgs/PoseStamped message representing the goal pose
-                
-                Returns: 
-                    - Tuple containing: 
-                        - PlannerGrid: Internal grid representation for the planner
-                        - PlannerPoint: Start point in planner's format
-                        - PlannerPoint: Goal point in planner's format
-                        
-                example: 
-                    >>> grid, start_pt, goal_pt = _convert_msg_to_planner_args(grid, start, goal)
-                """
-                grid: PlannerGrid = PlannerGrid.from_ros_msg(grid)
-                start_pt: PlannerPoint = PlannerPoint.from_ros_msg(start)
-                goal_pt: PlannerPoint = PlannerPoint.from_ros_msg(goal) 
-                
-                return (grid, start_pt, goal_pt)
-            
-            grid, start_pt, goal_pt = _convert_msg_to_planner_args(self.__map, self.__start_point, request.pose)
-            path:Path = self._planner.plan_path(grid, start_pt, goal_pt)
-        except Exception as e: 
-            response.success = False
-            response.message = f"Planning failed: {str(e)}"
-            self.get_logger().error(f"Planning failed when setting new goal: {str(e)}")
-            return response 
-        
-        # 3. If all check pass: 
-        #   3.1. set the current goal pose
-        #   3.2. if planner is inactive, activate it and start the replan timer
-        #   3.3. initialize subscription to /hybraut_nav/virtual_waypoints topic to receive virtual waypoints from Layer 2 (Tactical layer) this means that we will replan when we recieve this  
-        #   3.4. toggle state to active 
-        #   3.4. return response.success = True
-        # publish the path
-        
-        self.__goal_point = request.pose
-        self.__toggle_state(self.__is_active()) # Toggle state to active is not already active
-        self._activate_replan_timer()
-        self.__plan_pub.publish(path)
-        
-        response.success = True
-        response.message = "Goal set and planner activated"
-        
-        # initialize the virtual waypoint subscription
-        # TODO: Implement the virtual waypoint subscription callback
-        # self.__virtual_waypoint_subscription = self.create_subscription(
-        #     PoseStamped,
-        #     "/hybraut_nav/virtual_waypoints",
-        #     self.__virtual_waypoints_callback
-        # )
-        return response
-
-    # NOTE: DONE: NEEDS TESTED
-    def _cancel_goal_cb(self, request: Trigger.Request, 
-                            response: Trigger.Response) -> Trigger.Response:
-        """
-        Service callback to deactivate the planning for current goal.
-        
-        @flowchart: .diagrams/cancel_goal_callback_flowchart.puml
-        
-        Args:
-            request: Service request (empty)
-            response: Service response to populate
-            
-        Returns:
-            Response with success status
-        """
-        
-        try: 
-            # Step 1: check if planner is already inactive
-            if not self.is_active():
-                response.success = False
-                response.message = "Planner is already inactive"
-                return response
-            
-            # # Step 2: deactivate replan timer
-            # self._deactivate_replan_timer()
-
-            # Step 3: reset goal related state variables
-            self.__goal_point = None
-            self.__vw_point = None
-
-            # Step 4: toggle state to inactive
-            # self.toggle_state(self.is_active())        
-            
-            # set successful deactivation response
-            response.success = True
-            response.message = "Planner deactivated and current goal cancelled"
-        except Exception as e: 
-            # handle unexpected exceptions gracefully
-            response.success = False
-            response.message = f"Unexpected error during deactivation: {str(e)}"
-
-
-        # return response
-        return response
+        goal_pt = PlannerPoint.from_ros_msg(goal_pose)
+        return self._planner.plan_path(self._map, self._start_point, goal_pt)
 
     """ === World State Callback Functions === """
 
     def _map_rcv_cb(self, msg: OccupancyGrid):
         """
-        Callback for cost map updates. 
-        
-        Args: 
+        Callback for cost map updates.
+
+        Args:
             msg: OccupancyGrid message representing the cost map
-        
+
         Returns: None
-        
+
         raises: Exception logger message if message is invalid
         """
-        # Basic validation: check message type and dimensions
-        
-        # should check if there is a difference betwene previous map and current map 
         if not isinstance(msg, OccupancyGrid):
             self.get_logger().error("Received cost map is not of type OccupancyGrid")
             return
@@ -677,166 +501,343 @@ class StrategyNode(Node):
         if not msg.data or len(msg.data) != msg.info.width * msg.info.height:
             self.get_logger().error("Received cost map data size does not match grid dimensions")
             return
-        
-        # If valid, update the current cost map
-        self._map:PlannerGrid = PlannerGrid.from_ros_msg(msg)
-        
+
+        self._map = PlannerGrid.from_ros_msg(msg)
+
     def _agent_state_rcv_cb(self, msg: AgentState):
         """Callback for agent state updates."""
-        if not isinstance(msg, AgentState): 
+        if not isinstance(msg, AgentState):
             self.get_logger().error("Received agent state is not of type AgentState")
             return
-        
-        # Optionally: Validate frame_id matches cost map frame
-        if hasattr(self, '_map') and self._map:
-            if msg.header.frame_id != self._map.header.frame_id:
-                self.get_logger().warning(
-                    f"Agent pose frame_id ({msg.header.frame_id}) does not match cost map frame_id ({self._map.header.frame_id})"
-                )
-                
-        current_agent_pose = PoseStamped(header=msg.header, pose=msg.pose)
-        self._start_point:PlannerPoint = PlannerPoint.from_ros_msg(current_agent_pose)
 
+        current_agent_pose = PoseStamped(header=msg.header, pose=msg.pose)
+        self._start_point = PlannerPoint.from_ros_msg(current_agent_pose)
+
+    """ === navigate_to_goal action server === """
+
+    def _goal_cb(self, goal_request) -> GoalResponse:
+        """Only one mission runs at a time - reserves the active state
+        immediately (rather than waiting for execute_callback to start) so
+        a second goal arriving in that gap is still rejected, same pattern
+        tactical_node uses for its own single-leg-at-a-time gate."""
+        if self.is_active():
+            self.get_logger().warning("Rejecting mission goal - a mission is already in progress.")
+            return GoalResponse.REJECT
+        self.set_state(NodeState.ACTIVE)
+        return GoalResponse.ACCEPT
+
+    def _cancel_cb(self, goal_handle) -> CancelResponse:
+        """Always accept - the actual stop is driven from _run_leg/
+        _on_tactical_feedback noticing is_cancel_requested and canceling
+        whatever tactical leg is currently in flight."""
+        return CancelResponse.ACCEPT
+
+    async def _execute_mission_cb(self, goal_handle) -> NavigateToGoal.Result:
+        """
+        Drives one whole mission: plans a route to the goal, then dispatches
+        it to the tactical layer one leg at a time until the route is
+        exhausted, canceled, or fails - replanning in place if the agent
+        drifts off the stored route mid-mission (see _plan_check_cb).
+
+        This single coroutine is the only place that ever mutates route
+        state (_route_waypoints/_segment_lengths/_current_waypoint_index) -
+        _plan_check_cb only flags a replan and cancels the in-flight leg to
+        interrupt it promptly, it never touches the route itself.
+        """
+        request = goal_handle.request
+        self._mission_start_time = self.get_clock().now()
+        self._active_mission_goal_handle = goal_handle
+        self._tactical_goal_handle = None
+        self._replan_requested = False
+        self._cancel_sent_for_active_leg = False
+
+        ok, message = await self._plan_and_set_route(request.goal_waypoint)
+        if not ok:
+            self.get_logger().warning(f"Mission rejected: {message}")
+            goal_handle.abort()
+            self._clear_mission_state()
+            return NavigateToGoal.Result(success=False, message=message)
+
+        self._start_plan_check_timer()
+
+        while self._current_waypoint_index < len(self._route_waypoints):
+            target = self._route_waypoints[self._current_waypoint_index]
+            outcome, detail = await self._run_leg(target, request.mission_tag)
+
+            if outcome is _LegOutcome.REACHED:
+                self._current_waypoint_index += 1
+
+            elif outcome is _LegOutcome.CANCELED_FOR_REPLAN:
+                self.get_logger().info("Deviated from planned route - replanning")
+                self._replan_requested = False
+                ok, message = await self._plan_and_set_route(request.goal_waypoint)
+                if not ok:
+                    self.get_logger().error(f"Replan failed: {message}")
+                    self._stop_plan_check_timer()
+                    goal_handle.abort()
+                    self._clear_mission_state()
+                    return NavigateToGoal.Result(success=False, message=f"Replan failed: {message}")
+
+            elif outcome is _LegOutcome.CANCELED_BY_USER:
+                self._stop_plan_check_timer()
+                goal_handle.canceled()
+                self._clear_mission_state()
+                return NavigateToGoal.Result(success=False, message="Mission canceled")
+
+            else:  # FAILED
+                self.get_logger().error(f"Leg failed: {detail}")
+                self._stop_plan_check_timer()
+                goal_handle.abort()
+                self._clear_mission_state()
+                return NavigateToGoal.Result(success=False, message=detail)
+
+        self._stop_plan_check_timer()
+        self.get_logger().info("Mission complete: reached final goal waypoint")
+        goal_handle.succeed()
+        duration = self.get_clock().now() - self._mission_start_time
+        self._clear_mission_state()
+        return NavigateToGoal.Result(
+            success=True, message="Mission complete", total_mission_duration=duration.to_msg()
+        )
+
+    async def _run_leg(self, target: Waypoint, mission_tag: str) -> Tuple[_LegOutcome, str]:
+        """
+        Sends one waypoint to tactical_node's execute_mission action and
+        awaits its result, mapping the outcome for _execute_mission_cb's
+        drive loop. A genuine TERMINAL_REACHED success always wins even if
+        a replan/cancel was also requested right around the same time -
+        tactical_node's own result determination already gives a real
+        success priority over a late-arriving cancel request, so this
+        mirrors that here.
+        """
+        # a replan or cancel may already be pending from the gap between
+        # the previous leg's result and this call - don't bother sending a
+        # tactical goal we'd have to immediately cancel anyway.
+        if self._replan_requested:
+            return _LegOutcome.CANCELED_FOR_REPLAN, ""
+        if self._active_mission_goal_handle is not None and self._active_mission_goal_handle.is_cancel_requested:
+            return _LegOutcome.CANCELED_BY_USER, ""
+
+        if not self._tactical_action_client.wait_for_server(timeout_sec=5.0):
+            return _LegOutcome.FAILED, "tactical_node/execute_mission action server unavailable"
+
+        goal = ExecuteMission.Goal()
+        goal.stamp = self.get_clock().now().to_msg()
+        goal.mission_tag = mission_tag
+        goal.goal_waypoint = target
+        self._cancel_sent_for_active_leg = False
+
+        goal_handle = await self._tactical_action_client.send_goal_async(
+            goal, feedback_callback=self._on_tactical_feedback
+        )
+        if not goal_handle.accepted:
+            return _LegOutcome.FAILED, "tactical_node rejected the waypoint goal"
+
+        self._tactical_goal_handle = goal_handle
+        result_response = await goal_handle.get_result_async()
+        self._tactical_goal_handle = None
+        result = result_response.result
+
+        if result.success:
+            return _LegOutcome.REACHED, ""
+        if self._replan_requested:
+            return _LegOutcome.CANCELED_FOR_REPLAN, ""
+        if self._active_mission_goal_handle is not None and self._active_mission_goal_handle.is_cancel_requested:
+            return _LegOutcome.CANCELED_BY_USER, ""
+        return _LegOutcome.FAILED, result.message or "tactical leg failed"
+
+    def _on_tactical_feedback(self, feedback_msg):
+        """
+        Feedback callback for the currently in-flight tactical leg - fires
+        at tactical_node's own continuous_dynamics_publish_rate cadence
+        (default 50 Hz). Doubles as the cancel-detection heartbeat, the
+        same "periodic tick also checks for a pending cancel" pattern
+        tactical_node itself uses for its own cancel detection - here it's
+        what actually cancels the tactical goal once either this node's own
+        mission goal is canceled, or _plan_check_cb has flagged a replan.
+        """
+        if (self._tactical_goal_handle is not None
+                and not self._cancel_sent_for_active_leg
+                and (self._replan_requested
+                     or (self._active_mission_goal_handle is not None
+                         and self._active_mission_goal_handle.is_cancel_requested))):
+            self._cancel_sent_for_active_leg = True
+            self._tactical_goal_handle.cancel_goal_async()
+            return
+
+        self._publish_strategy_feedback(feedback_msg.feedback)
+
+    def _publish_strategy_feedback(self, tactical_feedback: ExecuteMission.Feedback):
+        """Builds and publishes this mission's own feedback: the relayed
+        tactical fields plus mission-level progress computed fresh each
+        tick from _segment_lengths/_current_waypoint_index."""
+        if self._active_mission_goal_handle is None or not self._active_mission_goal_handle.is_active:
+            return
+
+        elapsed = self.get_clock().now() - self._mission_start_time
+        elapsed_sec = elapsed.nanoseconds / 1e9
+
+        completed = sum(self._segment_lengths[:self._current_waypoint_index])
+        total = sum(self._segment_lengths)
+        if total > 0:
+            progress = completed / total
+        elif self._route_waypoints:
+            progress = self._current_waypoint_index / len(self._route_waypoints)
+        else:
+            progress = 0.0
+
+        eta_sec = 0.0
+        if completed > 0 and elapsed_sec > 0:
+            avg_speed = completed / elapsed_sec
+            if avg_speed > 0:
+                eta_sec = max(0.0, (total - completed) / avg_speed)
+
+        feedback = NavigateToGoal.Feedback()
+        feedback.planned_waypoints = list(self._route_waypoints)
+        feedback.current_waypoint_index = self._current_waypoint_index
+        feedback.progress = progress
+        feedback.elapsed_time = elapsed.to_msg()
+        feedback.estimated_time_remaining = Duration(seconds=eta_sec).to_msg()
+        feedback.tactical_automaton_state = tactical_feedback.automaton_state
+        feedback.tactical_time_since_last_transition = tactical_feedback.time_since_last_transition
+        feedback.current_position = tactical_feedback.current_position
+        feedback.stamp = self.get_clock().now().to_msg()
+
+        self._active_mission_goal_handle.publish_feedback(feedback)
+
+    """ === planning / route management === """
+
+    async def _plan_and_set_route(self, goal_waypoint: Waypoint) -> Tuple[bool, str]:
+        """
+        (Re)plans a global route from the agent's current position to
+        goal_waypoint, downsamples it, and replaces _route_waypoints/
+        _current_waypoint_index/_segment_lengths/_global_path with the
+        result. Used both for the initial plan on mission start and for
+        every replan mid-mission - a replan discards the previous route
+        wholesale rather than splicing it, same as before.
+        """
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.pose.position = goal_waypoint.position
+
+        valid, message = self._validate_goal(goal_pose)
+        if not valid:
+            return False, message
+
+        try:
+            path = self._plan(goal_pose)
+        except Exception as e:
+            return False, f"Planning failed: {str(e)}"
+
+        if path is None or len(path.poses) < 2:
+            return False, "Planner found no valid path to goal"
+
+        max_waypoints = int(self.get_parameter('max_tactical_waypoints').value)
+        downsampled = downsample_path(path, max_waypoints)
+        if not downsampled.poses:
+            return False, "Downsampled plan produced no waypoints"
+
+        self._goal_waypoint = goal_waypoint
+        self._global_path = path
+        self._route_waypoints = [
+            Waypoint(position=pose.pose.position) for pose in downsampled.poses
+        ]
+        self._current_waypoint_index = 0
+        self._segment_lengths = self._compute_segment_lengths()
+
+        downsampled.header.stamp = self.get_clock().now().to_msg()
+        self._plan_pub.publish(downsampled)
+        self._goal_pose_pub.publish(goal_pose)
+
+        return True, ""
+
+    def _compute_segment_lengths(self) -> List[float]:
+        """Euclidean length of each leg in _route_waypoints, in order,
+        starting from the agent's position at (re)plan time - index-aligned
+        with _route_waypoints, so segment_lengths[i] is the length of the
+        leg ending at route_waypoints[i]. Used for _publish_strategy_feedback's
+        distance-based progress/ETA."""
+        if self._start_point is None or not self._route_waypoints:
+            return []
+        lengths = []
+        prev_x, prev_y = self._start_point.x, self._start_point.y
+        for wp in self._route_waypoints:
+            x, y = wp.position.x, wp.position.y
+            lengths.append(math.hypot(x - prev_x, y - prev_y))
+            prev_x, prev_y = x, y
+        return lengths
+
+    def _clear_mission_state(self):
+        self._goal_waypoint = None
+        self._global_path = None
+        self._route_waypoints = []
+        self._segment_lengths = []
+        self._current_waypoint_index = 0
+        self._active_mission_goal_handle = None
+        self._tactical_goal_handle = None
+        self._mission_start_time = None
+        self._replan_requested = False
+        self._cancel_sent_for_active_leg = False
+        self.set_state(NodeState.INACTIVE)
+
+    """ === plan deviation / replan === """
+
+    async def _plan_check_cb(self):
+        """
+        Slow-frequency timer: checks the agent's current position against
+        the stored global plan and, if it's drifted past
+        path_deviation_tolerance, flags a replan and cancels whatever
+        tactical leg is currently in flight to interrupt it promptly. The
+        actual replanning happens back in _execute_mission_cb's drive loop
+        once that leg's cancellation comes back - not here, so there's only
+        ever one place mutating route state (see its docstring).
+        """
+        if not self.is_active() or self._replan_requested:
+            return
+        if self._start_point is None or self._global_path is None or not self._global_path.poses:
+            return
+
+        deviation = distance_to_path(self._start_point, self._global_path)
+        tolerance = float(self.get_parameter('path_deviation_tolerance').value)
+        if deviation <= tolerance:
+            return
+
+        self.get_logger().warning(
+            f"Deviation {deviation:.2f}m exceeds tolerance {tolerance:.2f}m - replanning"
+        )
+        self._replan_requested = True
+        if self._tactical_goal_handle is not None and not self._cancel_sent_for_active_leg:
+            self._cancel_sent_for_active_leg = True
+            self._tactical_goal_handle.cancel_goal_async()
+
+    def _start_plan_check_timer(self):
+        if self._plan_check_timer.is_canceled():
+            self._plan_check_timer.reset()
+
+    def _stop_plan_check_timer(self):
+        if not self._plan_check_timer.is_canceled():
+            self._plan_check_timer.cancel()
 
     """ === dynamic configuration callback functions === """
-    # NOTE: Done needs tested.
+
     def _parameter_update_cb(self, params: List[Parameter]) -> SetParametersResult:
         """
         Handle dynamic parameter changes.
-        
+
         Args:
             params: List of parameters that changed
-            
+
         Returns:
             Result indicating success or failure
-        
-        Tests: 
-            Unit and integration test for this function can be found at: 
-            - 
-            -  
-            -   
         """
-        try: 
+        try:
             for param in params:
-                # if param.name == 'planner_frequency':
-                #     self.set_replan_frequency(param.value)
                 if param.name == 'planner':
                     self.set_planner(param.value)
-                # elif param.name == 'max_planning_time':
-                #     self.set_max_planning_time(param.value)
-        except Exception as e: 
+        except Exception as e:
             return SetParametersResult(successful=False, reason=str(e))
-        
+
         return SetParametersResult(successful=True)
-
-    """ === planner functions === """
-
-
-
-    # """ === Timer State Togglers"""
-    
-    # def _toggle_replan_timer(self): 
-    #     """Toggler the replan timer state"""
-    #     if self.is_active():
-    #         self._deactivate_replan_timer() 
-    #         self.__state = NodeState.INACTIVE
-    #     else:
-    #         self._activate_replan_timer()
-    #         self.set_state
-    
-    # def _reconfigure_replan_timer(self):
-    #     """
-    #     reconfigures the replan timer with updated frequency.
-        
-    #     @flowchart: .diagrams/flowcharts/reconfigure_replan_timer_flowchart.puml
-    #     Tests: 
-    #     ...
-    #     """
-    #     autostart = False
-    #     if self.is_active():
-    #         autostart = True
-
-    #     self.__replan_timer.destroy()
-
-    #     self.__replan_timer = self.create_timer(
-    #         1.0 / self.get_replan_frequency(),
-    #         self._replan_callback,
-    #         autostart=autostart,
-    #         callback_group=ReentrantCallbackGroup()
-    #     )
-    
-    # # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-    # def _activate_replan_timer(self) -> Tuple[bool, str]:
-    #     """
-    #     Activate the replanning timer if not already active without reconfiguration.
-    #     Returns:
-    #         Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
-    #     """
-    #     try: 
-    #         if self.planner_timer.is_canceled():
-    #             self.planner_timer.reset()
-    #             return (True, "Replan timer activated successfully")
-    #         else: 
-    #             return (False, "Replan timer already active")
-    #     except Exception as e:
-    #         return (False, f"Failed to activate replan timer due to exception: {str(e)}")
-
-    # # NOTE: FUNCTION COMPLETE, NEEDS TESTING
-    # def _deactivate_replan_timer(self) -> Tuple[bool, str]: 
-    #     """ 
-    #     Deactivate the replanning timer if active without reconfiguration.
-    #     Returns:
-    #         Tuple[bool, str]: (True, message) if activated, (False, message) otherwise.
-    #     """
-    #     try: 
-    #         if not self.planner_timer.is_canceled():
-    #             self.planner_timer.cancel()
-    #             return (True, "Replan timer deactivated successfully")
-    #         else: 
-    #             return (False, "Replan timer already inactive")
-    #     except Exception as e:
-    #         return (False, f"Failed to deactivate replan timer due to exception: {str(e)}")
-
-    #     # TODO: NEED TO UPDATE THIS FUNCTION TO MATCH NEW ALGORITHM
-    
-    # def _replan_callback(self):
-    #     """
-    #     Timer callback to plan and publish path.
-        
-    #     Tests: 
-    #     Unit and Integration tests for this function can be found @ 
-    #         -    
-    #         -   
-    #         -   
-            
-    #     """
-    #     # Publish current goal pose
-    #     if self.current_goal_pose:
-    #         self.goalpose_publisher.publish(self.current_goal_pose)
-        
-    #     # Check if planner should be active
-    #     if not self.is_active():
-    #         self.planner_timer.cancel()
-    #         return
-
-    #     # Verify all required data is available
-    #     if not self._has_required_data():
-    #         self.get_logger().debug("Missing required data for planning")
-    #         return
-
-    #     # Attempt to plan and publish path
-    #     try:
-    #         path:Path = self._compute_path()
-
-    #         if path:
-    #             path.header.frame_id = 'map'
-    #             path.header.stamp = self.get_clock().now().to_msg()
-    #             self._publish_plan(path)
-    #         else: 
-    #             self.get_logger().warn("Path planning returned no valid path, deactiving planner for current goal")
-    #             self._deactivate_callback(Trigger.Request(), Trigger.Response())
-    #     except Exception as e:
-    #         self.get_logger().error(f"Planning failed: {str(e)}")
 
 
 def main(args=None):
@@ -859,7 +860,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
-# ============================================================================
-# Independent Testing Code
-# ============================================================================

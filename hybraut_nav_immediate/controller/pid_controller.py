@@ -82,5 +82,16 @@ class PIDController(Controller):
 
         return max(-self.max_yaw_rate, min(self.max_yaw_rate, yaw_rate_cmd))
 
+    def reset(self):
+        """Clears accumulated integral/derivative history - call this when
+        resuming after a gap (e.g. immediate_node's control loop going
+        active again after the tactical layer was idle) so a stale windup/
+        derivative spike from before the gap doesn't leak into the first
+        commands afterward. Leaves current_heading/desired_heading alone -
+        those get refreshed by the normal update_state/update_continous_dynamics
+        calls anyway."""
+        self._integral = 0.0
+        self._previous_error = 0.0
+
     def __repr__(self):
         return f"PIDController(kp={self.kp}, ki={self.ki}, kd={self.kd})"

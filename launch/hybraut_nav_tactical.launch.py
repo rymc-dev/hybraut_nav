@@ -1,36 +1,28 @@
 #!/usr/bin/env python3
 """
-Full stack: `risk_envelope_node` + `strategy_node` + `tactical_node` +
-`immediate_node` - the "risk assessment" configuration, i.e.
-`hybraut_nav_strategic_tactical_immediate.launch.py` plus the real risk
-layer.
+Tactical layer alone - `tactical_node` with no `immediate_node` (no
+guidance/control) and no `strategy_node` (no global path planning).
 
-`risk_envelope_node` needs `/agent_state`/`/obstacles_state` publishers to do
-anything (see `hybraut_nav_dynamic_obstacles.launch.py`'s
-`agent_state_bridge`/`obstacles_state_bridge`, or a `colav_interfaces`-based
-sim) - launching it here alone will just sit warning "No synchronised
-agent/obstacles update received" until something publishes those. Do not
-also run `hybraut_nav_dynamic_obstacles.launch.py` alongside this file - both
-bring up their own `risk_envelope_node` and would collide (duplicate node
-name, both publishing `/hybraut_nav/riskenv`).
+Useful for exercising the COLAV automaton's discrete-mode transitions in
+isolation - e.g. driving it with `fake_riskenv_publisher` or the real
+`risk_envelope_node` and watching `/hybraut_nav/tactical_node/automaton_state`
+without also having to stand up the control loop.
 
-`strategy_node` plans a global route and drives `tactical_node` (via its
-`execute_mission` action) one leg at a time. It needs `/map` and
-`/agent_state` feeding in separately - see
-docs/turtlebot3_demo.md#strategic-driven-demo for the full setup (map/agent
-bridges) - then send it one long-range goal for the whole mission:
-    ros2 action send_goal /hybraut_nav/strategy_node/navigate_to_goal \
-        hybraut_interfaces/action/NavigateToGoal \
-        "{goal_waypoint: {position: {x: 3.0, y: 2.0}}}" --feedback
+`tactical_node` exposes an action server - once it's up, send it a waypoint
+directly (no strategy_node here to dispatch one for you):
+    ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
+        hybraut_interfaces/action/ExecuteMission \
+        "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 
-Cancel an in-progress mission early with `ros2 action cancel` (or Ctrl-C the
-send_goal call above).
+See docs/turtlebot3_demo.md and docs/turtlebot3_dynamic_obstacles_demo.md.
 """
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 package_name = 'hybraut_nav'
 
@@ -40,12 +32,18 @@ def generate_launch_description():
         'use_sim_time', default_value='false',
         description='Use /clock (sim time) instead of the wall clock - '
                      'required whenever Gazebo is the time source '
-                     '(robot_state_publisher / ros_gz_bridge stamp /tf off '
-                     '/clock), otherwise message stamps drift arbitrarily '
-                     'from the TF buffer and TF-synchronised consumers '
-                     '(e.g. rviz displays, message_filters) silently stop '
-                     'updating. Doubly true with moving obstacles - see '
+                     '(robot_state_publisher stamps /tf off /clock), '
+                     'otherwise message stamps drift arbitrarily from the '
+                     'TF buffer and TF-synchronised consumers (e.g. rviz '
+                     'displays, message_filters) silently stop updating. '
+                     'Doubly true with moving obstacles - see '
                      'turtlebot3_dynamic_obstacles_demo.md.'
+    )
+    rviz_arg = DeclareLaunchArgument(
+        'rviz', default_value='true',
+        description="Launch RViz with rviz/tactical_node.rviz alongside "
+                     "tactical_node. Set to 'false' to skip it (e.g. "
+                     "running headless or with your own RViz instance)."
     )
     safety_radius_arg = DeclareLaunchArgument(
         'safety_radius', default_value='0.5',
@@ -60,14 +58,6 @@ def generate_launch_description():
     los_distance_threshold_arg = DeclareLaunchArgument(
         'los_distance_threshold', default_value='3.0',
         description='colav_automaton los_distance_threshold (m).'
-    )
-    dt_global_update_tolerance_arg = DeclareLaunchArgument(
-        'dt_global_update_tolerance', default_value='0.5',
-        description='risk_envelope_node ApproximateTimeSynchronizer slop '
-                     '(s) between /agent_state and /obstacles_state - '
-                     'independently-timed bridges rarely land within the '
-                     'default even with matching clocks, headroom to 2.0 '
-                     'is a reasonable starting point.'
     )
     lateral_offset_distance_arg = DeclareLaunchArgument(
         'lateral_offset_distance', default_value='1.0',
@@ -88,31 +78,6 @@ def generate_launch_description():
                      'ColavAutomaton - kept in step with lateral_offset_distance.'
     )
 
-    risk_envelope_node = Node(
-        package=package_name,
-        executable='risk_envelope_node',
-        output='screen',
-        parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'dt_global_update_tolerance': LaunchConfiguration('dt_global_update_tolerance'),
-        }]
-    )
-    strategy_node = Node(
-        package=package_name,
-        executable='strategy_node',
-        output='screen',
-        parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-        }]
-    )
-    immediate_node = Node(
-        package=package_name,
-        executable='immediate_node',
-        output='screen',
-        parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-        }]
-    )
     tactical_node = Node(
         package=package_name,
         executable='tactical_node',
@@ -126,17 +91,24 @@ def generate_launch_description():
             'longitudinal_offset_distance': LaunchConfiguration('longitudinal_offset_distance'),
         }]
     )
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', PathJoinSubstitution(
+            [FindPackageShare(package_name), 'rviz', 'tactical_node.rviz'])],
+        output='screen',
+        condition=IfCondition(LaunchConfiguration('rviz')),
+    )
 
     return LaunchDescription([
         use_sim_time_arg,
         safety_radius_arg,
         acceptance_radius_arg,
         los_distance_threshold_arg,
-        dt_global_update_tolerance_arg,
         lateral_offset_distance_arg,
         longitudinal_offset_distance_arg,
-        risk_envelope_node,
-        strategy_node,
-        immediate_node,
+        rviz_arg,
         tactical_node,
+        rviz_node,
     ])

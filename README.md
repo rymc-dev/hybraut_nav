@@ -23,6 +23,10 @@ conversions, euclidean distance, dynamic class import, YAML loading).
 - [Topic contract](#topic-contract)
 - [License](#license)
 
+See also: [TurtleBot3 Gazebo demo walkthrough](docs/turtlebot3_demo.md),
+[with dynamic obstacles](docs/turtlebot3_dynamic_obstacles_demo.md),
+[with scripted COLREG encounters](docs/turtlebot3_colreg_encounters_demo.md).
+
 ## Dependencies
 
 Pre-requisites:
@@ -82,7 +86,46 @@ ros2 lifecycle set /hybraut_nav/tactical_node activate
 ```
 
 Individual nodes can also be run standalone via `ros2 run hybraut_nav <node>`
-(see the table above for the executable names).
+(see the table above for the executable names), or in smaller combinations
+via the other run configurations under `launch/`:
+
+| Launch file | Nodes |
+|---|---|
+| `hybraut_nav_immediate.launch.py` | `immediate_node` alone |
+| `hybraut_nav_strategy.launch.py` | `strategy_node` alone |
+| `hybraut_nav_tactical.launch.py` | `tactical_node` alone |
+| `hybraut_nav_tactical_immediate.launch.py` | `tactical_node` + `immediate_node` (no `strategy_node`) |
+| `hybraut_nav_strategic_tactical_immediate.launch.py` | `strategy_node` + `tactical_node` + `immediate_node` (no `risk_envelope_node`) |
+| `hybraut_nav.launch.py` | full stack, `risk_envelope_node` included (the "risk assessment" configuration) |
+
+All five run configurations above (everything except `hybraut_nav.launch.py`)
+also bring up RViz alongside the node(s), pre-configured with the matching
+`rviz/*.rviz` file for what that configuration publishes/subscribes to (e.g.
+`hybraut_nav_tactical_immediate.launch.py` opens `rviz/tactical_immediate.rviz`).
+Pass `rviz:=false` to skip it (e.g. running headless, or pointing your own
+RViz instance at the config instead).
+
+Each accepts `use_sim_time`; the ones that bring up `tactical_node` also take
+`safety_radius`, `acceptance_radius`, `los_distance_threshold`,
+`lateral_offset_distance`, and `longitudinal_offset_distance` (plus
+`dt_global_update_tolerance` for `hybraut_nav.launch.py`) to retune
+`tactical_node`/`risk_envelope_node` for the platform in use - see
+[docs/turtlebot3_demo.md](docs/turtlebot3_demo.md)
+for TB3-scale examples.
+
+For a full worked example against a TurtleBot3 Gazebo sim - including a
+`fake_riskenv_publisher` demo/test node that stands in for
+`risk_envelope_node` so you can watch the automaton's discrete-mode
+transitions live - see
+[docs/turtlebot3_demo.md](docs/turtlebot3_demo.md). For the same demo
+extended with real moving obstacles feeding the actual
+`risk_envelope_node` -> `riskenv.create_unsafe_set()` pipeline instead of the
+synthetic polygon, see
+[docs/turtlebot3_dynamic_obstacles_demo.md](docs/turtlebot3_dynamic_obstacles_demo.md).
+For scripted COLREG encounters (head-on, crossing, overtaking) driving that
+same real `riskenv.create_unsafe_set()` geometry against a virtual obstacle -
+no Gazebo mover required - see
+[docs/turtlebot3_colreg_encounters_demo.md](docs/turtlebot3_colreg_encounters_demo.md).
 
 ## Topic contract
 

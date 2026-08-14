@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 from hybraut_nav_strategy import StrategyNode
-from hybraut_nav_strategy.strategy_node import StrategyState
+from hybraut_nav.state import NodeState
 
 class MockParameter:
     def __init__(self, value):
@@ -14,9 +14,7 @@ def strategy_node():
 """ === getter tests === """
 
 @pytest.mark.parametrize("method,expected", [
-    ("get_replan_frequency", 0.5),
-    ("get_planner_type", "rrt*"),
-    ("get_max_planning_time", 0.5),
+    ("get_planner_type", "A*"),
     ("get_description", "sample description of the class"),
 ])
 def test_strategy_node_get_methods(strategy_node: StrategyNode, method, expected):
@@ -24,40 +22,28 @@ def test_strategy_node_get_methods(strategy_node: StrategyNode, method, expected
         assert getattr(strategy_node, method)() == expected
 
 @pytest.mark.parametrize("expected_state", [
-    (StrategyState.ACTIVE),
-    (StrategyState.INACTIVE)
+    (NodeState.ACTIVE),
+    (NodeState.INACTIVE)
 ])
-def test_strategy_node_get_state(strategy_node: StrategyNode, expected_state: StrategyState): 
-    setattr(strategy_node, 'state', expected_state)
+def test_strategy_node_get_state(strategy_node: StrategyNode, expected_state: NodeState):
+    strategy_node._state = expected_state
     assert strategy_node.get_state() == expected_state
 
 """ === setter tests === """
 
-def test_set_planner_valid_path_string():
-    """ 
-    
-    """
-    pass
+def test_set_state_valid(strategy_node: StrategyNode):
+    strategy_node.set_state(NodeState.ACTIVE)
+    assert strategy_node.get_state() == NodeState.ACTIVE
 
-def test_set_planner_valid_path_plannertype():
-    pass
-
-
-# def test_set_replan_frequency_valid(strategy_node: StrategyNode):
-#     strategy_node.set_replnan_frequency(1.0)
-#     assert
-
+def test_set_state_rejects_non_node_state(strategy_node: StrategyNode):
+    with pytest.raises(Exception):
+        strategy_node.set_state("active")
 
 def test_is_active(strategy_node: StrategyNode):
+    strategy_node._state = NodeState.INACTIVE
     assert not strategy_node.is_active()
-    strategy_node.state = StrategyState.ACTIVE
+    strategy_node._state = NodeState.ACTIVE
     assert strategy_node.is_active()
-    
-def test_toggle_replan_timer(strategy_node: StrategyNode):
-    strategy_node.toggle_replan_timer()
-    assert strategy_node.is_active()
-    strategy_node.__toggle_replan_timer()
-    assert not strategy_node.is_active()
 
 if __name__ == '__main__':
     pytest.main([__file__])

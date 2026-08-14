@@ -19,9 +19,19 @@ Responsibilities:
   vessel-specific control considerations here
 
 NOTE:
-This version of the controller assumes a constant forward velocity and relies 
-on the continuous dynamics from the hybraut_tactical_layer to supply only a 
+This version of the controller assumes a constant forward velocity and relies
+on the continuous dynamics from the hybraut_tactical_layer to supply only a
 desired heading. Future versions may support richer dynamic references.
+
+Interface: no manual activation step. The control loop timer always runs;
+whether it commands real motion is driven entirely by whether
+`/hybraut_nav/continous_dynamics` is actively being published to (see
+`_is_tactical_active()`) - that's the same "is a leg currently executing"
+signal tactical_node's own action-driven publish timer expresses (it only
+publishes continous_dynamics while a leg is running). While stale (no leg
+running, or tactical_node isn't up), an explicit zero-velocity command is
+published instead of the last real command, so the robot doesn't keep
+coasting once the tactical layer is done.
 """
 
 import math
@@ -32,22 +42,22 @@ import os
 
 import rclpy
 from rclpy.node import Node
+from rclpy.time import Time
+from rclpy.duration import Duration
 from rclpy.qos import qos_profile_system_default
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.subscription import Subscription
 from rclpy.publisher import Publisher
-from rclpy.service import Service
 from rcl_interfaces.msg import ParameterDescriptor
+from rclpy.qos import QoSProfile, HistoryPolicy, ReliabilityPolicy, DurabilityPolicy
 
 from geometry_msgs.msg import TwistStamped, TransformStamped
 from nav_msgs.msg import Odometry
-from std_srvs.srv import Trigger
 
 from hybraut_nav.qos import world_state_qos
 
 from std_msgs.msg import Float64MultiArray
 
-from hybraut_nav.state import NodeState
 from hybraut_nav_utils import quaternion_to_heading
 
 from .controller import ControllerType, Controller
@@ -55,9 +65,10 @@ from .controller import ControllerType, Controller
 from rcl_interfaces.msg import ParameterType
 
 DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
-DEFAULT_CRUISE_SPEED: float = 0.2 # m/s       
-DEFAULT_YAW_RATE_LIMIT: float = 0.2
+DEFAULT_CRUISE_SPEED: float = 0.2 # m/s
+DEFAULT_YAW_RATE_LIMIT: float = 0.5
 DEFAULT_DESIRED_HEADING: float = 0.0
+DEFAULT_CONTINUOUS_DYNAMICS_TIMEOUT: float = 0.5  # s
 
 import numpy as np
 
@@ -89,34 +100,34 @@ class ImmediateNode(Node):
     """
 
     # internal state
-    state: NodeState = NodeState.INACTIVE
     ctrl: Optional[Controller] = None
 
     desired_heading: float = 0.0
-
-    desired_velocity: float = 10.0
     desired_yaw_rate: float = 0.0
 
-    # State variables
-    agent_state: Optional[Odometry] = None
-    
     # Subscriptions
     odom_sub: Subscription = None
     # Publishers
     cmd_vel_pub: Publisher = None
-    
-    # services 
-    toggle_controller_srv: Service = None
 
-    
     def __init__(self):
-        super().__init__('controller_node', namespace='hybraut_nav')
-        
+        super().__init__('immediate_node', namespace='hybraut_nav')
+
+        # last time a continous_dynamics message arrived - None until the
+        # first one ever does. Drives _is_tactical_active(); see module
+        # docstring for why liveness of that topic (rather than a manual
+        # activation step) is the right signal here.
+        self._last_continous_dynamics_time: Optional[Time] = None
+        # edge-detect flag for control_loop's active/inactive transition
+        # logging + the controller reset on resume - not itself used to
+        # gate publishing (that's a direct _is_tactical_active() check every
+        # tick, see control_loop).
+        self._was_tactical_active: bool = False
+
         self.__init_parameters__()
         self.__init_subscriptions__()
         self.__init_publishers__()
         self.__init_timers__()
-        self.__init_services__()
         self.__init_controller__()
 
     def __init_parameters__(self):
@@ -168,8 +179,23 @@ class ImmediateNode(Node):
                 type=ParameterType.PARAMETER_DOUBLE
             )
         )
+        self.declare_parameter(
+            'continuous_dynamics_timeout',
+            DEFAULT_CONTINUOUS_DYNAMICS_TIMEOUT,
+            ParameterDescriptor(
+                description=(
+                    'How long (s) without a /hybraut_nav/continous_dynamics message '
+                    'before the tactical layer is considered inactive and the control '
+                    'loop commands an explicit stop instead of real motion. Generous '
+                    "relative to tactical_node's own publish cadence (default 50 Hz) "
+                    'so ordinary scheduling jitter never trips it. '
+                    f'(default: {DEFAULT_CONTINUOUS_DYNAMICS_TIMEOUT})'
+                ),
+                type=ParameterType.PARAMETER_DOUBLE
+            )
+        )
 
-    def __init_subscriptions__(self): 
+    def __init_subscriptions__(self):
         self.odom_sub = self.create_subscription(
             msg_type=Odometry, 
             topic='/odom',
@@ -201,26 +227,21 @@ class ImmediateNode(Node):
         self.cmd_vel_pub = self.create_publisher(
             TwistStamped,  # msg_type
             '/cmd_vel',   # This is the output topic for turtlebot3's differential drive for giving target linear velocity and yaw rate
-            qos_profile_system_default,
+            qos_profile=QoSProfile(
+                history=HistoryPolicy.KEEP_LAST,
+                depth=10,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.VOLATILE
+            ),
             callback_group=ReentrantCallbackGroup()
         )
     
-    def __init_services__(self):
-        """ initializes services"""
-        self.toggle_controller_srv = self.create_service(
-            Trigger,
-            'controller_node/toggle',
-            self.toggle_controller_cb,
-            callback_group=ReentrantCallbackGroup()
-        )
-
     def __init_timers__(self):
         self.control_timer = self.create_timer(
-            timer_period_sec=1 / self.get_controller_frequency(),  # 10 Hz control loop
+            timer_period_sec=1 / self.get_controller_frequency(),
             callback=self.control_loop,
-            callback_group=ReentrantCallbackGroup(),
-            autostart=False
-        ) 
+            callback_group=ReentrantCallbackGroup()
+        )
 
     def __init_controller__(self):
         self.ctrl: Controller = ControllerType.initialize_controller(
@@ -242,41 +263,74 @@ class ImmediateNode(Node):
     def get_desired_heading(self) -> float:
         return self.get_parameter('desired_heading').value
 
+    def get_continuous_dynamics_timeout(self) -> float:
+        return self.get_parameter('continuous_dynamics_timeout').value
+
     """ === setters === """
     def set_controller_frequency(self, new_frequency: float):
         ...
 
     """ === callbacks === """
     def control_loop(self):
-        """Main control loop to compute and publish actuator commands."""
-        if self.state == NodeState.ACTIVE:
-            try:
-                commanded_yaw_rate = self.ctrl.step()
-            except Exception as e:
-                self.get_logger().error(f"Controller step failed: {e}")
-                return
+        """Main control loop - always runs. Only ever commands real motion
+        while /hybraut_nav/continous_dynamics is actively being published to
+        (see _is_tactical_active()); otherwise commands an explicit stop, so
+        the robot doesn't keep coasting on its last command once the
+        tactical layer goes idle (leg reached/canceled/failed, or
+        tactical_node isn't up)."""
+        tactical_active = self._is_tactical_active()
 
-            self._publish_cmd_vel(commanded_yaw_rate)
+        if tactical_active and not self._was_tactical_active:
+            self.get_logger().info("tactical layer active - resuming control output")
+            self.ctrl.reset()  # clear stale integral/derivative history from before the gap
+        elif not tactical_active and self._was_tactical_active:
+            self.get_logger().info("tactical layer inactive - holding station")
+        self._was_tactical_active = tactical_active
+
+        if not tactical_active:
+            self._publish_cmd_vel(yaw_rate=0.0, linear_velocity=0.0)
+            return
+
+        try:
+            commanded_yaw_rate = self.ctrl.step()
+        except Exception as e:
+            self.get_logger().error(f"Controller step failed: {e}")
+            return
+
+        self._publish_cmd_vel(commanded_yaw_rate, self.get_desired_velocity())
+
+    def _is_tactical_active(self) -> bool:
+        """True iff a /hybraut_nav/continous_dynamics message has arrived
+        within continuous_dynamics_timeout - i.e. tactical_node currently
+        has a leg running (its own publish timer only publishes that topic
+        while one is)."""
+        if self._last_continous_dynamics_time is None:
+            return False
+        elapsed = self.get_clock().now() - self._last_continous_dynamics_time
+        return elapsed < Duration(seconds=self.get_continuous_dynamics_timeout())
 
     def continous_dynamics_cb(self, msg: Float64MultiArray):
         """Handle updates from tactical layer - refreshes the controller's
-        setpoint. Publishing is handled by the control_loop timer."""
+        setpoint and the liveness timestamp _is_tactical_active() checks.
+        Publishing is handled by the control_loop timer."""
         if not isinstance(msg, Float64MultiArray):
             raise TypeError("Expected ContinousDynamics message.")
+
+        self._last_continous_dynamics_time = self.get_clock().now()
 
         desired_heading = msg.data[2]  # rad, from tactical layer
 
         self.desired_heading = desired_heading
         self.ctrl.update_continous_dynamics(desired_heading)
 
-    def _publish_cmd_vel(self, commanded_yaw_rate: float):
-        self.desired_yaw_rate = commanded_yaw_rate
+    def _publish_cmd_vel(self, yaw_rate: float, linear_velocity: float):
+        self.desired_yaw_rate = yaw_rate
 
         twist = TwistStamped()
         twist.header.stamp = self.get_clock().now().to_msg()
-        twist.header.frame_id = '/map'
-        twist.twist.angular.z = commanded_yaw_rate
-        twist.twist.linear.x = self.get_desired_velocity()
+        twist.header.frame_id = 'odom'
+        twist.twist.angular.z = yaw_rate
+        twist.twist.linear.x = linear_velocity
 
         self.cmd_vel_pub.publish(twist)
 
@@ -290,22 +344,7 @@ class ImmediateNode(Node):
 
     def base_link_cb(self, msg: TwistStamped):
         self.base_link_state = msg
-        
-    def toggle_controller_cb(self, request: Trigger.Request, response: Trigger.Response):
-        # Toggle controller state
-        if self.state == NodeState.ACTIVE:
-            self.state = NodeState.INACTIVE
-            response.success = True
-            response.message = "Controller deactivated."
-            self.control_timer.cancel()
-        else:
-            self.state = NodeState.ACTIVE
-            response.success = True
-            response.message = "Controller activated."
-            self.control_timer.reset()
-            
-        return response
-    
+
 
 def main(args=None):
     from rclpy.executors import MultiThreadedExecutor

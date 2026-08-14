@@ -18,21 +18,3 @@ def quaternion_to_heading(qx, qy, qz, qw) -> float:
 def normalize_angle(angle: float):
     """normalizes an angle between -pi - pi inclusive"""
     return (angle + np.pi) % (2 * np.pi) - np.pi
-
-
-def delta_heading(x_a, y_a, theta_a, x_w, y_w) -> float:
-    """
-    delta_heading
-    calculates the difference in heading between an goal point and
-    an agent position and orientation
-
-    returns: float
-    """
-    # desired heading angle (from agent to waypoint)
-    desired_theta = np.arctan2(y_w - y_a, x_w - x_a)
-    # Heading error: difference between the desired and current orientation
-    error = desired_theta - theta_a
-    # Normalize to [-pi, pi]
-    error = (error + np.pi) % (2 * np.pi) - np.pi
-
-    return error

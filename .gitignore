@@ -7,6 +7,8 @@ __pycache__/
 *.so
 
 log/
+logs/
+log_hybrid_automaton/
 
 # Ignore coverage report directory
 htmlcov/

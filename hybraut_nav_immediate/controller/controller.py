@@ -23,5 +23,14 @@ class Controller:
         """
         raise NotImplementedError("step() must be implemented in subclass.")
 
+    def reset(self):
+        """
+        Clear any state accumulated across step() calls (e.g. integral/
+        derivative history) so a controller that's been idle doesn't carry
+        stale history into its next active period. No-op by default -
+        override in subclasses that actually hold such state.
+        """
+        pass
+
     def __repr__(self):
         return f"{self.__class__.__name__}()"

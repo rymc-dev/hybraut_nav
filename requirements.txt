@@ -14,8 +14,7 @@ transitions
 jsonschema
 hybraut-executor-watchdog
 
-colav-automaton==1.0.0
-hybrid-automaton==1.0.0
+colav-automaton==1.0.1
 riskenv==1.0.0
 
 # finite-time-control: not yet published on PyPI. hybraut_nav_immediate defaults to

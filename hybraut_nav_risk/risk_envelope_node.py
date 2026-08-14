@@ -24,8 +24,9 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 from riskenv import create_unsafe_set, Agent, Obstacle, heading_from_quaternion
 
 from colav_interfaces.msg import AgentState, ObstaclesState
-from geometry_msgs.msg import PolygonStamped, Point32
+from geometry_msgs.msg import PolygonStamped, Point32, Point
 from std_msgs.msg import Header
+from visualization_msgs.msg import Marker, MarkerArray
 
 from hybraut_nav.qos.world_state_qos import world_state_qos
 
@@ -40,11 +41,25 @@ class RiskEnvelopeNode(Node):
         self,
         node_name: str = 'risk_node',
         namespace: str = 'hybraut_nav',
-        dt_global_update_tolerance: float = 0.5,
     ) -> None:
         super().__init__(node_name, namespace=namespace)
         self.get_logger().info(f"starting {namespace}/{node_name}")
 
+        self.declare_parameter(
+            'dt_global_update_tolerance',
+            0.5,
+            ParameterDescriptor(
+                name='dt_global_update_tolerance',
+                type=ParameterType.PARAMETER_DOUBLE,
+                description='ApproximateTimeSynchronizer slop (seconds) between '
+                        '/agent_state and /obstacles_state header.stamps - also used '
+                        '(x2) as the check_for_timeout watchdog threshold. Independent '
+                        'bridges/publishers rarely stamp perfectly in step even when '
+                        'both correctly use sim time, so this may need headroom above '
+                        'the two streams\' actual publish-latency gap. '
+                        f'(default: {0.5})'
+            )
+        )
         self.declare_parameter(
             'dsf',
             10.0,
@@ -73,9 +88,19 @@ class RiskEnvelopeNode(Node):
             '/hybraut_nav/riskenv',
             qos_profile_system_default,
         )
+        # RViz-friendly mirror of the same hull: PolygonStamped alone renders
+        # as a thin, fixed-color outline with no fill, so this republishes it
+        # as a filled + outlined Marker pair (see _publish_riskenv_marker).
+        self.riskenv_marker_pub = self.create_publisher(
+            MarkerArray,
+            '/hybraut_nav/riskenv_markers',
+            qos_profile_system_default,
+        )
 
         self.agent_sub = Subscriber(self, AgentState, '/agent_state', qos_profile=world_state_qos)
         self.obstacles_sub = Subscriber(self, ObstaclesState, '/obstacles_state', qos_profile=world_state_qos)
+
+        dt_global_update_tolerance = self.get_parameter('dt_global_update_tolerance').value
 
         # synchronised: the riskenv envelope is only recomputed once both
         # /agent_state and /obstacles_state have a fresh, matched-up pair.
@@ -177,16 +202,64 @@ class RiskEnvelopeNode(Node):
     """ === publishing === """
 
     def _publish_riskenv(self, riskenv_vertices: list):
+        stamp = self.get_clock().now().to_msg()
+
         msg = PolygonStamped()
-        msg.header = Header(
-            stamp=self.get_clock().now().to_msg(),
-            frame_id='map',
-        )
+        msg.header = Header(stamp=stamp, frame_id='map')
         msg.polygon.points = [
             Point32(x=float(vertex[0]), y=float(vertex[1]), z=0.0)
             for vertex in riskenv_vertices
         ]
         self.riskenv_pub.publish(msg)
+
+        self._publish_riskenv_marker(riskenv_vertices, stamp)
+
+    def _publish_riskenv_marker(self, riskenv_vertices: list, stamp):
+        """Republishes the risk envelope hull as a filled TRIANGLE_LIST plus
+        a LINE_STRIP outline, so it's clearly visible in RViz next to the
+        tactical layer's waypoint markers (tactical_node's
+        waypoint_markers/virtual_waypoint_markers). Fan-triangulated from
+        vertex 0, which only tiles a *convex* polygon correctly - safe here
+        because create_unsafe_set returns a convex hull."""
+        if len(riskenv_vertices) < 3:
+            # nothing to draw (or too few vertices for a hull) - clear
+            # whatever was there from the previous, non-empty envelope.
+            clear = Marker()
+            clear.header.frame_id = 'map'
+            clear.header.stamp = stamp
+            clear.ns = 'riskenv'
+            clear.action = Marker.DELETEALL
+            self.riskenv_marker_pub.publish(MarkerArray(markers=[clear]))
+            return
+
+        points = [Point(x=float(v[0]), y=float(v[1]), z=0.0) for v in riskenv_vertices]
+
+        fill = Marker()
+        fill.header.frame_id = 'map'
+        fill.header.stamp = stamp
+        fill.ns = 'riskenv'
+        fill.id = 0
+        fill.type = Marker.TRIANGLE_LIST
+        fill.action = Marker.ADD
+        fill.pose.orientation.w = 1.0
+        fill.scale.x = fill.scale.y = fill.scale.z = 1.0  # ignored by TRIANGLE_LIST, must stay nonzero
+        fill.color.r, fill.color.g, fill.color.b, fill.color.a = (1.0, 0.0, 0.0, 0.35)
+        for i in range(1, len(points) - 1):
+            fill.points.extend([points[0], points[i], points[i + 1]])
+
+        outline = Marker()
+        outline.header.frame_id = 'map'
+        outline.header.stamp = stamp
+        outline.ns = 'riskenv'
+        outline.id = 1
+        outline.type = Marker.LINE_STRIP
+        outline.action = Marker.ADD
+        outline.pose.orientation.w = 1.0
+        outline.scale.x = 0.15  # line width (m)
+        outline.color.r, outline.color.g, outline.color.b, outline.color.a = (1.0, 0.0, 0.0, 0.9)
+        outline.points = points + [points[0]]  # close the loop
+
+        self.riskenv_marker_pub.publish(MarkerArray(markers=[fill, outline]))
 
 
 def main(args=None):

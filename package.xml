@@ -11,6 +11,7 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
   <depend>std_srvs</depend>
   <depend>rcl_interfaces</depend>
   <depend>builtin_interfaces</depend>
@@ -19,6 +20,9 @@
   <depend>launch_ros</depend>
   <depend>colav_interfaces</depend>
   <depend>hybraut_interfaces</depend>
+  <depend>tf2_ros</depend>
+  <depend>ros_gz_sim</depend>
+  <depend>ros_gz_bridge</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
