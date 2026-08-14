@@ -1,0 +1,31 @@
+
+# ExecuteMission.action
+# ROS2 action interface for tactical_node's hybrid-automaton mission layer.
+# One goal = one waypoint ("leg"): the caller (typically strategy_node, or a
+# console operator via `ros2 action send_goal`) sends a single target, the
+# automaton runs continuously toward it, streaming feedback on its live
+# discrete state, and the action resolves once that leg reaches its target,
+# is canceled, or fails.
+
+
+# Goal
+builtin_interfaces/Time stamp         # caller's timestamp, echoed back for correlation/logging only
+string mission_tag                      # free-form tag identifying the mission/route this leg belongs to
+hybraut_nav/Waypoint goal_waypoint  # target (x, y) for this leg. NOTE: acceptance_radius on this
+                                          # message is currently informational only - colav_automaton is
+                                          # built once at node startup with a fixed 'acceptance_radius'
+                                          # param, it isn't overridden per leg.
+
+---
+# Result
+bool success
+string message
+
+---
+
+# Feedback
+string automaton_state                                   # live discrete automaton state name (e.g. Cruise, Transition_to_LOS, Fallback, Waypoint_Reached)
+builtin_interfaces/Duration time_since_last_transition    # time elapsed since the automaton's last discrete-state transition
+uint32 transitions_count                                  # number of discrete-state transitions so far this leg
+geometry_msgs/Point current_position                      # live (x, y) reference position from the automaton's continuous state (odom frame)
+builtin_interfaces/Time stamp

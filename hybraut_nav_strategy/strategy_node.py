@@ -4,12 +4,12 @@
 Layer one of the hybraut navigation stack: the global planner.
 
 This node subscribes to global cost map updates and agent states. On a
-`navigate_to_goal` action goal it plans a global path (A*, Dijkstra, RRT,
-RRT*) from the agent's current position to the requested overall target,
-downsamples it into a bounded list of intermediate waypoints, and
+`navigate_to_goal` action goal it plans a global path (A*) from the agent's
+current position to the requested overall target, downsamples it into a
+bounded list of intermediate waypoints, and
 dispatches them to layer two (the local planner hybrid automaton) **one at
 a time**, via `tactical_node`'s own `execute_mission` action
-(`hybraut_interfaces/action/ExecuteMission`) - sending one leg, awaiting its
+(`hybraut_nav/action/ExecuteMission`) - sending one leg, awaiting its
 result, then sending the next, until the route is exhausted.
 
 While a mission is active, this node also checks the agent's position
@@ -48,14 +48,13 @@ from rcl_interfaces.msg import ParameterDescriptor, SetParametersResult
 
 from nav_msgs.msg import OccupancyGrid, Path
 from geometry_msgs.msg import PoseStamped
-from colav_interfaces.msg import AgentState, Waypoint
-from hybraut_interfaces.action import ExecuteMission, NavigateToGoal
+from hybraut_nav.msg import AgentState, Waypoint
+from hybraut_nav.action import ExecuteMission, NavigateToGoal
 
 # Import path planning modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from hybraut_nav_strategy.path_planning import (
-    RRTStar, RRT, Dijkstra, AStar, Planner,
-    Grid as PlannerGrid, Point as PlannerPoint,
+    Planner, Grid as PlannerGrid, Point as PlannerPoint,
     PlannerType, downsample_path, distance_to_path,
 )
 
@@ -77,9 +76,8 @@ class StrategyNode(Node):
     Global planner for the Hybraut_nav navigation stack.
 
     Plans a global path relative to the agent's current state to a goal
-    waypoint using a specified planning algorithm (A*, Dijkstra, RRT,
-    RRT*), then dispatches it to the Tactical Layer (layer two) one
-    waypoint at a time via that layer's own `execute_mission` action,
+    waypoint using A*, then dispatches it to the Tactical Layer (layer two)
+    one waypoint at a time via that layer's own `execute_mission` action,
     replanning from scratch if the agent drifts too far off the stored
     route.
 
@@ -135,11 +133,11 @@ class StrategyNode(Node):
 
     # subscriptions
     _map_sub: Optional[Subscription] = None    # <<nav_msgs/msg/OccupancyGrid>>
-    _agent_sub: Optional[Subscription] = None  # <<colav_interfaces/msg/AgentState>>
+    _agent_sub: Optional[Subscription] = None  # <<hybraut_nav/msg/AgentState>>
 
     # Action server (this node's own interface) / client (into the tactical layer)
-    _mission_action_server: Optional[ActionServer] = None   # <<hybraut_interfaces/action/NavigateToGoal>>
-    _tactical_action_client: Optional[ActionClient] = None  # <<hybraut_interfaces/action/ExecuteMission>>
+    _mission_action_server: Optional[ActionServer] = None   # <<hybraut_nav/action/NavigateToGoal>>
+    _tactical_action_client: Optional[ActionClient] = None  # <<hybraut_nav/action/ExecuteMission>>
 
     # Timers
     _plan_check_timer: Optional[Timer] = None  # slow-frequency deviation check; not running until a mission starts
@@ -213,7 +211,7 @@ class StrategyNode(Node):
             self.DEFAULT_PLANNER_TYPE,
             ParameterDescriptor(
                 description='Type of global planner to use. '
-                           'Options: A*, Dijkstra, RRT, RRT* '
+                           'Options: A* '
                            f'(default: {self.DEFAULT_PLANNER_TYPE})'
             )
         )
@@ -415,7 +413,6 @@ class StrategyNode(Node):
 
         example:
             >>> set_planner(PlannerType.ASTAR)
-            >>> set_planner(PlannerType.RRTSTAR)
         Raises:
             ValueError: if planner type is not recognized
         """

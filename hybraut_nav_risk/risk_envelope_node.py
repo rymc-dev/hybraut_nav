@@ -6,8 +6,8 @@ riskenv's CPA / indices-of-interest geometry, and republishes it for the
 tactical layer's hybrid automaton to route around.
 
 Subscribes (time-synchronised):
-    /agent_state      (colav_interfaces/AgentState)
-    /obstacles_state  (colav_interfaces/ObstaclesState)
+    /agent_state      (hybraut_nav/AgentState)
+    /obstacles_state  (hybraut_nav/ObstaclesState)
 
 Publishes:
     /hybraut_nav/riskenv (geometry_msgs/PolygonStamped) - risk envelope
@@ -23,7 +23,7 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 
 from riskenv import create_unsafe_set, Agent, Obstacle, heading_from_quaternion
 
-from colav_interfaces.msg import AgentState, ObstaclesState
+from hybraut_nav.msg import AgentState, ObstaclesState
 from geometry_msgs.msg import PolygonStamped, Point32, Point
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray

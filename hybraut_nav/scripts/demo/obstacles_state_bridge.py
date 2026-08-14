@@ -3,7 +3,7 @@
 obstacles_state_bridge
 
 Aggregates each dynamic-obstacle mover's bridged `/<mover_name>/odom` into a
-single `colav_interfaces/msg/ObstaclesState` on `/obstacles_state` - the
+single `hybraut_nav/msg/ObstaclesState` on `/obstacles_state` - the
 input `risk_envelope_node` actually expects. Pairs with `agent_state_bridge`
 (ego side). `static_obstacles` is left empty - only dynamic movers are
 modelled by this demo, see worlds/models/simple_mover.
@@ -18,7 +18,7 @@ from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
 from std_msgs.msg import Header
 from nav_msgs.msg import Odometry
-from colav_interfaces.msg import ObstaclesState, DynamicObstacleState, DynamicObstacleGeometry
+from hybraut_nav.msg import ObstaclesState, DynamicObstacleState, DynamicObstacleGeometry
 
 
 class ObstaclesStateBridge(Node):

@@ -11,9 +11,9 @@ import threading
 import pytest
 from hybraut_nav_strategy import StrategyNode
 from hybraut_nav_strategy.strategy_node import map_qos, world_state_qos
-from hybraut_nav_strategy.path_planning import RRTStar, RRT, Dijkstra, AStar, Planner
+from hybraut_nav_strategy.path_planning import AStar, Planner
 from typing import Tuple
-from hybraut_interfaces.action import ExecuteMission, NavigateToGoal
+from hybraut_nav.action import ExecuteMission, NavigateToGoal
 
 
 class FakeTacticalNode(Node):
@@ -180,7 +180,7 @@ class TestStrategyNodeIntegration:
 
         assert isinstance(strategy_node._agent_sub, Subscription), "Odometry subscription should be initialized as a subscription"
         assert strategy_node._agent_sub.topic_name == "/agent_state"
-        from colav_interfaces.msg import AgentState
+        from hybraut_nav.msg import AgentState
         assert strategy_node._agent_sub.msg_type is AgentState
 
     def test_action_interface_initialization(self, strategy_node_and_mock_node_cli):
@@ -213,9 +213,6 @@ class TestStrategyNodeIntegration:
     """ === Test parameter updates Via CLI === """
 
     @pytest.mark.parametrize("new_value, expected_planner_cls", [
-        ('RRT*', RRTStar),
-        ('RRT', RRT),
-        ('Dijkstra', Dijkstra),
         ('A*', AStar),
     ])
     def test_paramater_update_planner_via_cli(self, new_value: str, expected_planner_cls: Planner, strategy_node_and_mock_node_cli: Tuple[StrategyNode, Node]):
@@ -314,7 +311,7 @@ class TestStrategyNodeIntegration:
         ...
 
     def test_agent_callback_via_cli(self, strategy_node_and_mock_node_cli: Tuple[StrategyNode, Node]):
-        from colav_interfaces.msg import AgentState
+        from hybraut_nav.msg import AgentState
         from geometry_msgs.msg import Pose
         strategy_node, cli_node = strategy_node_and_mock_node_cli
 
@@ -343,7 +340,7 @@ class TestStrategyNodeIntegration:
     ):
         strategy_node, cli_node = strategy_node_and_mock_node_cli
         from nav_msgs.msg import OccupancyGrid, Path
-        from colav_interfaces.msg import AgentState, Waypoint
+        from hybraut_nav.msg import AgentState, Waypoint
         from rclpy.publisher import Publisher
         from geometry_msgs.msg import Pose, Point
 

@@ -7,7 +7,7 @@ layer.
 
 `risk_envelope_node` needs `/agent_state`/`/obstacles_state` publishers to do
 anything (see `hybraut_nav_dynamic_obstacles.launch.py`'s
-`agent_state_bridge`/`obstacles_state_bridge`, or a `colav_interfaces`-based
+`agent_state_bridge`/`obstacles_state_bridge`, or a `hybraut_nav`-based
 sim) - launching it here alone will just sit warning "No synchronised
 agent/obstacles update received" until something publishes those. Do not
 also run `hybraut_nav_dynamic_obstacles.launch.py` alongside this file - both
@@ -20,7 +20,7 @@ name, both publishing `/hybraut_nav/riskenv`).
 docs/turtlebot3_demo.md#strategic-driven-demo for the full setup (map/agent
 bridges) - then send it one long-range goal for the whole mission:
     ros2 action send_goal /hybraut_nav/strategy_node/navigate_to_goal \
-        hybraut_interfaces/action/NavigateToGoal \
+        hybraut_nav/action/NavigateToGoal \
         "{goal_waypoint: {position: {x: 3.0, y: 2.0}}}" --feedback
 
 Cancel an in-progress mission early with `ros2 action cancel` (or Ctrl-C the

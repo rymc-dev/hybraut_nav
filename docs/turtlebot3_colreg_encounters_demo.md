@@ -48,7 +48,7 @@ ros2 launch turtlebot3_gazebo empty_world.launch.py
 source ~/ros2_ws/install/setup.bash
 ros2 launch hybraut_nav hybraut_nav_tactical_immediate.launch.py
 ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
-    hybraut_interfaces/action/ExecuteMission \
+    hybraut_nav/action/ExecuteMission \
     "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 
 # terminal 3 - COLREG encounter cycle + real riskenv geometry

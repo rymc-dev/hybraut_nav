@@ -11,7 +11,7 @@ without also having to stand up the control loop.
 `tactical_node` exposes an action server - once it's up, send it a waypoint
 directly (no strategy_node here to dispatch one for you):
     ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
-        hybraut_interfaces/action/ExecuteMission \
+        hybraut_nav/action/ExecuteMission \
         "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 
 See docs/turtlebot3_demo.md and docs/turtlebot3_dynamic_obstacles_demo.md.

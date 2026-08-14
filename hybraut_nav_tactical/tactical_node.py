@@ -20,7 +20,7 @@ definition) and drives it in real time:
 Interface: a plain `Node` (no ROS 2 lifecycle) with all parameters declared
 once at construction from ROS args on startup. The automaton is driven one
 waypoint ("leg") at a time via the `execute_mission` action server
-(`hybraut_interfaces/action/ExecuteMission`) - a caller (`strategy_node`, or
+(`hybraut_nav/action/ExecuteMission`) - a caller (`strategy_node`, or
 a console operator via `ros2 action send_goal ... --feedback`) sends one
 target, gets live feedback on the automaton's discrete state/transition
 timing while the leg runs, and a result once it's reached, canceled, or
@@ -40,14 +40,14 @@ from rclpy.duration import Duration
 from rclpy.qos import qos_profile_system_default
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import TransformStamped, PolygonStamped, PoseStamped
+from geometry_msgs.msg import PolygonStamped, PoseStamped
 from std_msgs.msg import Float64MultiArray, String
 from visualization_msgs.msg import Marker, MarkerArray
 from scipy.spatial.transform import Rotation as R
 
 from colav_automaton import ColavAutomaton
 from hybrid_automaton import Automaton, ContinuousState, AuxiliaryState, RunResult
-from hybraut_interfaces.action import ExecuteMission
+from hybraut_nav.action import ExecuteMission
 
 from hybraut_nav.qos import world_state_qos
 
@@ -191,14 +191,6 @@ class TacticalNode(Node):
             qos_profile=qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
-        self.base_link_sub=self.create_subscription(
-            msg_type=TransformStamped,
-            topic='/base_link',
-            callback=lambda msg: print (msg),
-            qos_profile=qos_profile_system_default,
-            callback_group=ReentrantCallbackGroup()
-        )
-
         # TODO: continous_x state needs to be below
         # tf2_ros.Buffer().lookup_transform("odom", "base_link") # APPLYS ROTATION THEN TRANSLATION
 

@@ -15,7 +15,7 @@ strategic-layer waypoints/path planning to the mix.
 docs/turtlebot3_demo.md#strategic-driven-demo for the full setup (map/agent
 bridges) - then send it one long-range goal for the whole mission:
     ros2 action send_goal /hybraut_nav/strategy_node/navigate_to_goal \
-        hybraut_interfaces/action/NavigateToGoal \
+        hybraut_nav/action/NavigateToGoal \
         "{goal_waypoint: {position: {x: 3.0, y: 2.0}}}" --feedback
 
 Cancel an in-progress mission early with `ros2 action cancel` (or Ctrl-C the

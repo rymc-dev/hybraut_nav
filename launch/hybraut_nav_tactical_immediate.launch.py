@@ -13,7 +13,7 @@ After launch:
     # no strategy_node here to dispatch waypoints for you - send one
     # directly (repeat for each leg of the demo route, e.g. (5, 5) then (0, 0)):
     ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
-        hybraut_interfaces/action/ExecuteMission \
+        hybraut_nav/action/ExecuteMission \
         "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 
 For the moving-obstacles demo, launch this with `use_sim_time:=true` and

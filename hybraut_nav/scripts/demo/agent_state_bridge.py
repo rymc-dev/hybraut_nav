@@ -2,7 +2,7 @@
 """
 agent_state_bridge
 
-Republishes the ego robot's `/odom` as `colav_interfaces/msg/AgentState` on
+Republishes the ego robot's `/odom` as `hybraut_nav/msg/AgentState` on
 `/agent_state` - the input `risk_envelope_node` actually expects, which a
 bare TurtleBot3 sim never produces on its own. Pairs with
 `obstacles_state_bridge` (dynamic obstacle side) to let the real
@@ -18,7 +18,7 @@ from rclpy.qos import qos_profile_system_default
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
 from nav_msgs.msg import Odometry
-from colav_interfaces.msg import AgentState
+from hybraut_nav.msg import AgentState
 
 
 class AgentStateBridge(Node):

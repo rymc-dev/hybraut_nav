@@ -76,7 +76,7 @@ for you):
 
 ```bash
 ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
-    hybraut_interfaces/action/ExecuteMission \
+    hybraut_nav/action/ExecuteMission \
     "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 ```
 
@@ -128,7 +128,7 @@ its own:
 - **`/agent_state`** - `agent_state_bridge` (built for the
   [dynamic obstacles demo](turtlebot3_dynamic_obstacles_demo.md) but
   standalone/reusable here) republishes `/odom` as
-  `colav_interfaces/msg/AgentState`.
+  `hybraut_nav/msg/AgentState`.
 - **`/map`** (`nav_msgs/OccupancyGrid`, transient-local) - `fake_map_publisher`
   publishes a single static, entirely free 20m x 20m grid centred on `(0, 0)`
   (tune via `--ros-args -p width:=... -p resolution:=... -p origin_x:=...`
@@ -153,7 +153,7 @@ ros2 run hybraut_nav fake_map_publisher
 
 # terminal 4 - goal (immediate_node needs no manual activation anymore)
 ros2 action send_goal /hybraut_nav/strategy_node/navigate_to_goal \
-    hybraut_interfaces/action/NavigateToGoal \
+    hybraut_nav/action/NavigateToGoal \
     "{goal_waypoint: {position: {x: 3.0, y: 2.0}}}" --feedback
 ```
 

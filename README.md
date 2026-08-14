@@ -44,10 +44,10 @@ Pre-requisites:
 All three are pinned in [`requirements.txt`](./requirements.txt) alongside the
 rest of the Python dependencies.
 
-`hybraut_nav` also depends on two custom ROS 2 interface packages that are
-**not** on PyPI/rosdep and must be built from source in the same workspace:
-- `colav_interfaces`
-- `hybraut_interfaces`
+All of `hybraut_nav`'s custom ROS 2 interfaces (formerly split across the
+external `hybraut_interfaces` and `colav_interfaces` packages) are now
+generated directly by this package - no separate interface-package clone or
+build step needed.
 
 ## Installation
 
@@ -55,15 +55,9 @@ rest of the Python dependencies.
 mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
 git clone <this repo> hybraut_nav
 
-# custom interface packages (source dependencies, not on rosdep)
-git clone https://github.com/Artemis-QUB-COLAV/colav-interfaces.git colav_interfaces
-git clone <hybraut_interfaces repo> hybraut_interfaces
-
 cd hybraut_nav && pip install -r requirements.txt
 
-cd ~/ros2_ws && colcon build --packages-select \
-    colav_interfaces hybraut_interfaces \
-    hybraut_nav hybraut_nav_strategy hybraut_nav_tactical hybraut_nav_immediate hybraut_nav_risk
+cd ~/ros2_ws && colcon build --packages-select hybraut_nav
 
 source install/setup.bash
 ```
@@ -130,8 +124,8 @@ no Gazebo mover required - see
 ## Topic contract
 
 - `risk_envelope_node` subscribes to `/agent_state`
-  (`colav_interfaces/AgentState`) and `/obstacles_state`
-  (`colav_interfaces/ObstaclesState`), and publishes the computed risk
+  (`hybraut_nav/AgentState`) and `/obstacles_state`
+  (`hybraut_nav/ObstaclesState`), and publishes the computed risk
   envelope hull on `/hybraut_nav/riskenv` (`geometry_msgs/PolygonStamped`).
 - `tactical_node` subscribes to `/odom` and `/hybraut_nav/riskenv`, and
   publishes the automaton's reference continuous state on

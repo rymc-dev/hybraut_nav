@@ -2,7 +2,7 @@
 
 Extends the [base TurtleBot3 demo](turtlebot3_demo.md) with 2-3 independently
 moving "mover" obstacles in Gazebo, bridged into real
-`colav_interfaces/AgentState`/`ObstaclesState` messages, so the **real**
+`hybraut_nav/AgentState`/`ObstaclesState` messages, so the **real**
 `risk_envelope_node` (not `fake_riskenv_publisher`'s synthetic polygon) drives
 `tactical_node`'s discrete-mode transitions off `riskenv.create_unsafe_set()`
 computed from genuine obstacle motion.
@@ -20,9 +20,9 @@ computed from genuine obstacle motion.
   speed + turn rate every few seconds and publishes it once (gz-sim's
   `VelocityControl` holds the last command indefinitely, no watchdog).
 - `agent_state_bridge` - republishes the ego robot's `/odom` as
-  `colav_interfaces/AgentState` on `/agent_state`.
+  `hybraut_nav/AgentState` on `/agent_state`.
 - `obstacles_state_bridge` - aggregates all movers' odometry into
-  `colav_interfaces/ObstaclesState` on `/obstacles_state`
+  `hybraut_nav/ObstaclesState` on `/obstacles_state`
   (`static_obstacles` is left empty - only the dynamic movers are modelled).
 - `launch/hybraut_nav_dynamic_obstacles.launch.py` - spawns the movers,
   bridges their gz topics, and brings up the two bridge nodes above plus the
@@ -46,7 +46,7 @@ ros2 launch hybraut_nav hybraut_nav_tactical_immediate.launch.py \
     use_sim_time:=true safety_radius:=1.5 acceptance_radius:=0.3 \
     los_distance_threshold:=5.0
 ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
-    hybraut_interfaces/action/ExecuteMission \
+    hybraut_nav/action/ExecuteMission \
     "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 ```
 

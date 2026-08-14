@@ -7,7 +7,6 @@ import heapq
 import math
 from typing import List, Tuple, Optional, Dict, Set
 from .planner import Path, Point, Grid, Planner
-import rclpy
 
 class AStar(Planner):
     """
