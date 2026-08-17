@@ -18,7 +18,7 @@ evolving unsafe sets rather than a synthetic placeholder.
 
 Cycle, per encounter in `encounter_sequence`:
   - COOLDOWN: no obstacle published, for `cooldown_period` seconds - a clean
-    window to observe Cruise/Transition_to_LOS with no unsafe region in play.
+    window to observe Transit with no unsafe region in play.
   - ENGAGED: the virtual obstacle is placed relative to a fixed anchor pose
     (`spawn_offset_distance` ahead of the agent's *start* pose - its pose at
     the first `/odom` message, not wherever it currently is) per the

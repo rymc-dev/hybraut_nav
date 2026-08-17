@@ -38,6 +38,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
   "msg/waypoints_state/Waypoint.msg"
 
+  "msg/maneuver_bias/ManeuverBias.msg"
+
   "action/ExecuteMission.action"
   "action/NavigateToGoal.action"
   DEPENDENCIES geometry_msgs nav_msgs std_msgs builtin_interfaces unique_identifier_msgs

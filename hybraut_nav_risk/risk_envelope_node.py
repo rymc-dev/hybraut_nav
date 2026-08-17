@@ -13,6 +13,12 @@ Publishes:
     /hybraut_nav/riskenv (geometry_msgs/PolygonStamped) - risk envelope
     hull vertices, matching the contract hybraut_nav_tactical/tactical_node.py
     already subscribes to.
+    /hybraut_nav/maneuver_bias (hybraut_nav/ManeuverBias) - COLREGs-informed
+    avoidance-side bias, from colav_automaton.classification.classify_unsafe_set_obstacles()
+    over the same agent/obstacles/dsf/time_of_interest used to build the
+    unsafe region above - tactical_node.py feeds this into the automaton's
+    'maneuver_bias' auxiliary state to steer generate_new_virtual_waypoint's
+    side selection.
 """
 
 import math
@@ -24,9 +30,10 @@ from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 
 from riskenv import create_unsafe_set, Agent, Obstacle, heading_from_quaternion
+from colav_automaton.classification import classify_unsafe_set_obstacles, Maneuver
 
 from nav_msgs.msg import Odometry
-from hybraut_nav.msg import ObstaclesState
+from hybraut_nav.msg import ObstaclesState, ManeuverBias
 from geometry_msgs.msg import PolygonStamped, Point32, Point
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
@@ -110,6 +117,11 @@ class RiskEnvelopeNode(Node):
             '/hybraut_nav/riskenv_markers',
             qos_profile_system_default,
         )
+        self.maneuver_bias_pub = self.create_publisher(
+            ManeuverBias,
+            '/hybraut_nav/maneuver_bias',
+            qos_profile_system_default,
+        )
 
         self.agent_sub = Subscriber(self, Odometry, '/odom', qos_profile=world_state_qos)
         self.obstacles_sub = Subscriber(self, ObstaclesState, '/obstacles_state', qos_profile=world_state_qos)
@@ -148,15 +160,29 @@ class RiskEnvelopeNode(Node):
     def process_data(self, agent_msg: Odometry, obstacles_msg: ObstaclesState):
         agent = self._extract_agent(agent_msg)
         obstacles = self._extract_obstacles(obstacles_msg)
+        dsf = self.get_parameter('dsf').value
+        time_of_interest = self.get_parameter('time_of_interest').value
 
         riskenv_vertices = create_unsafe_set(
             agent=agent,
             obstacles=obstacles,
-            dsf=self.get_parameter('dsf').value,
-            time_of_interest=self.get_parameter('time_of_interest').value,
+            dsf=dsf,
+            time_of_interest=time_of_interest,
+        )
+
+        # dsf/time_of_interest must match create_unsafe_set's above so the
+        # maneuver bias stays scoped to exactly the obstacles the unsafe
+        # region above represents - see classify_unsafe_set_obstacles's
+        # docstring.
+        maneuver = classify_unsafe_set_obstacles(
+            agent=agent,
+            obstacles=obstacles,
+            dsf=dsf,
+            time_of_interest=time_of_interest,
         )
 
         self._publish_riskenv(riskenv_vertices)
+        self._publish_maneuver_bias(maneuver)
 
     def _extract_agent(self, agent_msg: Odometry) -> Agent:
         return Agent(
@@ -176,7 +202,14 @@ class RiskEnvelopeNode(Node):
         """riskenv has no notion of static vs dynamic - both are folded into
         a single flat list of Obstacle, with static obstacles given zero
         speed/yaw_rate and their inflation radius standing in for
-        safety_radius."""
+        safety_radius.
+
+        riskenv.Obstacle has a single free-text `tag` field, which
+        colav_automaton.classification.normalize_vessel_type() keyword-matches
+        expecting AIS-style vessel-*type* text (e.g. "fishing", "tanker") for
+        Rule 18 right-of-way weighting - so it's fed from each obstacle's
+        `type` (classification), not `tag` (its identifier/name), falling
+        back to `tag` only if `type` was left blank."""
         obstacles = [
             Obstacle(
                 position=(dynamic.pose.position.x, dynamic.pose.position.y),
@@ -189,7 +222,7 @@ class RiskEnvelopeNode(Node):
                 speed=dynamic.velocity,
                 yaw_rate=dynamic.yaw_rate,
                 safety_radius=dynamic.safety_radius,
-                tag=dynamic.tag,
+                tag=dynamic.type or dynamic.tag,
             )
             for dynamic in obstacles_msg.dynamic_obstacles
         ]
@@ -206,7 +239,7 @@ class RiskEnvelopeNode(Node):
                 speed=0.0,
                 yaw_rate=0.0,
                 safety_radius=static.geometry.inflation_radius,
-                tag=static.tag,
+                tag=static.type or static.tag,
             )
             for static in obstacles_msg.static_obstacles
         ]
@@ -274,6 +307,16 @@ class RiskEnvelopeNode(Node):
         outline.points = points + [points[0]]  # close the loop
 
         self.riskenv_marker_pub.publish(MarkerArray(markers=[fill, outline]))
+
+    def _publish_maneuver_bias(self, maneuver: Maneuver):
+        msg = ManeuverBias()
+        msg.header = Header(stamp=self.get_clock().now().to_msg(), frame_id='odom')
+        msg.side = maneuver.side
+        msg.urgency = float(maneuver.urgency)
+        msg.give_way = maneuver.give_way
+        msg.encounter = maneuver.encounter.value
+        msg.reason = maneuver.reason
+        self.maneuver_bias_pub.publish(msg)
 
 
 def main(args=None):

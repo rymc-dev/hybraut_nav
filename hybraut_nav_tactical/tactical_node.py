@@ -48,6 +48,7 @@ from scipy.spatial.transform import Rotation as R
 from colav_automaton import ColavAutomaton
 from hybrid_automaton import Automaton, ContinuousState, AuxiliaryState, RunResult
 from hybraut_nav.action import ExecuteMission
+from hybraut_nav.msg import ManeuverBias
 
 from hybraut_nav.qos import world_state_qos
 
@@ -60,7 +61,6 @@ class TacticalNode(Node):
         self._declare_params()
 
         self._automaton: Automaton = ColavAutomaton(
-            heading_tolerance=self.get_parameter('heading_tolerance').value,
             k_theta=self.get_parameter('k_theta').value,
             k_v=self.get_parameter('k_v').value,
             constant_velocity=self.get_parameter('constant_velocity').value,
@@ -95,6 +95,20 @@ class TacticalNode(Node):
         # (not per-leg) - it only ever wraps self._riskenv_vertices, which
         # _riskenv_rcv() keeps current regardless of whether a leg is active.
         self._riskenv_aux: AuxiliaryState = AuxiliaryState(name='unsafe_region', aux0=self._riskenv_vertices.copy())
+        # NOTE: this MUST stay named 'maneuver_bias' - colav_automaton's
+        # generate_new_virtual_waypoint reset (resets.py) hardcodes that key
+        # when looking up ctx.auxiliary_states, and expects a
+        # {"side": "port"|"starboard", "urgency": 0..1} dict per
+        # Maneuver.as_bias(). Built once here (not per-leg), same as
+        # _riskenv_aux above - _maneuver_bias_rcv() keeps it current
+        # regardless of whether a leg is active. Defaults to the library's
+        # own "no obstacles" maneuver (starboard, urgency 0.0 - see
+        # colav_automaton.classification.aggregate_maneuvers) so a leg
+        # started before the first /hybraut_nav/maneuver_bias message
+        # behaves the same as one with no obstacles in play.
+        self._maneuver_bias_aux: AuxiliaryState = AuxiliaryState(
+            name='maneuver_bias', aux0={'side': 'starboard', 'urgency': 0.0}
+        )
 
         # last-seen discrete state name, used to edge-detect automaton
         # transitions for _publish_automaton_state_if_changed (see note
@@ -202,6 +216,14 @@ class TacticalNode(Node):
             callback_group=ReentrantCallbackGroup()
         )
 
+        self.maneuver_bias_sub = self.create_subscription(
+            msg_type=ManeuverBias,
+            topic='/hybraut_nav/maneuver_bias',
+            callback=lambda msg: self._maneuver_bias_rcv(msg),
+            qos_profile=qos_profile_system_default,
+            callback_group=ReentrantCallbackGroup()
+        )
+
     """ === action server: execute_mission (one waypoint/leg per goal) === """
 
     def _goal_cb(self, goal_request) -> GoalResponse:
@@ -264,7 +286,7 @@ class TacticalNode(Node):
         try:
             run_result: RunResult = loop.run_until_complete(self._automaton.activate(
                 initial_continuous_state=self._continuous_state,
-                initial_auxiliary_states=[self._waypoints_aux, self._riskenv_aux],
+                initial_auxiliary_states=[self._waypoints_aux, self._riskenv_aux, self._maneuver_bias_aux],
                 enable_real_time_mode=True,
                 enable_self_integration=True,
                 delta_time=self._dt,
@@ -329,23 +351,27 @@ class TacticalNode(Node):
         if self._riskenv_aux is not None:
             self._riskenv_aux.add(vertices)
 
+    """ === maneuver bias (COLREGs side selection) callback === """
+    def _maneuver_bias_rcv(self, msg: ManeuverBias):
+        """
+        Consumes the COLREGs-informed avoidance-side bias produced by
+        risk_envelope_node (colav_automaton.classification.classify_unsafe_set_obstacles)
+        and pushes {side, urgency} into the automaton's 'maneuver_bias'
+        auxiliary state, matching the shape colav_automaton.classification.Maneuver.as_bias()
+        produces - generate_new_virtual_waypoint (resets.py) reads this to
+        override its default purely-geometric side choice. give_way/encounter/
+        reason ride along on the message for logging/RViz but aren't
+        consumed by the automaton.
+        """
+        if self._maneuver_bias_aux is not None:
+            self._maneuver_bias_aux.add({'side': msg.side, 'urgency': msg.urgency})
+
     """ === parameters === """
 
     def _declare_params(self):
         """Declares every parameter this node uses, once, at construction -
         no lifecycle configure step. Values are read via get_parameter(...)
         right after this call in __init__."""
-        self.declare_parameter(
-            'heading_tolerance',
-            0.2,
-            ParameterDescriptor(
-                name='heading_tolerance',
-                type=ParameterType.PARAMETER_DOUBLE,
-                description='heading tolerance. '
-                        'cfg for guards for colav_automaton '
-                        f'(default: {0.2})'
-            )
-        )
         self.declare_parameter(
             'k_theta',
             1.0,
@@ -707,7 +733,7 @@ class TacticalNode(Node):
 
     def _publish_automaton_state_if_changed(self):
         """Edge-triggered publish of the automaton's current discrete state
-        (Cruise / Transition_to_LOS / Fallback / Waypoint_Reached) on
+        (Transit / Fallback / Waypoint_Reached) on
         `/hybraut_nav/tactical_node/automaton_state`, and mirrors the same
         transition to the ROS logger - so both are visible without having to
         go dig up the hybrid_automaton runtime's own temporal log file."""

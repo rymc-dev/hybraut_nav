@@ -7,16 +7,16 @@ there's no `/agent_state` + `/obstacles_state` source available (e.g. a bare
 TurtleBot3 Gazebo sim). It publishes directly onto `/hybraut_nav/riskenv`
 (the same `geometry_msgs/PolygonStamped` contract `tactical_node.py` already
 subscribes to), so you can exercise the ColavAutomaton's discrete-mode
-transitions (Cruise -> Transition_to_LOS -> Fallback -> Cruise) on demand,
+transitions (Transit -> Fallback -> Transit) on demand,
 without needing a real obstacle-detection pipeline.
 
 Reacts to `tactical_node`'s `/hybraut_nav/tactical_node/automaton_state`
 rather than blindly toggling on a fixed timer - a fixed toggle races the
 agent's actual closing speed on the obstacle, so it's a coin flip whether
-Transition_to_LOS gets any visible run time before the obstacle disappears
+Transit gets any visible run time before the obstacle disappears
 again. Instead it runs a small explicit cycle:
   - IDLE: no obstacle published. Waits `cooldown_period` seconds (a clean,
-    guaranteed window to observe Cruise / Transition_to_LOS with no unsafe
+    guaranteed window to observe Transit with no unsafe
     region in play) before placing the next one.
   - ACTIVE: a small square unsafe-region polygon is published `obstacle_offset`
     metres ahead of the agent's current heading (read from /odom). Clears
@@ -69,7 +69,7 @@ class FakeRiskenvPublisher(Node):
             5.0,
             ParameterDescriptor(
                 description='Seconds to leave no unsafe region published after clearing '
-                            '(and before the first one), giving Cruise/Transition_to_LOS a '
+                            '(and before the first one), giving Transit a '
                             'guaranteed clean window. (default: 5.0)',
                 type=ParameterType.PARAMETER_DOUBLE
             )

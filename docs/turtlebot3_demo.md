@@ -4,7 +4,7 @@ Runs the tactical + immediate layers against a TurtleBot3 in Gazebo, using
 `fake_riskenv_publisher` to stand in for `risk_envelope_node` (no
 `/agent_state`/`/obstacles_state` source exists in a bare TB3 sim), so you can
 watch the COLAV automaton's discrete-mode transitions
-(`Cruise` -> `Transition_to_LOS` -> `Fallback` -> `Cruise`) happen live.
+(`Transit` -> `Fallback` -> `Transit`) happen live.
 
 For the same demo driven by real moving obstacles instead of a synthetic
 polygon, see
@@ -53,7 +53,7 @@ It's how far off to the side of the unsafe region
 `/hybraut_nav/tactical_node/virtual_waypoint_markers` in RViz). Left at its
 vessel-scale default (100.0), every detour lands ~100m away - unreachable in
 a TB3 room - so the automaton just keeps stacking new detours on top each
-time it re-enters `Cruise`, and you'll never see `Waypoint_Reached` clear
+time it re-enters `Transit`, and you'll never see `Waypoint_Reached` clear
 them. This launch file already overrides it to `1.0`; if you run
 `tactical_node`/`hybraut_nav.launch.py` standalone instead, pass
 `lateral_offset_distance:=1.0` (or similar) explicitly.
@@ -105,7 +105,7 @@ ros2 run hybraut_nav fake_riskenv_publisher
 ```
 
 Cycles: `cooldown_period` seconds with no unsafe region (a clean window to
-observe `Cruise`/`Transition_to_LOS`) -> places a small square unsafe-region
+observe `Transit`) -> places a small square unsafe-region
 polygon `obstacle_offset` metres ahead of the agent's current heading ->
 clears it as soon as `/hybraut_nav/tactical_node/automaton_state` reports
 `Fallback` (or after `max_active_duration` seconds as a safety net) -> repeat.
