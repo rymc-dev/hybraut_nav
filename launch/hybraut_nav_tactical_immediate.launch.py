@@ -84,6 +84,15 @@ def generate_launch_description():
                      'still vessel-scale (100.0) by default and accepted by '
                      'ColavAutomaton - kept in step with lateral_offset_distance.'
     )
+    rviz_config_arg = DeclareLaunchArgument(
+        'rviz_config', default_value=PathJoinSubstitution(
+            [FindPackageShare(package_name), 'rviz', 'tactical_immediate.rviz']),
+        description='Path to the rviz config to load alongside tactical_node '
+                     '+ immediate_node. Defaults to this package\'s own '
+                     'tactical_immediate.rviz - override for callers (e.g. '
+                     'other packages\' launch files) that want their own '
+                     'view instead.'
+    )
 
     tactical_node = Node(
         package=package_name,
@@ -110,8 +119,7 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', PathJoinSubstitution(
-            [FindPackageShare(package_name), 'rviz', 'tactical_immediate.rviz'])],
+        arguments=['-d', LaunchConfiguration('rviz_config')],
         output='screen',
         condition=IfCondition(LaunchConfiguration('rviz')),
     )
@@ -124,6 +132,7 @@ def generate_launch_description():
         lateral_offset_distance_arg,
         longitudinal_offset_distance_arg,
         rviz_arg,
+        rviz_config_arg,
         tactical_node,
         immediate_node,
         rviz_node,

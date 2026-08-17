@@ -86,7 +86,7 @@ class FakeRiskenvPublisher(Node):
         )
         self.declare_parameter(
             'obstacle_offset',
-            2.0,
+            200.0,
             ParameterDescriptor(
                 description='Distance (m) ahead of the agent, along its current heading, '
                             'to centre the fake obstacle - keep this well outside '
@@ -97,7 +97,7 @@ class FakeRiskenvPublisher(Node):
         )
         self.declare_parameter(
             'obstacle_halfwidth',
-            0.4,
+            100,
             ParameterDescriptor(
                 description='Half-width (m) of the square fake obstacle polygon. '
                             '(default: 0.4)',

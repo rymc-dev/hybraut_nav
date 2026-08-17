@@ -11,8 +11,14 @@ encounter, not a synthetic polygon.
 
 No Gazebo mover, bridges, or `/agent_state`/`/obstacles_state` source is
 needed - the virtual obstacle is simulated inside the node itself, anchored
-each time off the agent's live `/odom`. For a demo with real independently-
-moving Gazebo obstacles instead (random walk, not COLREG-shaped), see
+`spawn_offset_distance` ahead of the agent's *start* pose (captured off the
+first `/odom` message) - a fixed point, not wherever the agent currently is,
+so every encounter stays staged in the same spot for the whole demo. The
+node also runs its own `ExecuteMission` action client and auto-sends one
+mission goal waypoint behind that anchor, so the agent drives through the
+staged encounter zone on its own - no manual `execute_mission` goal needed.
+For a demo with real independently-moving Gazebo obstacles instead (random
+walk, not COLREG-shaped), see
 [turtlebot3_dynamic_obstacles_demo.md](turtlebot3_dynamic_obstacles_demo.md).
 
 ## The five encounters
@@ -27,12 +33,12 @@ Cycled in order (repeating), by default:
 | `overtaking` | A slower obstacle spawns ahead on the same course - you close on it. | 13 |
 | `being_overtaken` | A faster obstacle spawns astern on the same course - it closes on you. | 13 |
 
-`head_on`/`crossing_*` obstacles re-aim at the agent's *live* position every
-tick (a simple pursuit intercept), so the encounter still closes even if the
-agent manoeuvres away. `overtaking`/`being_overtaken` obstacles hold the
-course captured at the agent's pose when the encounter starts and close
-purely on the speed differential, matching Rule 13's "same/nearly same
-course" definition.
+Every obstacle holds the straight-line course/speed computed once when the
+encounter starts - it never re-aims at the agent's live position, so the
+encounter is a genuine fixed geometry the agent has to navigate around
+(rather than an obstacle that chases wherever the agent manoeuvres to).
+`overtaking`/`being_overtaken` close purely on the speed differential,
+matching Rule 13's "same/nearly same course" definition.
 
 Pass a subset/reorder via `-p encounter_sequence:="['head_on', 'overtaking']"`
 if you only want to demo specific ones.
@@ -47,13 +53,20 @@ ros2 launch turtlebot3_gazebo empty_world.launch.py
 # terminal 2 - tactical + immediate layers (TB3-scale params, see base demo)
 source ~/ros2_ws/install/setup.bash
 ros2 launch hybraut_nav hybraut_nav_tactical_immediate.launch.py
-ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
-    hybraut_nav/action/ExecuteMission \
-    "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 
 # terminal 3 - COLREG encounter cycle + real riskenv geometry
 source ~/ros2_ws/install/setup.bash
 ros2 run hybraut_nav colreg_encounter_publisher
+```
+
+`colreg_encounter_publisher` auto-sends its own `execute_mission` goal to
+`tactical_node` once terminal 2's action server is up - no manual
+`ros2 action send_goal` needed. Pass `-p send_goal_waypoint:=false` on
+terminal 3 to disable that and drive the agent yourself instead, e.g.:
+```bash
+ros2 action send_goal /hybraut_nav/tactical_node/execute_mission \
+    hybraut_nav/action/ExecuteMission \
+    "{goal_waypoint: {position: {x: 5.0, y: 5.0}}}" --feedback
 ```
 
 Don't run `fake_riskenv_publisher` or `risk_envelope_node` alongside this -
@@ -80,8 +93,8 @@ In RViz (`hybraut_nav_tactical_immediate.launch.py` already opens one), add:
 Defaults are sized for a small TB3 room, not `colav_automaton`'s
 vessel-scale defaults - same caveat as the base demo. Worth checking first:
 
-- `initial_range` (default `3.0`m) - how far out obstacles spawn. Keep it
-  well outside `dsf` (below) so the encounter doesn't trip
+- `initial_range` (default `3.0`m) - how far out obstacles spawn from the
+  anchor. Keep it well outside `dsf` (below) so the encounter doesn't trip
   `unsafe_conditions_guard` the instant it starts.
 - `dsf` (default `2.5`m) / `time_of_interest` (default `15.0`s) - riskenv's
   proximity/TCPA thresholds, should roughly track `tactical_node`'s
@@ -93,6 +106,16 @@ vessel-scale defaults - same caveat as the base demo. Worth checking first:
   or the overtake never closes.
 - `engagement_duration` (default `40.0`s) - safety-net force-clear if
   `Fallback` is never observed (e.g. `tactical_node` not running).
+- `spawn_offset_distance` (default `2.0`m) - how far ahead of the agent's
+  start pose every encounter is anchored.
+- `goal_behind_distance` (default `6.0`m) - how far past the anchor
+  (`spawn_offset_distance` further along the start heading) the auto-sent
+  goal waypoint sits. Must clear the farthest obstacle spawn - by default
+  that's `overtaking`'s, `initial_range * overtaking_range_scale` past the
+  anchor - with headroom, or the agent stops short of it. Increase it if you
+  raise `initial_range`/`overtaking_range_scale`.
+- `send_goal_waypoint` (default `true`) - set `false` to skip the auto-sent
+  goal and drive the agent yourself instead.
 
 ## Gotchas
 
@@ -103,6 +126,8 @@ vessel-scale defaults - same caveat as the base demo. Worth checking first:
   `execute_mission` goal sent to `tactical_node`, which is what gets
   `immediate_node` commanding real motion) - the speed differential is what
   closes the gap, so a stationary agent never gets overtaken or catches up
-  to anything.
+  to anything. `colreg_encounter_publisher` sends that goal itself by
+  default (`send_goal_waypoint`); if you disabled it, remember to send one
+  manually.
 - Same `use_sim_time`/duplicate-process gotchas as the
   [base demo](turtlebot3_demo.md#gotchas) apply here.

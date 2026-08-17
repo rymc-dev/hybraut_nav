@@ -51,7 +51,7 @@ from rclpy.publisher import Publisher
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.qos import QoSProfile, HistoryPolicy, ReliabilityPolicy, DurabilityPolicy
 
-from geometry_msgs.msg import TwistStamped, TransformStamped
+from geometry_msgs.msg import TwistStamped, TransformStamped, Twist
 from nav_msgs.msg import Odometry
 
 from hybraut_nav.qos import world_state_qos
@@ -65,8 +65,8 @@ from .controller import ControllerType, Controller
 from rcl_interfaces.msg import ParameterType
 
 DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
-DEFAULT_CRUISE_SPEED: float = 0.2 # m/s
-DEFAULT_YAW_RATE_LIMIT: float = 0.5
+DEFAULT_CRUISE_SPEED: float = 7.2 # m/s = 15 knots
+DEFAULT_YAW_RATE_LIMIT: float = 0.5 # yaw rate
 DEFAULT_DESIRED_HEADING: float = 0.0
 DEFAULT_CONTINUOUS_DYNAMICS_TIMEOUT: float = 0.5  # s
 
@@ -225,7 +225,7 @@ class ImmediateNode(Node):
         
     def __init_publishers__(self):
         self.cmd_vel_pub = self.create_publisher(
-            TwistStamped,  # msg_type
+            Twist,  # msg_type
             '/cmd_vel',   # This is the output topic for turtlebot3's differential drive for giving target linear velocity and yaw rate
             qos_profile=QoSProfile(
                 history=HistoryPolicy.KEEP_LAST,
@@ -326,11 +326,14 @@ class ImmediateNode(Node):
     def _publish_cmd_vel(self, yaw_rate: float, linear_velocity: float):
         self.desired_yaw_rate = yaw_rate
 
-        twist = TwistStamped()
-        twist.header.stamp = self.get_clock().now().to_msg()
-        twist.header.frame_id = 'odom'
-        twist.twist.angular.z = yaw_rate
-        twist.twist.linear.x = linear_velocity
+        twist = Twist()
+        # twist.header.stamp = self.get_clock().now().to_msg()
+        # twist.header.frame_id = 'odom'
+        # twist.twist.angular.z = yaw_rate
+        # twist.twist.linear.x = linear_velocity
+
+        twist.angular.z = yaw_rate
+        twist.linear.x = linear_velocity
 
         self.cmd_vel_pub.publish(twist)
 
@@ -342,7 +345,7 @@ class ImmediateNode(Node):
         )
         self.ctrl.update_state(current_heading)
 
-    def base_link_cb(self, msg: TwistStamped):
+    def base_link_cb(self, msg: Twist):
         self.base_link_state = msg
 
 

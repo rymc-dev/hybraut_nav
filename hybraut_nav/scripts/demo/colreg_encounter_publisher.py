@@ -19,31 +19,40 @@ evolving unsafe sets rather than a synthetic placeholder.
 Cycle, per encounter in `encounter_sequence`:
   - COOLDOWN: no obstacle published, for `cooldown_period` seconds - a clean
     window to observe Cruise/Transition_to_LOS with no unsafe region in play.
-  - ENGAGED: the virtual obstacle is placed relative to the agent's pose at
-    that instant (its "anchor" pose) per the encounter's bearing/heading/speed,
-    then integrated forward every tick; `riskenv.create_unsafe_set()` is
-    recomputed each tick from the live agent + virtual obstacle and
-    republished. Clears back to COOLDOWN as soon as `automaton_state` reports
-    'Fallback' (unsafe_conditions_guard fired), or after `engagement_duration`
-    seconds as a safety net, then advances to the next encounter in sequence.
+  - ENGAGED: the virtual obstacle is placed relative to a fixed anchor pose
+    (`spawn_offset_distance` ahead of the agent's *start* pose - its pose at
+    the first `/odom` message, not wherever it currently is) per the
+    encounter's bearing/heading/speed, then integrated forward every tick;
+    `riskenv.create_unsafe_set()` is recomputed each tick from the live agent
+    + virtual obstacle and republished. Clears back to COOLDOWN as soon as
+    `automaton_state` reports 'Fallback' (unsafe_conditions_guard fired), or
+    after `engagement_duration` seconds as a safety net, then advances to the
+    next encounter in sequence.
+
+Also runs an `ExecuteMission` action client: once `tactical_node`'s
+`execute_mission` server is up, it auto-sends one mission goal waypoint
+`goal_behind_distance` past the encounter anchor (along the agent's start
+heading), so the agent drives on its own through the whole staged encounter
+zone for the life of the demo, without an operator having to
+`ros2 action send_goal` it manually (set `send_goal_waypoint:=false` to
+disable and drive the agent yourself instead).
 
 Encounter geometries (agent-relative bearing, 0 = dead ahead, +ve = to port,
 -ve = to starboard, matching REP103's x-forward/y-left body frame):
-  - head_on:            obstacle ahead, reciprocal course, pursuit-closing.
-  - crossing_give_way:  obstacle on your starboard bow, pursuit-closing -
-                         you are the give-way vessel (Rule 15).
-  - crossing_stand_on:  obstacle on your port bow, pursuit-closing - you are
-                         the stand-on vessel (Rule 15).
+  - head_on:            obstacle ahead, reciprocal course, closing.
+  - crossing_give_way:  obstacle on your starboard bow, closing - you are
+                         the give-way vessel (Rule 15).
+  - crossing_stand_on:  obstacle on your port bow, closing - you are the
+                         stand-on vessel (Rule 15).
   - overtaking:         slower obstacle ahead, same course - you overtake it
                          (Rule 13).
   - being_overtaken:    faster obstacle astern, same course - it overtakes
                          you (Rule 13).
 
-"Pursuit-closing" obstacles re-aim at the agent's live position every tick
-(so the encounter still closes even if the agent manoeuvres); overtaking
-obstacles hold the course captured at the agent's anchor pose and close
-purely on the speed differential, matching Rule 13's "same/nearly same
-course" definition.
+Every obstacle holds the straight-line course/speed computed once at
+engagement start (its "encounter path") - it does not re-aim at the agent's
+live position, so a genuine avoidance manoeuvre actually resolves the
+encounter instead of the obstacle re-locking onto wherever the agent goes.
 
 Publishes:
     /hybraut_nav/riskenv (geometry_msgs/PolygonStamped) - real unsafe-set
@@ -64,6 +73,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.action import ActionClient
 from rclpy.qos import qos_profile_system_default
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
@@ -75,6 +85,8 @@ from visualization_msgs.msg import Marker, MarkerArray
 from riskenv import create_unsafe_set, Agent, Obstacle
 
 from hybraut_nav_utils import quaternion_to_heading
+from hybraut_nav.action import ExecuteMission
+from hybraut_nav.msg import Waypoint
 
 FALLBACK_STATE_NAME = 'Fallback'
 
@@ -172,7 +184,7 @@ class ColregEncounterPublisher(Node):
         )
         self.declare_parameter(
             'obstacle_speed', 0.3,
-            ParameterDescriptor(description='Speed (m/s) for the pursuit-closing encounters '
+            ParameterDescriptor(description='Speed (m/s) for the closing encounters '
                                              '(head_on/crossing_*). (default: 0.3)',
                                  type=ParameterType.PARAMETER_DOUBLE)
         )
@@ -216,6 +228,46 @@ class ColregEncounterPublisher(Node):
                                  type=ParameterType.PARAMETER_DOUBLE)
         )
         self.declare_parameter(
+            'spawn_offset_distance', 2.0,
+            ParameterDescriptor(description='Distance (m) ahead of the agent\'s *start* pose '
+                                             '(captured on the first /odom message) at which '
+                                             'every encounter is anchored - a fixed point, not '
+                                             "the agent's live pose, so encounters stay staged "
+                                             "in the same spot however far the agent has since "
+                                             'driven. (default: 2.0)',
+                                 type=ParameterType.PARAMETER_DOUBLE)
+        )
+        self.declare_parameter(
+            'goal_behind_distance', 6.0,
+            ParameterDescriptor(description='Extra distance (m) beyond spawn_offset_distance, '
+                                             'along the start heading, at which the auto-sent '
+                                             "execute_mission goal waypoint sits - i.e. behind "
+                                             "the whole encounter zone, so driving toward it "
+                                             "carries the agent through every encounter. Must "
+                                             "clear the farthest obstacle spawn (overtaking's, "
+                                             "initial_range * overtaking_range_scale past the "
+                                             'anchor) with headroom or the agent stops short of '
+                                             'it. (default: 6.0)',
+                                 type=ParameterType.PARAMETER_DOUBLE)
+        )
+        self.declare_parameter(
+            'goal_acceptance_radius', 0.3,
+            ParameterDescriptor(description='acceptance_radius (m) stamped on the auto-sent '
+                                             'goal waypoint - informational only, tactical_node '
+                                             "uses its own fixed acceptance_radius param. "
+                                             '(default: 0.3)',
+                                 type=ParameterType.PARAMETER_DOUBLE)
+        )
+        self.declare_parameter(
+            'send_goal_waypoint', True,
+            ParameterDescriptor(description='Auto-send one execute_mission goal waypoint to '
+                                             'tactical_node behind the encounter zone, so the '
+                                             'agent keeps driving for the whole demo without an '
+                                             'operator send-goaling it manually. Set False to '
+                                             'drive the agent yourself instead. (default: True)',
+                                 type=ParameterType.PARAMETER_BOOL)
+        )
+        self.declare_parameter(
             'frame_id', 'odom',
             ParameterDescriptor(description='frame_id stamped on published polygons/markers - '
                                              'cosmetic only, tactical_node only reads the vertex '
@@ -250,6 +302,15 @@ class ColregEncounterPublisher(Node):
         self._agent_speed = 0.0
         self._agent_yaw_rate = 0.0
 
+        # agent's pose at the first /odom message - the fixed point every
+        # encounter is anchored relative to (see spawn_offset_distance)
+        self._start_captured = False
+        self._start_x = 0.0
+        self._start_y = 0.0
+        self._start_heading = 0.0
+
+        self._goal_waypoint_sent = False
+
         self._latest_automaton_state = None
 
         self._engaged = False
@@ -262,7 +323,6 @@ class ColregEncounterPublisher(Node):
         self._obs_y = 0.0
         self._obs_heading = 0.0
         self._obs_speed = 0.0
-        self._obs_pursuit = False
 
         self._riskenv_pub = self.create_publisher(
             PolygonStamped, '/hybraut_nav/riskenv', qos_profile_system_default,
@@ -272,6 +332,10 @@ class ColregEncounterPublisher(Node):
         )
         self._encounter_marker_pub = self.create_publisher(
             MarkerArray, '/hybraut_nav/colreg_encounter_markers', qos_profile_system_default,
+        )
+
+        self._goal_action_client = ActionClient(
+            self, ExecuteMission, '/hybraut_nav/tactical_node/execute_mission',
         )
 
         self._odom_sub = self.create_subscription(
@@ -301,20 +365,29 @@ class ColregEncounterPublisher(Node):
         self._agent_yaw_rate = msg.twist.twist.angular.z
         self._have_odom = True
 
+        if not self._start_captured:
+            self._start_x = self._agent_x
+            self._start_y = self._agent_y
+            self._start_heading = self._agent_heading
+            self._start_captured = True
+
     def _automaton_state_cb(self, msg: String):
         self._latest_automaton_state = msg.data
 
     """ === encounter geometry (called once, at engagement start) ===
 
-    Each returns (obs_x, obs_y, obs_heading, obs_speed, pursuit) given the
-    agent's anchor pose (ax, ay, aheading) captured at that instant. """
+    Each returns (obs_x, obs_y, obs_heading, obs_speed) given the agent's
+    anchor pose (ax, ay, aheading) captured at that instant. obs_heading/
+    obs_speed are held fixed for the rest of the engagement (see
+    _step_engagement) - the obstacle travels its own straight-line encounter
+    path, it does not re-aim at the agent's live position. """
 
     def _geometry_head_on(self, ax, ay, aheading):
         r = self.get_parameter('initial_range').value
         speed = self.get_parameter('obstacle_speed').value
         ox = ax + r * math.cos(aheading)
         oy = ay + r * math.sin(aheading)
-        return ox, oy, aheading + math.pi, speed, True
+        return ox, oy, aheading + math.pi, speed
 
     def _geometry_crossing_give_way(self, ax, ay, aheading):
         # obstacle on the agent's starboard (right) bow: negative bearing
@@ -324,7 +397,7 @@ class ColregEncounterPublisher(Node):
         bearing = aheading - math.radians(self.get_parameter('crossing_bearing_deg').value)
         ox = ax + r * math.cos(bearing)
         oy = ay + r * math.sin(bearing)
-        return ox, oy, aheading + math.pi / 2.0, speed, True
+        return ox, oy, aheading + math.pi / 2.0, speed
 
     def _geometry_crossing_stand_on(self, ax, ay, aheading):
         # obstacle on the agent's port (left) bow: positive bearing offset.
@@ -333,7 +406,7 @@ class ColregEncounterPublisher(Node):
         bearing = aheading + math.radians(self.get_parameter('crossing_bearing_deg').value)
         ox = ax + r * math.cos(bearing)
         oy = ay + r * math.sin(bearing)
-        return ox, oy, aheading - math.pi / 2.0, speed, True
+        return ox, oy, aheading - math.pi / 2.0, speed
 
     def _geometry_overtaking(self, ax, ay, aheading):
         # slower obstacle ahead, same course - agent closes on it.
@@ -341,7 +414,7 @@ class ColregEncounterPublisher(Node):
         speed = self.get_parameter('overtaking_slow_speed').value
         ox = ax + r * math.cos(aheading)
         oy = ay + r * math.sin(aheading)
-        return ox, oy, aheading, speed, False
+        return ox, oy, aheading, speed
 
     def _geometry_being_overtaken(self, ax, ay, aheading):
         # faster obstacle astern, same course - it closes on the agent.
@@ -349,13 +422,16 @@ class ColregEncounterPublisher(Node):
         speed = self.get_parameter('overtaking_fast_speed').value
         ox = ax + r * math.cos(aheading + math.pi)
         oy = ay + r * math.sin(aheading + math.pi)
-        return ox, oy, aheading, speed, False
+        return ox, oy, aheading, speed
 
     """ === cycle state machine === """
 
     def _tick_cb(self):
         if not self._have_odom:
             return  # nothing to anchor an encounter to yet
+
+        if not self._goal_waypoint_sent and self.get_parameter('send_goal_waypoint').value:
+            self._try_send_goal_waypoint()
 
         now = time.monotonic()
 
@@ -380,14 +456,16 @@ class ColregEncounterPublisher(Node):
         encounter_type = self._sequence[self._sequence_index]
         self._sequence_index = (self._sequence_index + 1) % len(self._sequence)
 
-        ax, ay, aheading = self._agent_x, self._agent_y, self._agent_heading
-        ox, oy, oheading, ospeed, pursuit = self._geometry_generators[encounter_type](ax, ay, aheading)
+        offset = self.get_parameter('spawn_offset_distance').value
+        ax = self._start_x + offset * math.cos(self._start_heading)
+        ay = self._start_y + offset * math.sin(self._start_heading)
+        aheading = self._start_heading
+        ox, oy, oheading, ospeed = self._geometry_generators[encounter_type](ax, ay, aheading)
 
         self._current_type = encounter_type
         self._obs_x, self._obs_y = ox, oy
         self._obs_heading = oheading
         self._obs_speed = ospeed
-        self._obs_pursuit = pursuit
         self._engaged = True
         self._latest_automaton_state = None
         self._phase_started_at = time.monotonic()
@@ -407,13 +485,69 @@ class ColregEncounterPublisher(Node):
         self._publish_riskenv_markers([])
         self._publish_encounter_markers(None, 0.0, 0.0, 0.0)
 
+    """ === auto-sent mission goal (drives the agent through the encounter zone) === """
+
+    def _try_send_goal_waypoint(self):
+        """One-shot, non-blocking: as soon as tactical_node's execute_mission
+        server is up, send a mission goal behind the whole encounter zone
+        (start pose + spawn_offset_distance + goal_behind_distance, along the
+        start heading) so the agent drives continuously through it for the
+        life of the demo - automates the manual `ros2 action send_goal` step
+        from docs/turtlebot3_colreg_encounters_demo.md. Retried every tick
+        (server_is_ready() is non-blocking) until accepted."""
+        if not self._goal_action_client.server_is_ready():
+            return
+
+        distance = (
+            self.get_parameter('spawn_offset_distance').value
+            + self.get_parameter('goal_behind_distance').value
+        )
+        gx = self._start_x + distance * math.cos(self._start_heading)
+        gy = self._start_y + distance * math.sin(self._start_heading)
+
+        goal = ExecuteMission.Goal()
+        goal.stamp = self.get_clock().now().to_msg()
+        goal.mission_tag = 'colreg_encounter_publisher'
+        goal.goal_waypoint = Waypoint(
+            position=Point(x=gx, y=gy, z=0.0),
+            acceptance_radius=self.get_parameter('goal_acceptance_radius').value,
+        )
+
+        self._goal_waypoint_sent = True  # set before sending: avoids a duplicate
+                                          # send racing in from next tick while
+                                          # send_goal_async is in flight
+        self.get_logger().info(
+            f"auto-sending execute_mission goal waypoint ({gx:.2f}, {gy:.2f}) - "
+            f"behind the encounter zone, drives the agent through it"
+        )
+        future = self._goal_action_client.send_goal_async(goal)
+        future.add_done_callback(self._on_goal_response)
+
+    def _on_goal_response(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn(
+                "tactical_node rejected the auto-sent execute_mission goal - "
+                "drive the agent manually instead (see "
+                "docs/turtlebot3_colreg_encounters_demo.md)"
+            )
+            self._goal_waypoint_sent = False  # allow a retry next tick
+            return
+        goal_handle.get_result_async().add_done_callback(self._on_goal_result)
+
+    def _on_goal_result(self, future):
+        result = future.result().result
+        self.get_logger().info(
+            f"execute_mission goal waypoint finished: success={result.success} "
+            f"({result.message})"
+        )
+
     def _step_engagement(self):
+        # obs_heading/obs_speed were fixed once at engagement start (see the
+        # _geometry_* generators) - the obstacle holds its own straight-line
+        # encounter path, it never re-aims at the agent's live position.
         dt = self.get_parameter('tick_period').value
 
-        if self._obs_pursuit:
-            self._obs_heading = math.atan2(
-                self._agent_y - self._obs_y, self._agent_x - self._obs_x
-            )
         self._obs_x += self._obs_speed * math.cos(self._obs_heading) * dt
         self._obs_y += self._obs_speed * math.sin(self._obs_heading) * dt
 

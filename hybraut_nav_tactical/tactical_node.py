@@ -73,7 +73,7 @@ class TacticalNode(Node):
         self._dt = self.get_parameter('dt').value
         self._sensor_update_rate = self.get_parameter('sensor_update_rate').value
         self._waypoint_buffer_len = self.get_parameter('waypoint_buffer_len').value
-        self._waypoint_marker_scale = self.get_parameter('waypoint_marker_scale').value
+        self._waypoint_marker_scale = 2 * self.get_parameter('acceptance_radius').value
         publish_rate = self.get_parameter('continuous_dynamics_publish_rate').value
 
         # live state - kept up to date for whichever leg is (or is about to
@@ -488,21 +488,6 @@ class TacticalNode(Node):
                         'leg. Each leg only ever carries one real waypoint (the '
                         'active goal), so this can stay small. '
                         f'(default: {8})'
-            )
-        )
-        self.declare_parameter(
-            'waypoint_marker_scale',
-            1.0,
-            ParameterDescriptor(
-                name='waypoint_marker_scale',
-                type=ParameterType.PARAMETER_DOUBLE,
-                description='waypoint_marker_scale. '
-                        'diameter (m) of the RViz sphere markers published for the '
-                        'real target waypoint and any virtual COLAV detour '
-                        'waypoints on waypoint_markers/virtual_waypoint_markers - '
-                        'scale to platform (e.g. ~0.3-0.5 for a TurtleBot3, larger '
-                        'for vessel-scale colav_automaton deployments). '
-                        f'(default: {1.0})'
             )
         )
 
