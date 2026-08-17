@@ -6,7 +6,7 @@ riskenv's CPA / indices-of-interest geometry, and republishes it for the
 tactical layer's hybrid automaton to route around.
 
 Subscribes (time-synchronised):
-    /agent_state      (hybraut_nav/AgentState)
+    /odom             (nav_msgs/Odometry)
     /obstacles_state  (hybraut_nav/ObstaclesState)
 
 Publishes:
@@ -14,6 +14,8 @@ Publishes:
     hull vertices, matching the contract hybraut_nav_tactical/tactical_node.py
     already subscribes to.
 """
+
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -23,7 +25,8 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 
 from riskenv import create_unsafe_set, Agent, Obstacle, heading_from_quaternion
 
-from hybraut_nav.msg import AgentState, ObstaclesState
+from nav_msgs.msg import Odometry
+from hybraut_nav.msg import ObstaclesState
 from geometry_msgs.msg import PolygonStamped, Point32, Point
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
@@ -52,7 +55,7 @@ class RiskEnvelopeNode(Node):
                 name='dt_global_update_tolerance',
                 type=ParameterType.PARAMETER_DOUBLE,
                 description='ApproximateTimeSynchronizer slop (seconds) between '
-                        '/agent_state and /obstacles_state header.stamps - also used '
+                        '/odom and /obstacles_state header.stamps - also used '
                         '(x2) as the check_for_timeout watchdog threshold. Independent '
                         'bridges/publishers rarely stamp perfectly in step even when '
                         'both correctly use sim time, so this may need headroom above '
@@ -62,7 +65,7 @@ class RiskEnvelopeNode(Node):
         )
         self.declare_parameter(
             'dsf',
-            10.0,
+            200.0,
             ParameterDescriptor(
                 name='dsf',
                 type=ParameterType.PARAMETER_DOUBLE,
@@ -74,12 +77,23 @@ class RiskEnvelopeNode(Node):
         )
         self.declare_parameter(
             'time_of_interest',
-            15.0,
+            100.0,
             ParameterDescriptor(
                 name='time_of_interest',
                 type=ParameterType.PARAMETER_DOUBLE,
                 description='Horizon (seconds) for riskenv\'s I3 (TCPA-based) filter. '
-                        f'(default: {15.0})'
+                        f'(default: {20.0})'
+            )
+        )
+        self.declare_parameter(
+            'safety_radius',
+            15.0,
+            ParameterDescriptor(
+                name='safety_radius',
+                type=ParameterType.PARAMETER_DOUBLE,
+                description='Agent safety perimeter radius (m) - /odom carries no '
+                        'such field, so this stands in for it. '
+                        f'(default: {0.5})'
             )
         )
 
@@ -97,13 +111,13 @@ class RiskEnvelopeNode(Node):
             qos_profile_system_default,
         )
 
-        self.agent_sub = Subscriber(self, AgentState, '/agent_state', qos_profile=world_state_qos)
+        self.agent_sub = Subscriber(self, Odometry, '/odom', qos_profile=world_state_qos)
         self.obstacles_sub = Subscriber(self, ObstaclesState, '/obstacles_state', qos_profile=world_state_qos)
 
         dt_global_update_tolerance = self.get_parameter('dt_global_update_tolerance').value
 
         # synchronised: the riskenv envelope is only recomputed once both
-        # /agent_state and /obstacles_state have a fresh, matched-up pair.
+        # /odom and /obstacles_state have a fresh, matched-up pair.
         self.sync = ApproximateTimeSynchronizer(
             [self.agent_sub, self.obstacles_sub],
             queue_size=10,
@@ -117,7 +131,7 @@ class RiskEnvelopeNode(Node):
 
     """ === synchronised state callback === """
 
-    def sync_callback(self, agent_msg: AgentState, obstacles_msg: ObstaclesState):
+    def sync_callback(self, agent_msg: Odometry, obstacles_msg: ObstaclesState):
         self.last_update_time = self.get_clock().now()
         self.process_data(agent_msg, obstacles_msg)
 
@@ -131,7 +145,7 @@ class RiskEnvelopeNode(Node):
 
     """ === riskenv pipeline === """
 
-    def process_data(self, agent_msg: AgentState, obstacles_msg: ObstaclesState):
+    def process_data(self, agent_msg: Odometry, obstacles_msg: ObstaclesState):
         agent = self._extract_agent(agent_msg)
         obstacles = self._extract_obstacles(obstacles_msg)
 
@@ -144,18 +158,18 @@ class RiskEnvelopeNode(Node):
 
         self._publish_riskenv(riskenv_vertices)
 
-    def _extract_agent(self, agent_msg: AgentState) -> Agent:
+    def _extract_agent(self, agent_msg: Odometry) -> Agent:
         return Agent(
-            position=(agent_msg.pose.position.x, agent_msg.pose.position.y),
+            position=(agent_msg.pose.pose.position.x, agent_msg.pose.pose.position.y),
             heading=heading_from_quaternion(
-                agent_msg.pose.orientation.x,
-                agent_msg.pose.orientation.y,
-                agent_msg.pose.orientation.z,
-                agent_msg.pose.orientation.w,
+                agent_msg.pose.pose.orientation.x,
+                agent_msg.pose.pose.orientation.y,
+                agent_msg.pose.pose.orientation.z,
+                agent_msg.pose.pose.orientation.w,
             ),
-            speed=agent_msg.velocity,
-            yaw_rate=agent_msg.yaw_rate,
-            safety_radius=agent_msg.safety_radius,
+            speed=math.hypot(agent_msg.twist.twist.linear.x, agent_msg.twist.twist.linear.y),
+            yaw_rate=agent_msg.twist.twist.angular.z,
+            safety_radius=self.get_parameter('safety_radius').value,
         )
 
     def _extract_obstacles(self, obstacles_msg: ObstaclesState) -> list:
@@ -205,7 +219,7 @@ class RiskEnvelopeNode(Node):
         stamp = self.get_clock().now().to_msg()
 
         msg = PolygonStamped()
-        msg.header = Header(stamp=stamp, frame_id='map')
+        msg.header = Header(stamp=stamp, frame_id='odom')
         msg.polygon.points = [
             Point32(x=float(vertex[0]), y=float(vertex[1]), z=0.0)
             for vertex in riskenv_vertices
