@@ -14,14 +14,15 @@ also run `hybraut_nav_dynamic_obstacles.launch.py` alongside this file - both
 bring up their own `risk_envelope_node` and would collide (duplicate node
 name, both publishing `/hybraut_nav/riskenv`).
 
-`strategy_node` plans a global route and drives `tactical_node` (via its
-`execute_mission` action) one leg at a time. It needs `/map` and
-`/agent_state` feeding in separately - see
+`strategy_node` checks each waypoint is reachable and drives `tactical_node`
+(via its `execute_mission` action) through them one leg at a time, in order.
+It needs `/map` and `/agent_state` feeding in separately - see
 docs/turtlebot3_demo.md#strategic-driven-demo for the full setup (map/agent
-bridges) - then send it one long-range goal for the whole mission:
+bridges) - then send it the ordered list of goal waypoints for the whole
+mission:
     ros2 action send_goal /hybraut_nav/strategy_node/navigate_to_goal \
         hybraut_nav/action/NavigateToGoal \
-        "{goal_waypoint: {position: {x: 3.0, y: 2.0}}}" --feedback
+        "{goal_waypoints: [{position: {x: 3.0, y: 2.0}}]}" --feedback
 
 Cancel an in-progress mission early with `ros2 action cancel` (or Ctrl-C the
 send_goal call above).

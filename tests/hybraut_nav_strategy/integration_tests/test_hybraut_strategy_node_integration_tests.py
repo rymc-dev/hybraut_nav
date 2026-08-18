@@ -128,7 +128,7 @@ class TestStrategyNodeIntegration:
         strategy_node, _ = strategy_node_and_mock_node_cli
         strategy_node: StrategyNode = strategy_node
         assert strategy_node.get_parameter('planner').value == strategy_node.DEFAULT_PLANNER_TYPE, "Planner type parameter should be initialized to default value"
-        assert strategy_node.get_parameter('max_tactical_waypoints').value == strategy_node.DEFAULT_MAX_TACTICAL_WAYPOINTS
+        assert strategy_node.get_parameter('max_mission_waypoints').value == strategy_node.DEFAULT_MAX_MISSION_WAYPOINTS
         assert strategy_node.get_parameter('plan_check_frequency').value == strategy_node.DEFAULT_PLAN_CHECK_FREQUENCY
         assert strategy_node.get_parameter('path_deviation_tolerance').value == strategy_node.DEFAULT_PATH_DEVIATION_TOLERANCE
 
@@ -377,7 +377,7 @@ class TestStrategyNodeIntegration:
         assert action_client.wait_for_server(timeout_sec=5.0), "navigate_to_goal action server should be available"
 
         goal_msg = NavigateToGoal.Goal()
-        goal_msg.goal_waypoint = Waypoint(position=Point(x=8.0, y=8.0, z=0.0))
+        goal_msg.goal_waypoints = [Waypoint(position=Point(x=8.0, y=8.0, z=0.0))]
 
         send_future = action_client.send_goal_async(goal_msg)
         rclpy.spin_until_future_complete(cli_node, send_future, timeout_sec=10.0)
@@ -399,8 +399,10 @@ class TestStrategyNodeIntegration:
         assert isinstance(plan[-1], Path), "Published plan should be of type Path"
         assert plan[-1].poses, "Published plan should contain at least one waypoint"
 
-        assert fake_tactical_node.received_goals, \
-            "StrategyNode should have dispatched at least one waypoint to tactical_node/execute_mission"
+        assert len(fake_tactical_node.received_goals) == 1, \
+            "StrategyNode should have dispatched exactly one waypoint to tactical_node/execute_mission"
+        assert fake_tactical_node.received_goals[0].position.x == 8.0
+        assert fake_tactical_node.received_goals[0].position.y == 8.0
 
         # the fake tactical node resolves every leg instantly, so there's no
         # reliable window to catch strategy_node ACTIVE mid-mission here -
@@ -409,6 +411,198 @@ class TestStrategyNodeIntegration:
 
         action_client.destroy()
         cli_node.destroy_subscription(plan_sub)
+        cli_node.destroy_publisher(map_pub)
+        cli_node.destroy_publisher(agent_state_pub)
+
+    def test_navigate_to_goal_multi_waypoint_mission_via_cli(
+        self,
+        strategy_node_and_mock_node_cli: Tuple[StrategyNode, Node],
+        fake_tactical_node: FakeTacticalNode,
+    ):
+        """
+        @test integration_test test_navigate_to_goal_multi_waypoint_mission_via_cli
+        @brief A goal_waypoints list with more than one entry is dispatched
+        to tactical_node one leg at a time, in order, with no synthesized
+        intermediate waypoints in between.
+        """
+        strategy_node, cli_node = strategy_node_and_mock_node_cli
+        from nav_msgs.msg import OccupancyGrid
+        from hybraut_nav.msg import AgentState, Waypoint
+        from rclpy.publisher import Publisher
+        from geometry_msgs.msg import Pose, Point
+
+        map_pub: Publisher = cli_node.create_publisher(OccupancyGrid, '/map', map_qos)
+        agent_state_pub: Publisher = cli_node.create_publisher(AgentState, '/agent_state', world_state_qos)
+
+        sample_occupancy_grid = OccupancyGrid()
+        sample_occupancy_grid.header.frame_id = "map"
+        sample_occupancy_grid.info.resolution = 1.0
+        sample_occupancy_grid.info.width = 10
+        sample_occupancy_grid.info.height = 10
+        sample_occupancy_grid.info.origin.position.x = 0.0
+        sample_occupancy_grid.info.origin.position.y = 0.0
+        sample_occupancy_grid.data = [0] * 100  # 10x10 grid, all free
+
+        import time
+        agent_state_pub.publish(AgentState(pose=Pose(position=Point(x=1.0, y=1.0, z=0.0))))
+        time.sleep(0.05)
+        map_pub.publish(sample_occupancy_grid)
+        time.sleep(0.05)
+
+        action_client = ActionClient(cli_node, NavigateToGoal, '/hybraut_nav/strategy_node/navigate_to_goal')
+        assert action_client.wait_for_server(timeout_sec=5.0)
+
+        expected_positions = [(3.0, 3.0), (6.0, 6.0), (9.0, 9.0)]
+        goal_msg = NavigateToGoal.Goal()
+        goal_msg.goal_waypoints = [
+            Waypoint(position=Point(x=x, y=y, z=0.0)) for x, y in expected_positions
+        ]
+
+        send_future = action_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(cli_node, send_future, timeout_sec=10.0)
+        goal_handle = send_future.result()
+        assert goal_handle is not None and goal_handle.accepted
+
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(cli_node, result_future, timeout_sec=10.0)
+        result = result_future.result().result
+        assert result.success, f"Mission should complete successfully: {result.message}"
+
+        assert len(fake_tactical_node.received_goals) == len(expected_positions), \
+            "StrategyNode should have dispatched each goal_waypoint as its own leg, in order"
+        for received, (x, y) in zip(fake_tactical_node.received_goals, expected_positions):
+            assert received.position.x == x
+            assert received.position.y == y
+
+        action_client.destroy()
+        cli_node.destroy_publisher(map_pub)
+        cli_node.destroy_publisher(agent_state_pub)
+
+    def test_navigate_to_goal_rejects_unreachable_waypoint_via_cli(
+        self,
+        strategy_node_and_mock_node_cli: Tuple[StrategyNode, Node],
+        fake_tactical_node: FakeTacticalNode,
+    ):
+        """
+        @test integration_test test_navigate_to_goal_rejects_unreachable_waypoint_via_cli
+        @brief A goal_waypoints list where one leg is blocked by an
+        obstacle is rejected upfront - before any leg is ever dispatched
+        to tactical_node - and no intermediate waypoints are synthesized
+        to route around the obstacle.
+        """
+        strategy_node, cli_node = strategy_node_and_mock_node_cli
+        from nav_msgs.msg import OccupancyGrid
+        from hybraut_nav.msg import AgentState, Waypoint
+        from rclpy.publisher import Publisher
+        from geometry_msgs.msg import Pose, Point
+
+        map_pub: Publisher = cli_node.create_publisher(OccupancyGrid, '/map', map_qos)
+        agent_state_pub: Publisher = cli_node.create_publisher(AgentState, '/agent_state', world_state_qos)
+
+        # 10x10 grid, all free except a full obstacle row at y=5 - this
+        # makes it impossible for even an 8-connected planner to cross
+        # from y<5 to y>5 anywhere in the grid.
+        sample_occupancy_grid = OccupancyGrid()
+        sample_occupancy_grid.header.frame_id = "map"
+        sample_occupancy_grid.info.resolution = 1.0
+        sample_occupancy_grid.info.width = 10
+        sample_occupancy_grid.info.height = 10
+        sample_occupancy_grid.info.origin.position.x = 0.0
+        sample_occupancy_grid.info.origin.position.y = 0.0
+        data = [0] * 100
+        for x in range(10):
+            data[5 * 10 + x] = 100
+        sample_occupancy_grid.data = data
+
+        import time
+        agent_state_pub.publish(AgentState(pose=Pose(position=Point(x=1.0, y=2.0, z=0.0))))
+        time.sleep(0.05)
+        map_pub.publish(sample_occupancy_grid)
+        time.sleep(0.05)
+
+        action_client = ActionClient(cli_node, NavigateToGoal, '/hybraut_nav/strategy_node/navigate_to_goal')
+        assert action_client.wait_for_server(timeout_sec=5.0)
+
+        goal_msg = NavigateToGoal.Goal()
+        goal_msg.goal_waypoints = [
+            Waypoint(position=Point(x=2.0, y=2.0, z=0.0)),  # reachable (same side)
+            Waypoint(position=Point(x=8.0, y=8.0, z=0.0)),  # blocked by the row at y=5
+        ]
+
+        send_future = action_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(cli_node, send_future, timeout_sec=10.0)
+        goal_handle = send_future.result()
+        assert goal_handle is not None and goal_handle.accepted
+
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(cli_node, result_future, timeout_sec=10.0)
+        result = result_future.result().result
+
+        assert not result.success
+        assert "goal_waypoints[1]" in result.message
+        assert not fake_tactical_node.received_goals, \
+            "No leg should be dispatched to tactical_node when the route fails upfront validation"
+        assert not strategy_node.is_active()
+
+        action_client.destroy()
+        cli_node.destroy_publisher(map_pub)
+        cli_node.destroy_publisher(agent_state_pub)
+
+    def test_navigate_to_goal_rejects_empty_goal_waypoints_via_cli(
+        self,
+        strategy_node_and_mock_node_cli: Tuple[StrategyNode, Node],
+        fake_tactical_node: FakeTacticalNode,
+    ):
+        """
+        @test integration_test test_navigate_to_goal_rejects_empty_goal_waypoints_via_cli
+        @brief An empty goal_waypoints list is accepted at the action-goal
+        level (the same gate as today - _goal_cb doesn't inspect goal
+        content) but rejected from inside execute_callback, same
+        abort/message pattern as any other invalid mission.
+        """
+        strategy_node, cli_node = strategy_node_and_mock_node_cli
+        from nav_msgs.msg import OccupancyGrid
+        from hybraut_nav.msg import AgentState
+        from rclpy.publisher import Publisher
+        from geometry_msgs.msg import Pose, Point
+
+        map_pub: Publisher = cli_node.create_publisher(OccupancyGrid, '/map', map_qos)
+        agent_state_pub: Publisher = cli_node.create_publisher(AgentState, '/agent_state', world_state_qos)
+
+        sample_occupancy_grid = OccupancyGrid()
+        sample_occupancy_grid.header.frame_id = "map"
+        sample_occupancy_grid.info.resolution = 1.0
+        sample_occupancy_grid.info.width = 10
+        sample_occupancy_grid.info.height = 10
+        sample_occupancy_grid.data = [0] * 100
+
+        import time
+        agent_state_pub.publish(AgentState(pose=Pose(position=Point(x=1.0, y=1.0, z=0.0))))
+        time.sleep(0.05)
+        map_pub.publish(sample_occupancy_grid)
+        time.sleep(0.05)
+
+        action_client = ActionClient(cli_node, NavigateToGoal, '/hybraut_nav/strategy_node/navigate_to_goal')
+        assert action_client.wait_for_server(timeout_sec=5.0)
+
+        goal_msg = NavigateToGoal.Goal()
+        goal_msg.goal_waypoints = []
+
+        send_future = action_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(cli_node, send_future, timeout_sec=10.0)
+        goal_handle = send_future.result()
+        assert goal_handle is not None and goal_handle.accepted
+
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(cli_node, result_future, timeout_sec=10.0)
+        result = result_future.result().result
+
+        assert not result.success
+        assert "empty" in result.message.lower()
+        assert not fake_tactical_node.received_goals
+        assert not strategy_node.is_active()
+
+        action_client.destroy()
         cli_node.destroy_publisher(map_pub)
         cli_node.destroy_publisher(agent_state_pub)
 

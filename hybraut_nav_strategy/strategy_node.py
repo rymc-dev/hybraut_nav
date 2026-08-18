@@ -4,29 +4,33 @@
 Layer one of the hybraut navigation stack: the global planner.
 
 This node subscribes to global cost map updates and agent states. On a
-`navigate_to_goal` action goal it plans a global path (A*) from the agent's
-current position to the requested overall target, downsamples it into a
-bounded list of intermediate waypoints, and
-dispatches them to layer two (the local planner hybrid automaton) **one at
-a time**, via `tactical_node`'s own `execute_mission` action
+`navigate_to_goal` action goal it takes the caller-supplied ordered list
+of goal waypoints (`goal_waypoints`) as-is - no intermediate waypoints are
+ever synthesized - checks each one is in bounds and that each consecutive
+leg (agent's current position -> goal_waypoints[0] -> goal_waypoints[1]
+-> ... -> goal_waypoints[-1]) is reachable via the currently configured
+global planner (A* today; see the `planner` param and
+`hybraut_nav_strategy.path_planning.PlannerType`), and then dispatches
+them to layer two (the local planner hybrid automaton) **one at a time**,
+via `tactical_node`'s own `execute_mission` action
 (`hybraut_nav/action/ExecuteMission`) - sending one leg, awaiting its
-result, then sending the next, until the route is exhausted.
+result, then sending the next, until the list is exhausted.
 
 While a mission is active, this node also checks the agent's position
-against the stored global plan at a slow frequency. If it has drifted past
-a tolerance, it cancels whatever leg is currently in flight and replans
-from the agent's current position to the same overall goal, discarding
-whatever was left of the old route.
+against a straight line from wherever the currently-dispatching leg
+started to its target, at a slow frequency. If it has drifted past a
+tolerance, it cancels whatever leg is currently in flight and re-checks
+only that one leg's reachability from the agent's current position -
+resuming the same target if it is still reachable, aborting the mission
+otherwise. The caller-supplied goal_waypoints list itself is never
+altered.
 
 This node's own `navigate_to_goal` action streams feedback covering both
 the live state of whichever leg is currently executing (relayed straight
 from tactical_node's own feedback) and mission-level progress across the
-whole route - the planned waypoint list, elapsed time since the mission
-started, an estimated time remaining, and overall distance-based progress.
-
-UML Reference:
-    See state machine diagram: ./diagrams/strategy_node_state_machine.puml
-    See class diagram: .diagrams/strategy_node_class_class_diagram.uml
+whole route - the caller's own waypoint list, elapsed time since the
+mission started, an estimated time remaining, and overall distance-based
+progress.
 """
 
 import os
@@ -55,7 +59,7 @@ from hybraut_nav.action import ExecuteMission, NavigateToGoal
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from hybraut_nav_strategy.path_planning import (
     Planner, Grid as PlannerGrid, Point as PlannerPoint,
-    PlannerType, downsample_path, distance_to_path,
+    PlannerType, distance_to_path,
 )
 
 from hybraut_nav.qos import map_qos, world_state_qos
@@ -75,11 +79,15 @@ class StrategyNode(Node):
     """
     Global planner for the Hybraut_nav navigation stack.
 
-    Plans a global path relative to the agent's current state to a goal
-    waypoint using A*, then dispatches it to the Tactical Layer (layer two)
-    one waypoint at a time via that layer's own `execute_mission` action,
-    replanning from scratch if the agent drifts too far off the stored
-    route.
+    Takes a caller-supplied ordered list of goal waypoints for a mission,
+    checks each one is in bounds and that each consecutive leg is
+    reachable via the configured planner (A* today - see the `planner`
+    param), then dispatches them to the Tactical Layer (layer two) one
+    waypoint at a time, in order, via that layer's own `execute_mission`
+    action - no intermediate waypoints are ever synthesized between the
+    caller's own waypoints. If the agent drifts too far off the leg it is
+    currently executing, only that one leg's reachability is re-checked
+    from the agent's current position before resuming.
 
     This is Layer one of the HybrautNav navigation stack, generating optimal
     trajectories over the static cost map layer - a continuous representation
@@ -103,20 +111,19 @@ class StrategyNode(Node):
 
     # Parameter Defaults
     DEFAULT_PLANNER_TYPE: str = PlannerType.ASTAR.value  # DEFAULT planner type is A*
-    DEFAULT_MAX_TACTICAL_WAYPOINTS: int = 8              # cap on legs dispatched per plan
+    DEFAULT_MAX_MISSION_WAYPOINTS: int = 8                # cap on goal_waypoints accepted per mission
     DEFAULT_PLAN_CHECK_FREQUENCY: float = 0.2            # Hz - deviation check every 5s
-    DEFAULT_PATH_DEVIATION_TOLERANCE: float = 0.5        # metres off the global plan before replanning
+    DEFAULT_PATH_DEVIATION_TOLERANCE: float = 0.5        # metres off the current leg before re-checking it
 
     # World State Variables
     _map: Optional[PlannerGrid] = None            # latest cost map, converted for planning
     _start_point: Optional[PlannerPoint] = None    # latest agent position, converted for planning
 
     # Mission State Variables - all reset together in _clear_mission_state()
-    _goal_waypoint: Optional[Waypoint] = None      # overall target of the active mission, if any
-    _global_path: Optional[Path] = None            # full-resolution planned path, for deviation checks
-    _route_waypoints: List[Waypoint] = None        # current downsampled route, dispatched one at a time
+    _route_waypoints: List[Waypoint] = None        # caller-supplied ordered goal_waypoints, dispatched one at a time verbatim (never mutated)
     _segment_lengths: List[float] = None           # per-leg length of _route_waypoints, for progress/ETA
     _current_waypoint_index: int = 0               # index into _route_waypoints of the leg now executing
+    _current_leg_start_point: Optional[PlannerPoint] = None  # world position the current leg started from (previous waypoint's position, or the agent's position when the leg began) - baseline for _plan_check_cb's deviation check
     _mission_start_time = None                     # rclpy.time.Time - when the active mission's goal was accepted
     _active_mission_goal_handle = None              # ServerGoalHandle for the in-flight navigate_to_goal goal
     _tactical_goal_handle = None                    # ClientGoalHandle for the in-flight tactical leg, if any
@@ -128,7 +135,7 @@ class StrategyNode(Node):
     _planner: Optional[Planner] = None      # planner class instance utilized for making path planning
 
     # publishers
-    _plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>> - downsampled dispatch route, for observability
+    _plan_pub: Optional[Publisher] = None        # <<nav_msgs/msg/Path>> - the mission's goal_waypoints as a polyline, for observability
     _goal_pose_pub: Optional[Publisher] = None   # <<geometry_msgs/msg/PoseStamped>>
 
     # subscriptions
@@ -216,14 +223,19 @@ class StrategyNode(Node):
             )
         )
         self.declare_parameter(
-            'max_tactical_waypoints',
-            self.DEFAULT_MAX_TACTICAL_WAYPOINTS,
+            'max_mission_waypoints',
+            self.DEFAULT_MAX_MISSION_WAYPOINTS,
             ParameterDescriptor(
-                description='Maximum number of intermediate waypoints (legs) '
-                           'dispatched to the tactical layer per plan. Must '
-                           'stay comfortably below the tactical layer\'s '
-                           'waypoint_buffer_len. '
-                           f'(default: {self.DEFAULT_MAX_TACTICAL_WAYPOINTS})'
+                description='Maximum number of goal_waypoints (legs) '
+                           'accepted in a single navigate_to_goal mission. '
+                           'Each waypoint triggers its own reachability '
+                           'check via the configured planner before the '
+                           'mission starts (see `planner`), so this bounds '
+                           'worst-case upfront planning cost. Unrelated to '
+                           'the tactical layer\'s own waypoint_buffer_len '
+                           '(that\'s a per-leg COLAV local-avoidance '
+                           'buffer depth, not a mission-level leg count). '
+                           f'(default: {self.DEFAULT_MAX_MISSION_WAYPOINTS})'
             )
         )
         self.declare_parameter(
@@ -304,9 +316,9 @@ class StrategyNode(Node):
 
     def __init_publishers__(self):
         """
-        Create topic publishers for the downsampled dispatch route (purely
-        for observability - the tactical layer is fed one waypoint at a
-        time via the execute_mission action, not via this topic) and goal
+        Create topic publishers for the mission's route (purely for
+        observability - the tactical layer is fed one waypoint at a time
+        via the execute_mission action, not via this topic) and goal
         poses.
 
         Args:
@@ -464,18 +476,6 @@ class StrategyNode(Node):
 
         return True, ""
 
-    def _plan(self, goal_pose: PoseStamped) -> Optional[Path]:
-        """
-        Plans a global path from the agent's current position to
-        `goal_pose` using the currently configured planner.
-
-        Returns:
-            The dense nav_msgs/Path from the planner, or None if no path
-            was found.
-        """
-        goal_pt = PlannerPoint.from_ros_msg(goal_pose)
-        return self._planner.plan_path(self._map, self._start_point, goal_pt)
-
     """ === World State Callback Functions === """
 
     def _map_rcv_cb(self, msg: OccupancyGrid):
@@ -531,15 +531,25 @@ class StrategyNode(Node):
 
     async def _execute_mission_cb(self, goal_handle) -> NavigateToGoal.Result:
         """
-        Drives one whole mission: plans a route to the goal, then dispatches
-        it to the tactical layer one leg at a time until the route is
-        exhausted, canceled, or fails - replanning in place if the agent
-        drifts off the stored route mid-mission (see _plan_check_cb).
+        Drives one whole mission: validates the caller-supplied
+        goal_waypoints list (each waypoint in-bounds, and each consecutive
+        leg reachable via the configured planner - see
+        _validate_route/_check_leg_reachable), adopts it as
+        _route_waypoints verbatim (no downsampling, no synthesized
+        intermediates), then dispatches it to the tactical layer one leg
+        at a time until the list is exhausted, canceled, or fails. If the
+        agent drifts off the leg it is currently executing mid-mission
+        (see _plan_check_cb), this re-checks only that one leg's
+        reachability from the agent's current position and resumes the
+        same target if it is still reachable, aborting the mission
+        otherwise - the caller-supplied goal_waypoints list itself is
+        never mutated.
 
         This single coroutine is the only place that ever mutates route
-        state (_route_waypoints/_segment_lengths/_current_waypoint_index) -
-        _plan_check_cb only flags a replan and cancels the in-flight leg to
-        interrupt it promptly, it never touches the route itself.
+        state (_route_waypoints/_segment_lengths/_current_waypoint_index/
+        _current_leg_start_point) - _plan_check_cb only flags a replan and
+        cancels the in-flight leg to interrupt it promptly, it never
+        touches the route itself.
         """
         request = goal_handle.request
         self._mission_start_time = self.get_clock().now()
@@ -548,32 +558,48 @@ class StrategyNode(Node):
         self._replan_requested = False
         self._cancel_sent_for_active_leg = False
 
-        ok, message = await self._plan_and_set_route(request.goal_waypoint)
+        ok, message = await self._start_mission_route(list(request.goal_waypoints))
         if not ok:
             self.get_logger().warning(f"Mission rejected: {message}")
             goal_handle.abort()
             self._clear_mission_state()
             return NavigateToGoal.Result(success=False, message=message)
 
-        self._start_plan_check_timer()
+        # Deviation-triggered replanning disabled for now - it was breaking
+        # the sim flow. Implementation (this timer, _plan_check_cb, and the
+        # CANCELED_FOR_REPLAN branch below) is left in place for a future
+        # version; just not started.
+        # self._start_plan_check_timer()
 
         while self._current_waypoint_index < len(self._route_waypoints):
             target = self._route_waypoints[self._current_waypoint_index]
             outcome, detail = await self._run_leg(target, request.mission_tag)
 
             if outcome is _LegOutcome.REACHED:
+                self._current_leg_start_point = PlannerPoint(target.position.x, target.position.y)
                 self._current_waypoint_index += 1
 
             elif outcome is _LegOutcome.CANCELED_FOR_REPLAN:
-                self.get_logger().info("Deviated from planned route - replanning")
+                self.get_logger().info(
+                    f"Deviated from leg {self._current_waypoint_index} - re-checking its reachability"
+                )
                 self._replan_requested = False
-                ok, message = await self._plan_and_set_route(request.goal_waypoint)
-                if not ok:
-                    self.get_logger().error(f"Replan failed: {message}")
+                reachable, reach_detail = await self._check_leg_reachable(self._start_point, target)
+                if not reachable:
+                    self.get_logger().error(
+                        f"Leg {self._current_waypoint_index} no longer reachable after deviation: {reach_detail}"
+                    )
                     self._stop_plan_check_timer()
                     goal_handle.abort()
                     self._clear_mission_state()
-                    return NavigateToGoal.Result(success=False, message=f"Replan failed: {message}")
+                    return NavigateToGoal.Result(
+                        success=False,
+                        message=(
+                            f"Mission aborted: leg {self._current_waypoint_index} "
+                            f"unreachable after deviation: {reach_detail}"
+                        ),
+                    )
+                self._current_leg_start_point = self._start_point
 
             elif outcome is _LegOutcome.CANCELED_BY_USER:
                 self._stop_plan_check_timer()
@@ -704,56 +730,145 @@ class StrategyNode(Node):
 
     """ === planning / route management === """
 
-    async def _plan_and_set_route(self, goal_waypoint: Waypoint) -> Tuple[bool, str]:
+    async def _start_mission_route(self, goal_waypoints: List[Waypoint]) -> Tuple[bool, str]:
         """
-        (Re)plans a global route from the agent's current position to
-        goal_waypoint, downsamples it, and replaces _route_waypoints/
-        _current_waypoint_index/_segment_lengths/_global_path with the
-        result. Used both for the initial plan on mission start and for
-        every replan mid-mission - a replan discards the previous route
-        wholesale rather than splicing it, same as before.
+        Validates a caller-supplied goal_waypoints list (see
+        _validate_route) and, if it passes, adopts it as this mission's
+        route verbatim: _route_waypoints becomes the list itself (no
+        downsampling, no synthesized intermediates - see module
+        docstring), _current_waypoint_index resets to 0, and
+        _current_leg_start_point is set to the agent's current position
+        (the start of leg 0). Publishes the adopted route for
+        observability (see _publish_route_observability).
         """
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.pose.position = goal_waypoint.position
-
-        valid, message = self._validate_goal(goal_pose)
+        valid, message = await self._validate_route(goal_waypoints)
         if not valid:
             return False, message
 
-        try:
-            path = self._plan(goal_pose)
-        except Exception as e:
-            return False, f"Planning failed: {str(e)}"
-
-        if path is None or len(path.poses) < 2:
-            return False, "Planner found no valid path to goal"
-
-        max_waypoints = int(self.get_parameter('max_tactical_waypoints').value)
-        downsampled = downsample_path(path, max_waypoints)
-        if not downsampled.poses:
-            return False, "Downsampled plan produced no waypoints"
-
-        self._goal_waypoint = goal_waypoint
-        self._global_path = path
-        self._route_waypoints = [
-            Waypoint(position=pose.pose.position) for pose in downsampled.poses
-        ]
+        self._route_waypoints = list(goal_waypoints)
         self._current_waypoint_index = 0
+        self._current_leg_start_point = self._start_point
         self._segment_lengths = self._compute_segment_lengths()
 
-        downsampled.header.stamp = self.get_clock().now().to_msg()
-        self._plan_pub.publish(downsampled)
-        self._goal_pose_pub.publish(goal_pose)
+        self._publish_route_observability()
+        return True, ""
+
+    async def _validate_route(self, goal_waypoints: List[Waypoint]) -> Tuple[bool, str]:
+        """
+        Upfront validation of a caller-supplied goal_waypoints list before
+        any mission is started: rejects an empty list, a list longer than
+        max_mission_waypoints, any waypoint outside the cost map bounds,
+        and - via _check_leg_reachable - any consecutive pair (agent's
+        current position -> goal_waypoints[0] -> goal_waypoints[1] -> ...
+        -> goal_waypoints[-1]) that the configured planner can't find a
+        path between. Never synthesizes intermediate waypoints to patch
+        around a failure - a leg that can't be reached just fails the
+        whole mission upfront, same fail-fast-before-starting behavior as
+        before.
+        """
+        if not goal_waypoints:
+            return False, "Cannot start mission: goal_waypoints is empty"
+
+        max_waypoints = int(self.get_parameter('max_mission_waypoints').value)
+        if len(goal_waypoints) > max_waypoints:
+            return False, (
+                f"Cannot start mission: {len(goal_waypoints)} goal_waypoints "
+                f"exceeds max_mission_waypoints ({max_waypoints})"
+            )
+
+        if self._start_point is None or self._map is None:
+            return False, "Cannot start mission: missing world state data (agent pose or cost map)"
+
+        for i, wp in enumerate(goal_waypoints):
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.pose.position = wp.position
+            valid, message = self._validate_goal(pose)
+            if not valid:
+                return False, f"goal_waypoints[{i}]: {message}"
+
+        leg_start = self._start_point
+        for i, wp in enumerate(goal_waypoints):
+            reachable, detail = await self._check_leg_reachable(leg_start, wp)
+            if not reachable:
+                prev_desc = "the agent's current position" if i == 0 else f"goal_waypoints[{i - 1}]"
+                return False, f"Cannot start mission: goal_waypoints[{i}] not reachable from {prev_desc} ({detail})"
+            leg_start = PlannerPoint(wp.position.x, wp.position.y)
 
         return True, ""
 
+    async def _check_leg_reachable(self, start: PlannerPoint, target: Waypoint) -> Tuple[bool, str]:
+        """
+        Runs the configured planner (A* today - see the `planner` param
+        and PlannerType) from `start` to `target`'s position purely as a
+        reachability probe - the dense path it returns is discarded
+        immediately, never turned into intermediate waypoints. Used both
+        for the upfront whole-list check in _validate_route and for the
+        single-leg recheck on deviation (see _execute_mission_cb's
+        CANCELED_FOR_REPLAN branch). Kept `async` (with no `await` inside
+        today, same as this file's previous planning helper) so a future,
+        slower planner (e.g. RRT) can add real cooperative yielding here
+        without changing this method's call sites.
+
+        Returns:
+            (True, "") if reachable, else (False, <reason>).
+        """
+        goal_pt = PlannerPoint(target.position.x, target.position.y)
+        try:
+            path = self._planner.plan_path(self._map, start, goal_pt)
+        except Exception as e:
+            return False, f"planning failed: {str(e)}"
+        if path is None or len(path.poses) < 2:
+            return False, "no valid path found"
+        return True, ""
+
+    def _publish_route_observability(self):
+        """
+        Publishes the agent's start position plus the caller-supplied
+        goal_waypoints as a straight polyline through the actual dispatch
+        targets on planner/plan, and the final waypoint as
+        planner/goal_pose - purely for observability (the tactical layer
+        is fed one waypoint at a time via the execute_mission action, not
+        via this topic - see __init_publishers__). Local avoidance
+        between consecutive waypoints is handled entirely by the
+        tactical/COLAV layer, so this deliberately does not attempt to
+        show a pre-planned dense trace. The start position is included so
+        the path is a real polyline (>= 2 poses) even for a single-
+        waypoint mission - otherwise a Path with just the one goal pose
+        has nothing for rviz's Path display to draw a line between.
+        """
+        stamp = self.get_clock().now().to_msg()
+
+        path = Path()
+        path.header.frame_id = 'map'
+        path.header.stamp = stamp
+        if self._current_leg_start_point is not None:
+            start_pose = PoseStamped()
+            start_pose.header.frame_id = 'map'
+            start_pose.pose.position.x = self._current_leg_start_point.x
+            start_pose.pose.position.y = self._current_leg_start_point.y
+            path.poses.append(start_pose)
+        for wp in self._route_waypoints:
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.pose.position = wp.position
+            path.poses.append(pose)
+        self._plan_pub.publish(path)
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.header.stamp = stamp
+        goal_pose.pose.position = self._route_waypoints[-1].position
+        self._goal_pose_pub.publish(goal_pose)
+
     def _compute_segment_lengths(self) -> List[float]:
         """Euclidean length of each leg in _route_waypoints, in order,
-        starting from the agent's position at (re)plan time - index-aligned
-        with _route_waypoints, so segment_lengths[i] is the length of the
-        leg ending at route_waypoints[i]. Used for _publish_strategy_feedback's
-        distance-based progress/ETA."""
+        starting from the agent's position when the mission started - this
+        is now only computed once, at mission start (a deviation recheck
+        no longer changes the route, so it never needs recomputing) -
+        index-aligned with _route_waypoints, so segment_lengths[i] is the
+        length of the leg ending at route_waypoints[i]. Used for
+        _publish_strategy_feedback's distance-based progress/ETA."""
         if self._start_point is None or not self._route_waypoints:
             return []
         lengths = []
@@ -765,11 +880,10 @@ class StrategyNode(Node):
         return lengths
 
     def _clear_mission_state(self):
-        self._goal_waypoint = None
-        self._global_path = None
         self._route_waypoints = []
         self._segment_lengths = []
         self._current_waypoint_index = 0
+        self._current_leg_start_point = None
         self._active_mission_goal_handle = None
         self._tactical_goal_handle = None
         self._mission_start_time = None
@@ -782,30 +896,57 @@ class StrategyNode(Node):
     async def _plan_check_cb(self):
         """
         Slow-frequency timer: checks the agent's current position against
-        the stored global plan and, if it's drifted past
-        path_deviation_tolerance, flags a replan and cancels whatever
+        a straight-line segment from wherever the currently-dispatching
+        leg started (_current_leg_start_point) to its target
+        (_route_waypoints[_current_waypoint_index]) and, if it has drifted
+        past path_deviation_tolerance, flags a replan and cancels whatever
         tactical leg is currently in flight to interrupt it promptly. The
-        actual replanning happens back in _execute_mission_cb's drive loop
-        once that leg's cancellation comes back - not here, so there's only
-        ever one place mutating route state (see its docstring).
+        actual re-check of that one leg's reachability happens back in
+        _execute_mission_cb's drive loop once that leg's cancellation
+        comes back - not here, so there's only ever one place mutating
+        route state (see its docstring). No dense global path is stored
+        anymore (see module docstring) - this builds a small on-the-fly
+        2-pose Path each tick instead of reading a cached one.
         """
         if not self.is_active() or self._replan_requested:
             return
-        if self._start_point is None or self._global_path is None or not self._global_path.poses:
+        if (self._start_point is None
+                or self._current_leg_start_point is None
+                or not self._route_waypoints
+                or self._current_waypoint_index >= len(self._route_waypoints)):
             return
 
-        deviation = distance_to_path(self._start_point, self._global_path)
+        target = self._route_waypoints[self._current_waypoint_index]
+        leg_path = self._build_leg_segment(self._current_leg_start_point, target)
+
+        deviation = distance_to_path(self._start_point, leg_path)
         tolerance = float(self.get_parameter('path_deviation_tolerance').value)
         if deviation <= tolerance:
             return
 
         self.get_logger().warning(
-            f"Deviation {deviation:.2f}m exceeds tolerance {tolerance:.2f}m - replanning"
+            f"Deviation {deviation:.2f}m exceeds tolerance {tolerance:.2f}m - "
+            "re-checking current leg's reachability"
         )
         self._replan_requested = True
         if self._tactical_goal_handle is not None and not self._cancel_sent_for_active_leg:
             self._cancel_sent_for_active_leg = True
             self._tactical_goal_handle.cancel_goal_async()
+
+    def _build_leg_segment(self, start: PlannerPoint, target: Waypoint) -> Path:
+        """Builds a minimal 2-pose nav_msgs/Path from `start` to `target`'s
+        position - just enough for distance_to_path to measure cross-track
+        deviation against the current leg's straight-line path, since no
+        dense global path is stored anymore (see module docstring)."""
+        path = Path()
+        path.header.frame_id = 'map'
+        for x, y in ((start.x, start.y), (target.position.x, target.position.y)):
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.pose.position.x = x
+            pose.pose.position.y = y
+            path.poses.append(pose)
+        return path
 
     def _start_plan_check_timer(self):
         if self._plan_check_timer.is_canceled():

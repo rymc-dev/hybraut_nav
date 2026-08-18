@@ -1,6 +1,5 @@
-# controller_node.py
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Implementation of the Guidance and Control Layer (Layer 3) of the HybrautNav 
 Navigation Stack.
@@ -34,42 +33,38 @@ published instead of the last real command, so the robot doesn't keep
 coasting once the tactical layer is done.
 """
 
-import math
-from typing import Optional
-
-from rclpy.callback_groups import ReentrantCallbackGroup
 import os
+from typing import Optional
 
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.duration import Duration
-from rclpy.qos import qos_profile_system_default
+from rclpy.qos import (
+    qos_profile_system_default,
+    QoSProfile,
+    HistoryPolicy,
+    ReliabilityPolicy,
+    DurabilityPolicy,
+)
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.subscription import Subscription
 from rclpy.publisher import Publisher
-from rcl_interfaces.msg import ParameterDescriptor
-from rclpy.qos import QoSProfile, HistoryPolicy, ReliabilityPolicy, DurabilityPolicy
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
-from geometry_msgs.msg import TwistStamped, TransformStamped, Twist
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-
-from hybraut_nav.qos import world_state_qos
-
 from std_msgs.msg import Float64MultiArray
 
+from hybraut_nav.qos import world_state_qos
 from hybraut_nav_utils import quaternion_to_heading
 
 from .controller import ControllerType, Controller
-
-from rcl_interfaces.msg import ParameterType
 
 DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
 DEFAULT_CRUISE_SPEED: float = 7.2 # m/s = 15 knots
 DEFAULT_YAW_RATE_LIMIT: float = 0.5 # yaw rate
 DEFAULT_CONTINUOUS_DYNAMICS_TIMEOUT: float = 0.5  # s
-
-import numpy as np
 
 
 class ImmediateNode(Node):
@@ -205,7 +200,7 @@ class ImmediateNode(Node):
     def __init_publishers__(self):
         self.cmd_vel_pub = self.create_publisher(
             Twist,  # msg_type
-            '/cmd_vel',   # This is the output topic for turtlebot3's differential drive for giving target linear velocity and yaw rate
+            '/cmd_vel',               
             qos_profile=QoSProfile(
                 history=HistoryPolicy.KEEP_LAST,
                 depth=10,
@@ -242,9 +237,8 @@ class ImmediateNode(Node):
     def get_continuous_dynamics_timeout(self) -> float:
         return self.get_parameter('continuous_dynamics_timeout').value
 
-    """ === setters === """
-    def set_controller_frequency(self, new_frequency: float):
-        ...
+    def get_yaw_rate_limit(self) -> float:
+        return self.get_parameter('yaw_rate_limit').value
 
     """ === callbacks === """
     def control_loop(self):
@@ -272,6 +266,12 @@ class ImmediateNode(Node):
         except Exception as e:
             self.get_logger().error(f"Controller step failed: {e}")
             return
+
+        # Final safety clamp - enforced here regardless of whether the
+        # active Controller subclass applies its own internal limit, so
+        # yaw_rate_limit is honored uniformly across controller types.
+        yaw_rate_limit = self.get_yaw_rate_limit()
+        commanded_yaw_rate = max(-yaw_rate_limit, min(yaw_rate_limit, commanded_yaw_rate))
 
         self._publish_cmd_vel(commanded_yaw_rate, self.get_desired_velocity())
 
@@ -303,11 +303,6 @@ class ImmediateNode(Node):
         self.desired_yaw_rate = yaw_rate
 
         twist = Twist()
-        # twist.header.stamp = self.get_clock().now().to_msg()
-        # twist.header.frame_id = 'odom'
-        # twist.twist.angular.z = yaw_rate
-        # twist.twist.linear.x = linear_velocity
-
         twist.angular.z = yaw_rate
         twist.linear.x = linear_velocity
 
@@ -320,9 +315,6 @@ class ImmediateNode(Node):
             orientation.x, orientation.y, orientation.z, orientation.w
         )
         self.ctrl.update_state(current_heading)
-
-    def base_link_cb(self, msg: Twist):
-        self.base_link_state = msg
 
 
 def main(args=None):

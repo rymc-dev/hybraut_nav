@@ -1,19 +1,27 @@
 
 # NavigateToGoal.action
 # ROS2 action interface for strategy_node (Layer 1 - global planning). One
-# goal = the whole mission: a single overall target. strategy_node plans a
-# global route to it, then dispatches the resulting waypoints to
-# tactical_node's own execute_mission action one leg at a time (see
-# hybraut_nav/action/ExecuteMission.action) until the route is
-# exhausted, replanning from the agent's current position if it drifts off
-# the stored route mid-mission. Feedback carries both the live state of
-# whichever leg is currently executing (relayed from tactical_node's own
-# feedback) and mission-level progress across the whole route.
+# goal = the whole mission: an ordered list of goal waypoints (legs) the
+# agent must visit in sequence. Each waypoint is checked for reachability
+# (via the currently configured global planner - see the `planner` ROS
+# param and hybraut_nav_strategy.path_planning.PlannerType) from wherever
+# the previous leg ends, before any of them are ever dispatched - no
+# intermediate waypoints are synthesized between caller-supplied
+# waypoints; a leg that can't be reached is reported, not patched around.
+# strategy_node dispatches the list to tactical_node's own execute_mission
+# action (see hybraut_nav/action/ExecuteMission.action) one leg at a time,
+# in order, until it is exhausted. If the agent drifts off the leg it is
+# currently executing, only that one leg's reachability is re-checked from
+# the agent's current position before resuming the same target - the
+# caller-supplied goal_waypoints list itself is never altered. Feedback
+# carries both the live state of whichever leg is currently executing
+# (relayed from tactical_node's own feedback) and mission-level progress
+# across the whole list.
 
 # Goal
 builtin_interfaces/Time stamp
 string mission_tag
-hybraut_nav/Waypoint goal_waypoint   # overall target (x, y) for the mission
+hybraut_nav/Waypoint[] goal_waypoints   # ordered list of goal waypoints (legs) to visit in sequence
 
 ---
 # Result
@@ -25,7 +33,7 @@ builtin_interfaces/Duration total_mission_duration   # wall-clock time from goal
 
 # Feedback
 # -- mission-level progress --
-hybraut_nav/Waypoint[] planned_waypoints          # current downsampled route (replaced wholesale on a replan)
+hybraut_nav/Waypoint[] planned_waypoints          # the caller-supplied goal_waypoints, echoed back as the active route (never mutated mid-mission)
 uint32 current_waypoint_index                          # index into planned_waypoints of the leg now executing
 float64 progress                                       # 0.0-1.0, distance-based fraction of the route completed
 builtin_interfaces/Duration elapsed_time                # time since this mission's goal was accepted

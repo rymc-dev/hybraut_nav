@@ -68,7 +68,8 @@ class TacticalNode(Node):
             acceptance_radius=self.get_parameter('acceptance_radius').value,
             los_distance_threshold=self.get_parameter('los_distance_threshold').value,
             longitudinal_offset_distance=self.get_parameter('longitudinal_offset_distance').value,
-            lateral_offset_distance=self.get_parameter('lateral_offset_distance').value
+            lateral_offset_distance=self.get_parameter('lateral_offset_distance').value,
+            fallback_timeout=self.get_parameter('fallback_timeout').value
         )
         self._dt = self.get_parameter('dt').value
         self._sensor_update_rate = self.get_parameter('sensor_update_rate').value
@@ -462,6 +463,25 @@ class TacticalNode(Node):
                 description='lateral_offset_distance. '
                         'lateral_offset_distance for resets for colav_automaton '
                         f'(default: {0.2})'
+            )
+        )
+        self.declare_parameter(
+            'fallback_timeout',
+            30.0,
+            ParameterDescriptor(
+                name='fallback_timeout',
+                type=ParameterType.PARAMETER_DOUBLE,
+                description='fallback_timeout. '
+                        'seconds the automaton may idle in Fallback (see '
+                        'fallback_recoverable_invariant) before the leg is '
+                        'reported as failed. Fallback\'s own flow just '
+                        'brakes/holds the reference heading and waits for '
+                        'safe_conditions_guard to clear - for a fast-closing '
+                        'encounter that can take longer than colav_automaton\'s '
+                        'own default (30.0) purely because the other vessel '
+                        'needs real time to move clear, not because the leg '
+                        'is genuinely stuck. '
+                        f'(default: {30.0})'
             )
         )
         self.declare_parameter(

@@ -89,8 +89,8 @@ target is reached (or cancel it early with `ros2 action cancel` /
 Ctrl-C while it's streaming feedback).
 
 For a real strategic-driven demo instead of the fixed 2-point route - where
-you set one long-range goal and `strategy_node` plans + dispatches the
-intermediate waypoints itself - see
+you send `strategy_node` an ordered list of goal waypoints and it checks
+and dispatches each one itself - see
 [Strategic-driven demo](#strategic-driven-demo) below.
 
 `immediate_node` needs no manual activation - its control loop always runs,
@@ -115,11 +115,12 @@ the room is too small/large for the defaults.
 ## Strategic-driven demo
 
 Instead of sending each leg's goal by hand (section 2), `strategy_node`
-accepts a single long-range goal via its own `navigate_to_goal` action,
-plans a global A* route to it, and dispatches the resulting waypoints to
-`tactical_node`'s `execute_mission` action one at a time itself - streaming
-back feedback that covers both the currently-active leg (relayed from
-`tactical_node`) and mission-level progress (the planned waypoint list,
+accepts an ordered list of goal waypoints via its own `navigate_to_goal`
+action, checks each leg is reachable via A* (no intermediate waypoints are
+synthesized - you get exactly the legs you sent), and dispatches them to
+`tactical_node`'s `execute_mission` action one at a time itself in order -
+streaming back feedback that covers both the currently-active leg (relayed
+from `tactical_node`) and mission-level progress (the waypoint list,
 elapsed time, an ETA, and overall completion fraction).
 
 Two live inputs `strategy_node` needs that a bare TB3 sim doesn't produce on
@@ -154,14 +155,16 @@ ros2 run hybraut_nav fake_map_publisher
 # terminal 4 - goal (immediate_node needs no manual activation anymore)
 ros2 action send_goal /hybraut_nav/strategy_node/navigate_to_goal \
     hybraut_nav/action/NavigateToGoal \
-    "{goal_waypoint: {position: {x: 3.0, y: 2.0}}}" --feedback
+    "{goal_waypoints: [{position: {x: 3.0, y: 2.0}}]}" --feedback
 ```
 
-`strategy_node` will dispatch each downsampled waypoint to `tactical_node`
-in turn as the previous one is reached, replanning in place if the agent
-drifts too far off the stored route, until the goal is reached. Cancel a
-mission early with `ros2 action cancel` (or Ctrl-C the send_goal call
-above).
+`strategy_node` will dispatch each of your `goal_waypoints` to
+`tactical_node` in order, one at a time, as the previous one is reached -
+checking each is reachable via A* before the mission starts, with no
+intermediate waypoints synthesized in between - re-checking the current leg
+only if the agent drifts too far off it, until the list is exhausted.
+Cancel a mission early with `ros2 action cancel` (or Ctrl-C the send_goal
+call above).
 
 ## Watching it work
 
