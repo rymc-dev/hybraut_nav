@@ -272,7 +272,7 @@ class RiskEnvelopeNode(Node):
             # nothing to draw (or too few vertices for a hull) - clear
             # whatever was there from the previous, non-empty envelope.
             clear = Marker()
-            clear.header.frame_id = 'map'
+            clear.header.frame_id = 'odom'
             clear.header.stamp = stamp
             clear.ns = 'riskenv'
             clear.action = Marker.DELETEALL
@@ -282,7 +282,7 @@ class RiskEnvelopeNode(Node):
         points = [Point(x=float(v[0]), y=float(v[1]), z=0.0) for v in riskenv_vertices]
 
         fill = Marker()
-        fill.header.frame_id = 'map'
+        fill.header.frame_id = 'odom'
         fill.header.stamp = stamp
         fill.ns = 'riskenv'
         fill.id = 0
@@ -295,7 +295,7 @@ class RiskEnvelopeNode(Node):
             fill.points.extend([points[0], points[i], points[i + 1]])
 
         outline = Marker()
-        outline.header.frame_id = 'map'
+        outline.header.frame_id = 'odom'
         outline.header.stamp = stamp
         outline.ns = 'riskenv'
         outline.id = 1

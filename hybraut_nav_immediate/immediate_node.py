@@ -67,7 +67,6 @@ from rcl_interfaces.msg import ParameterType
 DEFAULT_CONTROLLER_FREQUENCY: float = 100.0  # Hz
 DEFAULT_CRUISE_SPEED: float = 7.2 # m/s = 15 knots
 DEFAULT_YAW_RATE_LIMIT: float = 0.5 # yaw rate
-DEFAULT_DESIRED_HEADING: float = 0.0
 DEFAULT_CONTINUOUS_DYNAMICS_TIMEOUT: float = 0.5  # s
 
 import numpy as np
@@ -161,14 +160,6 @@ class ImmediateNode(Node):
             ),
         )
         self.declare_parameter(
-            'desired_heading',
-            DEFAULT_DESIRED_HEADING,
-            ParameterDescriptor(
-                description='Desired heading for the guidance controller currently',
-                type=ParameterType.PARAMETER_DOUBLE
-            )
-        )
-        self.declare_parameter(
             'yaw_rate_limit',
             DEFAULT_YAW_RATE_LIMIT,
             ParameterDescriptor(
@@ -203,18 +194,6 @@ class ImmediateNode(Node):
             qos_profile=qos_profile_system_default,
             callback_group=ReentrantCallbackGroup()
         )
-        # self.base_link_sub=self.create_subscription(
-        #     msg_type=TransformStamped,
-        #     topic='/base_link',
-        #     callback=lambda msg: self.base_link_cb(msg), 
-        #     qos_profile=None,
-        #     callback_group=ReentrantCallbackGroup()
-        # )
-
-        # TODO: continous_x state needs to be below
-        # tf2_ros.Buffer().lookup_transform("odom", "base_link") # APPLYS ROTATION THEN TRANSLATION
-
-
         self.continous_dynamics_sub = self.create_subscription(
             msg_type=Float64MultiArray,
             topic='/hybraut_nav/continous_dynamics',
@@ -259,9 +238,6 @@ class ImmediateNode(Node):
 
     def get_desired_velocity(self) -> float:
         return self.get_parameter('desired_velocity').value
-
-    def get_desired_heading(self) -> float:
-        return self.get_parameter('desired_heading').value
 
     def get_continuous_dynamics_timeout(self) -> float:
         return self.get_parameter('continuous_dynamics_timeout').value
